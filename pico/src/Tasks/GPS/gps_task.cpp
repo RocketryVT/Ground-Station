@@ -8,7 +8,7 @@
 #include <string.h>
 
 #define GPS_UART      uart1
-#define GPS_BAUD      38400
+#define GPS_BAUD      115200
 #define GPS_PUB_MS    1000   // publish rate cap (ms)
 
 static void gps_task( void* param )
@@ -16,9 +16,10 @@ static void gps_task( void* param )
     ( void ) param;
 
     // Initialise UART1 for NMEA at 9600 8N1
+    gpio_set_function(Pins::GPS_UART_TX, UART_FUNCSEL_NUM(GPS_UART, Pins::GPS_UART_TX));
+    gpio_set_function(Pins::GPS_UART_RX, UART_FUNCSEL_NUM(GPS_UART, Pins::GPS_UART_RX));
     uart_init( GPS_UART, GPS_BAUD );
-    gpio_set_function( Pins::GPS_UART_TX, GPIO_FUNC_UART );
-    gpio_set_function( Pins::GPS_UART_RX, GPIO_FUNC_UART );
+
     uart_set_hw_flow( GPS_UART, false, false );
     uart_set_format( GPS_UART, 8, 1, UART_PARITY_NONE );
     uart_set_fifo_enabled( GPS_UART, true );
@@ -27,10 +28,10 @@ static void gps_task( void* param )
                GPS_BAUD, Pins::GPS_UART_RX, Pins::GPS_UART_TX );
 
     gps::GPSParser parser;
-    TickType_t     last_pub = 0;
+    // TickType_t     last_pub = 0;
     bool           had_fix  = false;
 
-    char json[ 128 ];
+    // char json[ 128 ];
     char nmea_buf[ 128 ];
     int  nmea_len = 0;
 
@@ -68,27 +69,24 @@ static void gps_task( void* param )
             LocationMsg loc { c.latitude, c.longitude, c.altitude };
             xQueueOverwrite( g_gs_location_q, &loc );
 
-            TickType_t now = xTaskGetTickCount();
-            if ( ( now - last_pub ) >= pdMS_TO_TICKS( GPS_PUB_MS ) ) {
-                last_pub = now;
-
-                const gps::Coordinate& c = parser.getCoordinate();
-                snprintf( json, sizeof( json ),
-                          "{\"lat\":%.6f,\"lon\":%.6f,\"alt\":%.1f,\"sats\":%d}",
-                          c.latitude, c.longitude, c.altitude, c.satellites );
-
-                MqttMessage msg;
-                strncpy( msg.topic,   "rocket/gps", sizeof( msg.topic ) - 1 );
-                strncpy( msg.payload, json,          sizeof( msg.payload ) - 1 );
-
-                xQueueSend( g_mqtt_queue, &msg, pdMS_TO_TICKS( 50 ) );
-            }
+            // TickType_t now = xTaskGetTickCount();
+            // if ( ( now - last_pub ) >= pdMS_TO_TICKS( GPS_PUB_MS ) ) {
+            //     last_pub = now;
+            //     const gps::Coordinate& c = parser.getCoordinate();
+            //     snprintf( json, sizeof( json ),
+            //               "{\"lat\":%.6f,\"lon\":%.6f,\"alt\":%.1f,\"sats\":%d}",
+            //               c.latitude, c.longitude, c.altitude, c.satellites );
+            //     MqttMessage msg;
+            //     strncpy( msg.topic,   "rocket/gps", sizeof( msg.topic ) - 1 );
+            //     strncpy( msg.payload, json,          sizeof( msg.payload ) - 1 );
+            //     xQueueSend( g_mqtt_queue, &msg, pdMS_TO_TICKS( 50 ) );
+            // }
         } else if ( had_fix ) {
             log_print( "[gps] fix lost\n" );
             had_fix = false;
         }
 
-        vTaskDelay( pdMS_TO_TICKS( 10 ) );   // 100 Hz poll — comfortably drains 9600 baud FIFO
+        vTaskDelay( pdMS_TO_TICKS( 1 ) );   // 100 Hz poll — comfortably drains 9600 baud FIFO
     }
 }
 

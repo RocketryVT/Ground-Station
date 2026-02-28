@@ -41,6 +41,12 @@ if (NOT EXISTS "${LORA_ROOT}/CMakeLists.txt")
 endif()
 add_subdirectory(${LORA_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/lora)
 
+# lr11xx_hal.c includes FreeRTOS headers; the config header lives in this
+# project's include/ directory and must be forwarded to the library target.
+target_include_directories(lr11xx PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/include
+)
+
 # GPS NMEA parser library — provides the 'gps' target.
 if (NOT EXISTS "${GPS_ROOT}/CMakeLists.txt")
     message(FATAL_ERROR "GPS library not found at ${GPS_ROOT}. Set GPS_ROOT.")
