@@ -1,0 +1,5 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "active-drag-system")(type "KiCad")(uri "${KIPRJMOD}/active-drag-system.pretty")(options "")(descr ""))
+  (lib (name "footprints_logger")(type "KiCad")(uri "${KIPRJMOD}/footprints_logger.pretty")(options "")(descr ""))
+)
