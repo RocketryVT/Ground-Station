@@ -102,21 +102,6 @@ int main( void )
 {
     stdio_init_all();
 
-    // Wait for USB CDC to enumerate so the first log lines are not lost
-    while ( !stdio_usb_connected() ) {
-        sleep_ms( 100 );
-    }
-    sleep_ms( 500 );
-
-    printf( "=== Ground Station — LoRa + GPS + MQTT ===\n" );
-    printf( "    Board : Pico 2W (RP2350)\n" );
-    printf( "    LoRa  : SX1276  GPIO NSS=%u DIO0=%u RST=%u\n",
-            Pins::LORA_NSS, Pins::LORA_DIO0, Pins::LORA_RST );
-    printf( "    GPS   : UART1   GPIO RX=%u  TX=%u\n",
-            Pins::GPS_UART_RX, Pins::GPS_UART_TX );
-    printf( "    MQTT  : %s:%d  client=%s\n\n",
-            MQTT_BROKER_HOST, MQTT_BROKER_PORT, MQTT_CLIENT_ID );
-
     // Create shared synchronisation objects (statically backed)
     g_net_events = xEventGroupCreateStatic( &s_net_events_buf );
 
@@ -137,11 +122,11 @@ int main( void )
                                                &s_rocket_location_buf );
 
     // Spawn tasks (each allocates its own static TCB + stack internally)
-    wifi_task_init();
-    mqtt_task_init();
+    // wifi_task_init();
+    // mqtt_task_init();
     lora_task_init();
     gps_task_init();
-    servo_task_init();
+    // servo_task_init();
     usb_task_init();
 
     vTaskStartScheduler();

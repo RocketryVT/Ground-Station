@@ -14,7 +14,7 @@ struct LogMessage {
     char buf[ 256 ];
 };
 
-#define LOG_QUEUE_DEPTH  16
+#define LOG_QUEUE_DEPTH  64
 extern QueueHandle_t g_log_queue;
 
 // Printf-style logger — safe from any FreeRTOS task, never from ISR.
