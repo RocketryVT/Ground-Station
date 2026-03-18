@@ -1,0 +1,73 @@
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Root ──────────────────────────────────────────────────────────────────── */
+.root {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #E5E1E6;
+}
+
+/* ── Status bar ────────────────────────────────────────────────────────────── */
+.status-bar {
+  flex: 0 0 48px;
+  background: #861F41;
+  border-bottom: 2px solid #6b1834;
+}
+
+/* ── Content area below status bar ────────────────────────────────────────── */
+.content {
+  flex: 1 1 0;
+  min-height: 0;       /* critical — lets flex child shrink below content size */
+  padding: 4px;
+  background: #E5E1E6;
+}
+
+/* react-resizable-panels Group already sets height:100%/width:100%,
+   so .content just needs to be sized correctly above.                        */
+
+/* ── .fill — applied to Panel's inner div (via className prop) ─────────────
+   Ensures nested Groups and content fill the panel's available space.        */
+.fill {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Leaf panel wrapper ────────────────────────────────────────────────────── */
+.panel {
+  height: 100%;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #D7D2CB;
+  border-radius: 2px;
+}
+
+/* ── Resize handle ─────────────────────────────────────────────────────────── */
+.handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  outline: none;
+  background: transparent;
+}
+
+/* Horizontal separator (between vertical panels → horizontal bar) */
+[data-group][data-orientation="vertical"]   > .handle { height: 5px; cursor: row-resize;    width: 100%; }
+/* Vertical separator (between horizontal panels → vertical bar)   */
+[data-group][data-orientation="horizontal"] > .handle { width:  5px; cursor: col-resize; height: 100%; }
+
+.handle__bar {
+  background: #D7D2CB;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+[data-group][data-orientation="vertical"]   > .handle .handle__bar { width: 40px; height: 2px; }
+[data-group][data-orientation="horizontal"] > .handle .handle__bar { width: 2px; height: 40px; }
+
+.handle:hover  .handle__bar,
+.handle:active .handle__bar { background: #CA4F00; }
