@@ -23,6 +23,9 @@
 #define MEMP_NUM_TCP_SEG                16
 #define PBUF_POOL_SIZE                  24
 #define PBUF_POOL_BUFSIZE               1024
+// Default is auto-calculated from enabled features (~6) but does not include
+// MQTT client timers.  Set explicitly with headroom for DHCP+ARP+DNS+TCP+MQTT.
+#define MEMP_NUM_SYS_TIMEOUT            16
 
 // Protocol support
 #define LWIP_ARP                        1

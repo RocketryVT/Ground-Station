@@ -42,8 +42,9 @@ static void cmd_help()
 
 static void cmd_status()
 {
-    printf( "heap free  : %u B\n",
-            ( unsigned ) xPortGetFreeHeapSize() );
+    printf( "heap free  : %u B (min %u B)\n",
+            ( unsigned ) xPortGetFreeHeapSize(),
+            ( unsigned ) xPortGetMinimumEverFreeHeapSize() );
     printf( "wifi       : %s\n",
             ( xEventGroupGetBits( g_net_events ) & EVT_WIFI_CONNECTED ) ? "up" : "down" );
     printf( "mqtt       : %s\n",
@@ -141,10 +142,9 @@ static StackType_t  s_usb_stack[ 2048 ];
 
 void usb_task_init()
 {
-    TaskHandle_t h = xTaskCreateStatic( usb_task, "usb", 2048,
-                                         nullptr, tskIDLE_PRIORITY + 1,
-                                         s_usb_stack, &s_usb_tcb );
-    configASSERT( h );
     // TinyUSB IRQ fires on core 0; printf must live on the same core.
+    TaskHandle_t h = task_create( usb_task, "usb", 2048, nullptr,
+                                   tskIDLE_PRIORITY + 1,
+                                   s_usb_stack, &s_usb_tcb );
     vTaskCoreAffinitySet( h, 0x01 );
 }

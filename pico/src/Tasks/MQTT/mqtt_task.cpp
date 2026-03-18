@@ -103,7 +103,6 @@ static StackType_t  s_mqtt_stack[ 1024 ];
 
 void mqtt_task_init()
 {
-    configASSERT( xTaskCreateStatic( mqtt_task, "mqtt", 1024,
-                                      NULL, tskIDLE_PRIORITY + 2,
-                                      s_mqtt_stack, &s_mqtt_tcb ) );
+    task_create( mqtt_task, "mqtt", 1024, nullptr, tskIDLE_PRIORITY + 2,
+                  s_mqtt_stack, &s_mqtt_tcb );
 }

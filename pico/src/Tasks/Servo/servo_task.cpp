@@ -3,56 +3,117 @@
 
 #include "math_utils/GroundStationMath.h"
 
-#include "hardware/pwm.h"
 #include "hardware/gpio.h"
+#include "pico/time.h"
 
-// ── PWM constants ─────────────────────────────────────────────────────────────
-// 125 MHz system clock ÷ 125 clkdiv = 1 MHz counter clock.
-// Wrap at 20 000 → period = 20 ms = 50 Hz (standard hobby servo frequency).
-// Pulse width counts: 1 000 = 1 ms (full CCW), 1 500 = 1.5 ms (centre),
-//                     2 000 = 2 ms (full CW).
-static constexpr float    PWM_CLKDIV   = 125.0f;
-static constexpr uint32_t PWM_WRAP     = 19999;   // 0-indexed → 20 000 steps
-static constexpr uint16_t PULSE_MIN    = 1000;    // 1 ms
-static constexpr uint16_t PULSE_CENTER = 1500;    // 1.5 ms
-static constexpr uint16_t PULSE_MAX    = 2000;    // 2 ms
+// ── Command queue backing storage ─────────────────────────────────────────────
+QueueHandle_t g_servo1_cmd_q = nullptr;
+QueueHandle_t g_servo2_cmd_q = nullptr;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-// Map an angle (degrees) to a PWM pulse-width count, clamped to [min, max].
-static uint16_t angle_to_counts( double deg, double deg_min, double deg_max )
+static StaticQueue_t s_srv1_cmd_buf;
+static uint8_t       s_srv1_cmd_storage[ sizeof(ServoCmd) ];  // depth 1
+
+static StaticQueue_t s_srv2_cmd_buf;
+static uint8_t       s_srv2_cmd_storage[ sizeof(ServoCmd) ];  // depth 1
+
+// ── Hardware task config ───────────────────────────────────────────────────────
+struct ServoHwCfg {
+    uint           pul_p;
+    uint           pul_n;
+    uint           dir_p;
+    uint           dir_n;
+    QueueHandle_t* cmd_q_ptr;
+    const char*    tag;
+};
+
+// ── Step pulse helpers ────────────────────────────────────────────────────────
+static inline void set_direction( const ServoHwCfg* hw, bool forward )
 {
-    if ( deg < deg_min ) deg = deg_min;
-    if ( deg > deg_max ) deg = deg_max;
-    double t = ( deg - deg_min ) / ( deg_max - deg_min );
-    return static_cast<uint16_t>( PULSE_MIN + t * ( PULSE_MAX - PULSE_MIN ) );
+    gpio_put( hw->dir_p, forward ? 1u : 0u );
+    gpio_put( hw->dir_n, forward ? 0u : 1u );
+    sleep_us( ServoCfg::DIR_SETUP_US );
 }
 
-static void servo_pwm_init()
+static inline void step_pulse( const ServoHwCfg* hw )
 {
-    gpio_set_function( Pins::SERVO_AZIMUTH, GPIO_FUNC_PWM );
-    gpio_set_function( Pins::SERVO_ZENITH,  GPIO_FUNC_PWM );
-
-    // GPIO 0 and GPIO 1 share PWM slice 0 (channels A and B).
-    uint slice = pwm_gpio_to_slice_num( Pins::SERVO_AZIMUTH );
-
-    pwm_config cfg = pwm_get_default_config();
-    pwm_config_set_clkdiv( &cfg, PWM_CLKDIV );
-    pwm_config_set_wrap( &cfg, PWM_WRAP );
-    pwm_init( slice, &cfg, true );
-
-    // Park both servos at centre on startup
-    pwm_set_gpio_level( Pins::SERVO_AZIMUTH, PULSE_CENTER );
-    pwm_set_gpio_level( Pins::SERVO_ZENITH,  PULSE_CENTER );
+    gpio_put( hw->pul_p, 1u );
+    gpio_put( hw->pul_n, 0u );
+    sleep_us( ServoCfg::PULSE_US );
+    gpio_put( hw->pul_p, 0u );
+    gpio_put( hw->pul_n, 1u );
+    sleep_us( ServoCfg::PULSE_US );   // low dwell = same width as high
 }
 
-// ── Task ─────────────────────────────────────────────────────────────────────
-static void servo_task( void* param )
+// ── Generic step/dir hardware task ───────────────────────────────────────────
+// One instance runs per servo axis.  The task owns its four GPIO pins and
+// executes step pulses toward the target position held in the command queue.
+//
+// The command queue has depth 1.  The controller uses xQueueOverwrite() so
+// this task always sees the latest target; xQueuePeek() is non-destructive
+// so the last target persists even when no new command arrives.
+static void servo_hw_task( void* arg )
 {
-    ( void ) param;
+    const ServoHwCfg* hw = static_cast<const ServoHwCfg*>( arg );
 
-    servo_pwm_init();
-    log_print( "[servo] PWM 50 Hz ready — GPIO az=%u el=%u\n",
-               Pins::SERVO_AZIMUTH, Pins::SERVO_ZENITH );
+    // Initialise GPIO – idle state: PUL low-side asserted, DIR forward
+    const uint pins[4] = { hw->pul_p, hw->pul_n, hw->dir_p, hw->dir_n };
+    for ( uint p : pins ) {
+        gpio_init( p );
+        gpio_set_dir( p, GPIO_OUT );
+    }
+    gpio_put( hw->pul_p, 0u );  gpio_put( hw->pul_n, 1u );
+    gpio_put( hw->dir_p, 0u );  gpio_put( hw->dir_n, 1u );
+
+    log_print( "[%s] differential step/dir ready"
+               "  PUL+=%u PUL-=%u  DIR+=%u DIR-=%u\n",
+               hw->tag,
+               hw->pul_p, hw->pul_n, hw->dir_p, hw->dir_n );
+
+    QueueHandle_t cmd_q = *hw->cmd_q_ptr;
+
+    int32_t  current_steps = 0;
+    int32_t  target_steps  = 0;
+    uint16_t step_hz       = ServoCfg::DEFAULT_STEP_HZ;
+
+    // µs delay between steps → convert from hz; recomputed on each new command
+    uint32_t step_period_us = 1'000'000u / step_hz;
+
+    for ( ;; ) {
+        // Non-destructive peek — picks up the latest overwritten target
+        ServoCmd cmd;
+        if ( xQueuePeek( cmd_q, &cmd, 0 ) == pdTRUE ) {
+            target_steps = cmd.target_steps;
+            if ( cmd.step_hz > 0 ) {
+                step_hz        = cmd.step_hz;
+                step_period_us = 1'000'000u / step_hz;
+            }
+        }
+
+        if ( current_steps != target_steps ) {
+            bool forward = ( target_steps > current_steps );
+            set_direction( hw, forward );
+            step_pulse( hw );
+            current_steps += forward ? 1 : -1;
+
+            // Yield for step_period_us.  vTaskDelay has 1 ms resolution; for
+            // rates ≤ 1000 Hz the ms delay is accurate enough.  At higher
+            // rates the busy-wait pulse time already dominates anyway.
+            TickType_t delay_ms = step_period_us / 1000u;
+            vTaskDelay( pdMS_TO_TICKS( delay_ms < 1u ? 1u : delay_ms ) );
+        } else {
+            // Idle — block until a new command might arrive (10 ms poll)
+            vTaskDelay( pdMS_TO_TICKS( 10 ) );
+        }
+    }
+}
+
+// ── Servo controller task ─────────────────────────────────────────────────────
+// Reads the latest ground-station and rocket positions from the shared
+// depth-1 location queues, computes azimuth and elevation, converts to
+// step targets, and overwrites the servo command queues at 10 Hz.
+static void servo_ctrl_task( void* )
+{
+    log_print( "[servo_ctrl] waiting for location fixes...\n" );
 
     LocationMsg gs  = {};
     LocationMsg rkt = {};
@@ -60,7 +121,6 @@ static void servo_task( void* param )
     bool have_rkt   = false;
 
     for ( ;; ) {
-        // Peek latest positions — non-destructive, writers use xQueueOverwrite
         if ( xQueuePeek( g_gs_location_q,     &gs,  0 ) == pdTRUE ) have_gs  = true;
         if ( xQueuePeek( g_rocket_location_q, &rkt, 0 ) == pdTRUE ) have_rkt = true;
 
@@ -71,31 +131,73 @@ static void servo_task( void* param )
             double az = rocket_math::GroundStationMath::calculateAzimuth(  station, rocket );
             double el = rocket_math::GroundStationMath::calculateElevation( station, rocket );
 
-            // Azimuth servo covers 0–180°.  Normalise the full-circle bearing
-            // to the nearest servo-reachable angle (wrap >180° back to 0–180°).
-            if ( az > 180.0 ) az = 360.0 - az;
+            // Convert angles to absolute step counts
+            auto az_steps = static_cast<int32_t>( az * ServoCfg::STEPS_PER_DEG );
+            auto el_steps = static_cast<int32_t>( el * ServoCfg::STEPS_PER_DEG );
 
-            uint16_t az_counts = angle_to_counts( az, 0.0, 180.0 );
-            uint16_t el_counts = angle_to_counts( el, 0.0,  90.0 );
+            ServoCmd cmd1 { az_steps, ServoCfg::DEFAULT_STEP_HZ };
+            ServoCmd cmd2 { el_steps, ServoCfg::DEFAULT_STEP_HZ };
 
-            pwm_set_gpio_level( Pins::SERVO_AZIMUTH, az_counts );
-            pwm_set_gpio_level( Pins::SERVO_ZENITH,  el_counts );
-        } else {
-            // No fix yet — hold centre
-            pwm_set_gpio_level( Pins::SERVO_AZIMUTH, PULSE_CENTER );
-            pwm_set_gpio_level( Pins::SERVO_ZENITH,  PULSE_CENTER );
+            xQueueOverwrite( g_servo1_cmd_q, &cmd1 );
+            xQueueOverwrite( g_servo2_cmd_q, &cmd2 );
         }
 
-        vTaskDelay( pdMS_TO_TICKS( 100 ) );   // 10 Hz update — plenty for tracking
+        vTaskDelay( pdMS_TO_TICKS( 100 ) );   // 10 Hz control loop
     }
 }
 
-static StaticTask_t s_servo_tcb;
-static StackType_t  s_servo_stack[ 1024 ];
+// ── Servo 1 (Zenith, GPIO 0-3) ────────────────────────────────────────────────
+static ServoHwCfg s_srv1_hw = {
+    .pul_p     = Pins::SRV1_PUL_P,
+    .pul_n     = Pins::SRV1_PUL_N,
+    .dir_p     = Pins::SRV1_DIR_P,
+    .dir_n     = Pins::SRV1_DIR_N,
+    .cmd_q_ptr = &g_servo1_cmd_q,
+    .tag       = "srv1",
+};
 
-void servo_task_init()
+static StaticTask_t s_srv1_tcb;
+static StackType_t  s_srv1_stack[ 512 ];
+
+void servo1_task_init()
 {
-    configASSERT( xTaskCreateStatic( servo_task, "servo", 1024,
-                                      NULL, tskIDLE_PRIORITY + 2,
-                                      s_servo_stack, &s_servo_tcb ) );
+    g_servo1_cmd_q = xQueueCreateStatic( 1, sizeof(ServoCmd),
+                                          s_srv1_cmd_storage, &s_srv1_cmd_buf );
+    configASSERT( g_servo1_cmd_q );
+
+    task_create( servo_hw_task, "srv1", 512, &s_srv1_hw, tskIDLE_PRIORITY + 3,
+                  s_srv1_stack, &s_srv1_tcb );
+}
+
+// ── Servo 2 (Azimuth, GPIO 4-7) ──────────────────────────────────────────────
+static ServoHwCfg s_srv2_hw = {
+    .pul_p     = Pins::SRV2_PUL_P,
+    .pul_n     = Pins::SRV2_PUL_N,
+    .dir_p     = Pins::SRV2_DIR_P,
+    .dir_n     = Pins::SRV2_DIR_N,
+    .cmd_q_ptr = &g_servo2_cmd_q,
+    .tag       = "srv2",
+};
+
+static StaticTask_t s_srv2_tcb;
+static StackType_t  s_srv2_stack[ 512 ];
+
+void servo2_task_init()
+{
+    g_servo2_cmd_q = xQueueCreateStatic( 1, sizeof(ServoCmd),
+                                          s_srv2_cmd_storage, &s_srv2_cmd_buf );
+    configASSERT( g_servo2_cmd_q );
+
+    task_create( servo_hw_task, "srv2", 512, &s_srv2_hw, tskIDLE_PRIORITY + 3,
+                  s_srv2_stack, &s_srv2_tcb );
+}
+
+// ── Servo controller ──────────────────────────────────────────────────────────
+static StaticTask_t s_ctrl_tcb;
+static StackType_t  s_ctrl_stack[ 512 ];
+
+void servo_ctrl_task_init()
+{
+    task_create( servo_ctrl_task, "srv_ctrl", 512, nullptr, tskIDLE_PRIORITY + 2,
+                  s_ctrl_stack, &s_ctrl_tcb );
 }

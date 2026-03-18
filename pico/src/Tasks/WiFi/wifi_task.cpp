@@ -10,11 +10,14 @@ static void wifi_task( void* param )
 {
     ( void ) param;
 
+    log_print( "[wifi] task started\n" );
+
     if ( cyw43_arch_init() ) {
         log_print( "[wifi] cyw43 init failed — task exiting\n" );
         vTaskDelete( NULL );
         return;
     }
+    log_print( "[wifi] cyw43 init ok\n" );
 
     cyw43_arch_enable_sta_mode();
 
@@ -62,7 +65,6 @@ static StackType_t  s_wifi_stack[ 2048 ];
 
 void wifi_task_init()
 {
-    configASSERT( xTaskCreateStatic( wifi_task, "wifi", 2048,
-                                      NULL, tskIDLE_PRIORITY + 3,
-                                      s_wifi_stack, &s_wifi_tcb ) );
+    task_create( wifi_task, "wifi", 2048, nullptr, tskIDLE_PRIORITY + 3,
+                  s_wifi_stack, &s_wifi_tcb );
 }
