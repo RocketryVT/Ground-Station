@@ -15,7 +15,7 @@ const PANEL  = Cesium.Color.fromCssColorString('#861F41').withAlpha(0.85);
 
 const N_CONE_EDGES = 16;
 
-// ── Build cone edge positions in ECEF ────────────────────────────────────────
+// -- Build cone edge positions in ECEF ----------------------------------------
 function coneRingPositions(
   gsEcef: Cesium.Cartesian3,
   azDeg: number,
@@ -94,7 +94,7 @@ export function TrajectoryMap() {
   const lastHistoryRef   = useRef<RocketTelemetry[]>([]);
 
   // Pad location + MSL altitude: captured from first GPS fix.
-  // Used every frame to compute the MSL→ellipsoidal offset via globe.getHeight().
+  // Used every frame to compute the MSL->ellipsoidal offset via globe.getHeight().
   const padAltRef        = useRef<number | null>(null);
   const padLatRef        = useRef<number | null>(null);
   const padLonRef        = useRef<number | null>(null);
@@ -110,7 +110,7 @@ export function TrajectoryMap() {
   const nodes  = useTelemetryStore((s) => s.nodes);
   const latest = useTelemetryStore((s) => s.latest);
 
-  // ── Init viewer + ALL primitives + preRender listener ────────────────────
+  // -- Init viewer + ALL primitives + preRender listener --------------------
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -127,13 +127,13 @@ export function TrajectoryMap() {
       selectionIndicator:   false,
     });
 
-    // ── Performance: fewer terrain tiles, capped frame rate ──────────────
+    // -- Performance: fewer terrain tiles, capped frame rate --------------
     viewer.scene.globe.tileCacheSize          = 25;  // default 100
     viewer.scene.globe.maximumScreenSpaceError = 4;  // default 2 — fewer/coarser tiles
     viewer.targetFrameRate                    = 60;  // cap render loop at 30 fps
     viewer.scene.debugShowFramesPerSecond     = true;
 
-    // ── Trajectory (PolylineCollection — positions mutated in-place) ──────
+    // -- Trajectory (PolylineCollection — positions mutated in-place) ------
     const trackColl = new Cesium.PolylineCollection();
     viewer.scene.primitives.add(trackColl);
     trackPolyRef.current = trackColl.add({
@@ -143,7 +143,7 @@ export function TrajectoryMap() {
       material:  Cesium.Material.fromType('Color', { color: Cesium.Color.WHITE }),
     });
 
-    // ── Rocket entity — HeightReference.NONE; altitude corrected via offset ──
+    // -- Rocket entity — HeightReference.NONE; altitude corrected via offset --
     // offset = globe.getHeight(pad) - padAltMSL is recomputed every frame so
     // the rocket always matches the rendered tile mesh, just like CLAMP_TO_GROUND.
     const rocketPosProp  = new Cesium.ConstantPositionProperty(Cesium.Cartesian3.ZERO);
@@ -175,7 +175,7 @@ export function TrajectoryMap() {
       },
     });
 
-    // ── Beam polylines (pre-allocated) ────────────────────────────────────
+    // -- Beam polylines (pre-allocated) ------------------------------------
     const beamLines = new Cesium.PolylineCollection();
     viewer.scene.primitives.add(beamLines);
     beamLinesRef.current = beamLines;
@@ -195,13 +195,13 @@ export function TrajectoryMap() {
     pls.push(beamLines.add({ show: false, positions: zero, width: 2, material: mkDash() })); // target
     beamPolylinesRef.current = pls;
 
-    // ── preRender listener: ALL high-frequency Cesium updates ─────────────
+    // -- preRender listener: ALL high-frequency Cesium updates -------------
     // Runs synchronously before each GPU frame — eliminates the async React
-    // useEffect → Cesium render gap that caused polyline flicker.
+    // useEffect -> Cesium render gap that caused polyline flicker.
     const removePreRender = viewer.scene.preRender.addEventListener(() => {
       const { history, latest: l, antenna, nodes: ns } = useTelemetryStore.getState();
 
-      // ── Terrain offset: computed every frame from the rendered tile mesh ──
+      // -- Terrain offset: computed every frame from the rendered tile mesh --
       // globe.getHeight() returns the ellipsoidal height of whatever tile Cesium
       // has loaded and is about to draw — the same mesh that CLAMP_TO_GROUND
       // entities snap to. This keeps rocket, trail, and cone flush with the
@@ -310,7 +310,7 @@ export function TrajectoryMap() {
     };
   }, []);
 
-  // ── Node entities (slow path — nodes rarely change) ──────────────────────
+  // -- Node entities (slow path — nodes rarely change) ----------------------
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;

@@ -1,5 +1,5 @@
 """
-MQTT → SQLite logger
+MQTT -> SQLite logger
 Subscribes to the same topics as the dashboard and persists every packet.
 
 Run alongside the dashboard:
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import paho.mqtt.client as mqtt
 
-# ── Config ─────────────────────────────────────────────────────────────────────
+# -- Config ---------------------------------------------------------------------
 BROKER_HOST = "localhost"
 BROKER_PORT  = 1883
 DB_PATH      = Path(__file__).parent / "telemetry.db"
@@ -25,7 +25,7 @@ TOPICS = [
     "nodes/+/position",
 ]
 
-# ── Schema ─────────────────────────────────────────────────────────────────────
+# -- Schema ---------------------------------------------------------------------
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS rocket_telemetry (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,7 +61,7 @@ def init_db(path: Path) -> sqlite3.Connection:
     conn.commit()
     return conn
 
-# ── Message handler ─────────────────────────────────────────────────────────────
+# -- Message handler -------------------------------------------------------------
 def make_on_message(conn: sqlite3.Connection):
     def on_message(client, userdata, msg):
         try:

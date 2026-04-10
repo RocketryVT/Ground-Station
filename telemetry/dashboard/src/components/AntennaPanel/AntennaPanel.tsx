@@ -1,7 +1,7 @@
 import { useTelemetryStore } from '../../store/telemetryStore';
 import styles from './AntennaPanel.module.css';
 
-// ── Compass rose — needle points to azimuth ───────────────────────────────────
+// -- Compass rose — needle points to azimuth -----------------------------------
 function Compass({ az }: { az: number }) {
   const cardinals = ['N', 'E', 'S', 'W'];
   const r = 38; // outer radius (svg units)
@@ -64,7 +64,7 @@ function Compass({ az }: { az: number }) {
   );
 }
 
-// ── Elevation arc — filled arc shows zenith angle ────────────────────────────
+// -- Elevation arc — filled arc shows zenith angle ----------------------------
 function ElevationArc({ el }: { el: number }) {
   // Arc from 0° (horizon) to el° on a 180° semicircle.
   const clamp = Math.max(0, Math.min(90, el));
@@ -73,7 +73,7 @@ function ElevationArc({ el }: { el: number }) {
   // Start at horizon left (-180°) draw to el on the right side
   const startX = -40;
   const startY = 0;
-  const endRad  = toRad(90 - clamp); // map el: 0→90°right, 90→top
+  const endRad  = toRad(90 - clamp); // map el: 0->90°right, 90->top
   const endX = Math.cos(endRad) * 40;
   const endY = -Math.sin(endRad) * 40;
   const largeArc = clamp > 90 ? 1 : 0;

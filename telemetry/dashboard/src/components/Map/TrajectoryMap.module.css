@@ -6,7 +6,7 @@
   background: #040408;
 }
 
-/* ── Cesium widget overrides ──────────────────────────────────────────────── */
+/* -- Cesium widget overrides ------------------------------------------------ */
 
 /* Hide Cesium logo / attribution bar */
 .wrapper :global(.cesium-widget-credits) {
@@ -24,7 +24,7 @@
   display: none;
 }
 
-/* ── Coordinate overlay ───────────────────────────────────────────────────── */
+/* -- Coordinate overlay ----------------------------------------------------- */
 .coords {
   position: absolute;
   bottom: 8px;

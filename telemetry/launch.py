@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Ground Station Launcher
-────────────────────────────────────────────────────────────────────────────────
+--------------------------------------------------------------------------------
 Unified TUI that starts the telemetry logger, history API, and Vite dashboard.
 MQTT broker (Mosquitto) must be started separately — its status is shown but
 the launcher does not manage it.
@@ -13,7 +13,7 @@ Run from the laptop/ directory:
 Logs are also written to laptop/logs/<service>.log so you can inspect or
 copy them at any time from another terminal:
     tail -f logs/api.log
-────────────────────────────────────────────────────────────────────────────────
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -35,19 +35,19 @@ from textual.containers import Grid
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, RichLog, Static
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
+# -- Paths ----------------------------------------------------------------------
 HERE       = Path(__file__).parent.resolve()
 VENV_BIN   = HERE / "logger" / ".venv" / "bin"
 LOGGER_DIR = HERE / "logger"
 DASH_DIR   = HERE / "dashboard"
 LOGS_DIR   = HERE / "logs"
 
-# ── Strip ANSI codes before writing to Rich markup ─────────────────────────────
+# -- Strip ANSI codes before writing to Rich markup -----------------------------
 _ANSI = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 def _clean(text: str) -> str:
     return _ANSI.sub("", text)
 
-# ── Port helpers ───────────────────────────────────────────────────────────────
+# -- Port helpers ---------------------------------------------------------------
 def port_open(host: str = "localhost", port: int = 1883, timeout: float = 0.4) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(timeout)
@@ -75,12 +75,12 @@ async def free_port(port: int) -> bool:
         await asyncio.sleep(0.6)   # give the process a moment to exit
     return bool(pids)
 
-# ── Status icons ───────────────────────────────────────────────────────────────
+# -- Status icons ---------------------------------------------------------------
 _ICON = {"pending": "○", "running": "●", "stopped": "■", "error": "✗"}
 _ICOL = {"pending": "dim white", "running": "bright_green",
          "stopped": "yellow",    "error":   "bright_red"}
 
-# ── Service panel widget ───────────────────────────────────────────────────────
+# -- Service panel widget -------------------------------------------------------
 class ServicePanel(Static):
     """Header + scrolling log for one service."""
 
@@ -121,7 +121,7 @@ class ServicePanel(Static):
         self.query_one(RichLog).write(f"[dim italic]  {msg}[/dim italic]")
 
 
-# ── App ────────────────────────────────────────────────────────────────────────
+# -- App ------------------------------------------------------------------------
 class Launcher(App[None]):
     TITLE = "ROCKETRY AT VT GROUND STATION"
     CSS = """
@@ -198,7 +198,7 @@ class Launcher(App[None]):
         LOGS_DIR.mkdir(exist_ok=True)
         self._tasks.append(asyncio.create_task(self._start_all()))
 
-    # ── Startup ────────────────────────────────────────────────────────────────
+    # -- Startup ----------------------------------------------------------------
     async def _start_all(self) -> None:
         await asyncio.gather(
             self._watch_broker(),
@@ -295,7 +295,7 @@ class Launcher(App[None]):
                 except Exception:
                     proc.kill()
 
-    # ── Actions ────────────────────────────────────────────────────────────────
+    # -- Actions ----------------------------------------------------------------
     async def action_quit_all(self) -> None:
         for task in self._tasks:
             task.cancel()

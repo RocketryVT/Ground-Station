@@ -5,14 +5,14 @@
  *   0 –  3 s  motor burn   fast climb, high acceleration
  *   3 – 12 s  coast        deceleration, rotation slows
  *  12 – 14 s  apogee       ~3 000 m, near-zero velocity
- *  14 – 28 s  descent      drogue → main chute, slow fall
+ *  14 – 28 s  descent      drogue -> main chute, slow fall
  *  28 – 30 s  landed       stationary on ground
  */
 
 import { useEffect, useRef } from 'react';
 import { useTelemetryStore } from '../store/telemetryStore';
 
-// ── Launch-pad coordinates (White Sands, NM) ────────────────────────────────
+// -- Launch-pad coordinates (White Sands, NM) --------------------------------
 const LAT0 =  32.9503;
 const LON0 = -106.9750;
 const ALT0 =  1220;   // m MSL (pad elevation)
@@ -43,7 +43,7 @@ function altProfile(t: number): number {
   return ALT0;
 }
 
-// ── Chase-car offset from pad (degrees) ────────────────────────────────────
+// -- Chase-car offset from pad (degrees) ------------------------------------
 const CHASE_DLAT =  0.0012;
 const CHASE_DLON = -0.0008;
 
@@ -72,9 +72,9 @@ export function useDemoMode(enabled: boolean) {
       const t = tRef.current % CYCLE_S;
       tRef.current += DT;
 
-      // ── Position ───────────────────────────────────────────────────────
+      // -- Position -------------------------------------------------------
       const alt  = altProfile(t);
-      const frac = Math.min(t, 28) / 28;            // 0→1 over the flight
+      const frac = Math.min(t, 28) / 28;            // 0->1 over the flight
 
       // Horizontal drift — monotonic so the trajectory is a true arc, not a loop.
       // Rocket drifts ~700 m downrange by landing.
@@ -85,7 +85,7 @@ export function useDemoMode(enabled: boolean) {
       const lat  = LAT0 + dlat;
       const lon  = LON0 + dlon;
 
-      // ── Velocity (numerical derivative of alt + drift) ──────────────
+      // -- Velocity (numerical derivative of alt + drift) --------------
       const altNext = altProfile(Math.min(t + DT, 28));
       const vel_d   = -(altNext - alt) / DT;                    // positive = falling
 
@@ -95,7 +95,7 @@ export function useDemoMode(enabled: boolean) {
       const vel_n       = vel_horiz * Math.cos(bearRad);
       const vel_e       = vel_horiz * Math.sin(bearRad);
 
-      // ── Attitude ────────────────────────────────────────────────────
+      // -- Attitude ----------------------------------------------------
       // During burn: pitched slightly toward drift; during descent: stable
       const pitch = t < 3
         ? 5 + 3 * Math.sin(t * 2)
@@ -109,7 +109,7 @@ export function useDemoMode(enabled: boolean) {
 
       const yaw = (driftBearing + 5 * Math.sin(t * 0.7)) % 360;
 
-      // ── Signal ──────────────────────────────────────────────────────
+      // -- Signal ------------------------------------------------------
       const slantRange = Math.sqrt(
         ((lat - LAT0) * 111_320) ** 2 +
         ((lon - LON0) * 111_320 * Math.cos(LAT0 * Math.PI / 180)) ** 2 +
@@ -126,7 +126,7 @@ export function useDemoMode(enabled: boolean) {
         rssi, snr,
       });
 
-      // ── Antenna tracking (az/el from GS node position, not pad) ─────────
+      // -- Antenna tracking (az/el from GS node position, not pad) ---------
       // The beam is drawn from the GS node, so angles must be referenced there.
       const gsLat = LAT0 + CHASE_DLAT;
       const gsLon = LON0 + CHASE_DLON;
@@ -149,7 +149,7 @@ export function useDemoMode(enabled: boolean) {
         target_el: el,
       });
 
-      // ── Ground nodes ─────────────────────────────────────────────────
+      // -- Ground nodes -------------------------------------------------
       updateNode({
         id:        'gs',
         name:      'GS',

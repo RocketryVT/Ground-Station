@@ -1,4 +1,4 @@
-// ── MQTT topic payloads ────────────────────────────────────────────────────────
+// -- MQTT topic payloads --------------------------------------------------------
 // These match what the Pico 2W ground station publishes over MQTT.
 
 export interface RocketTelemetry {

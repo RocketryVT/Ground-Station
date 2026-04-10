@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { useTelemetryStore } from '../../store/telemetryStore';
 import styles from './RocketScene.module.css';
 
-// ── Rocket geometry (procedural — swap for a GLTF if you have a model) ─────────
+// -- Rocket geometry (procedural — swap for a GLTF if you have a model) ---------
 function RocketModel() {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -58,7 +58,7 @@ function RocketModel() {
   );
 }
 
-// ── Body-frame axis indicators ─────────────────────────────────────────────────
+// -- Body-frame axis indicators -------------------------------------------------
 function BodyAxes() {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -84,7 +84,7 @@ function BodyAxes() {
   );
 }
 
-// ── Label overlay ──────────────────────────────────────────────────────────────
+// -- Label overlay --------------------------------------------------------------
 function AttitudeReadout() {
   const latest = useTelemetryStore((s) => s.latest);
   if (!latest) return null;
@@ -97,7 +97,7 @@ function AttitudeReadout() {
   );
 }
 
-// ── Compass rose on the ground plane ──────────────────────────────────────────
+// -- Compass rose on the ground plane ------------------------------------------
 function Compass() {
   const y = -1.59;
   const r = 1.0;

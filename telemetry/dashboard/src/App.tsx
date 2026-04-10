@@ -34,7 +34,7 @@ export default function App() {
       <div className="content">
         <Group orientation="horizontal">
 
-          {/* ── Left column: map + 3-D views ─────────────────────────── */}
+          {/* -- Left column: map + 3-D views --------------------------- */}
           <Panel defaultSize={50} minSize={20} className="fill">
             <Group orientation="vertical">
               <Panel defaultSize={50} minSize={15} className="fill">
@@ -58,7 +58,7 @@ export default function App() {
 
           <Handle />
 
-          {/* ── Right column: video + charts ─────────────────────────── */}
+          {/* -- Right column: video + charts --------------------------- */}
           <Panel defaultSize={50} minSize={20} className="fill">
             <Group orientation="vertical">
 

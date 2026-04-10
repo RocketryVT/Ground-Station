@@ -51,7 +51,7 @@ def db() -> sqlite3.Connection:
     return conn
 
 
-# ── Telemetry ──────────────────────────────────────────────────────────────────
+# -- Telemetry ------------------------------------------------------------------
 
 @app.get("/telemetry")
 def get_telemetry(
@@ -73,7 +73,7 @@ def get_telemetry(
     return [dict(r) for r in rows]
 
 
-# ── Antenna ────────────────────────────────────────────────────────────────────
+# -- Antenna --------------------------------------------------------------------
 
 @app.get("/antenna")
 def get_antenna(limit: int = Query(500, ge=1, le=5_000)):
@@ -84,7 +84,7 @@ def get_antenna(limit: int = Query(500, ge=1, le=5_000)):
     return [dict(r) for r in rows]
 
 
-# ── Mobile nodes ───────────────────────────────────────────────────────────────
+# -- Mobile nodes ---------------------------------------------------------------
 
 @app.get("/nodes")
 def get_nodes(limit: int = Query(200, ge=1, le=2_000)):
@@ -95,7 +95,7 @@ def get_nodes(limit: int = Query(200, ge=1, le=2_000)):
     return [dict(r) for r in rows]
 
 
-# ── Flights ─────────────────────────────────────────────────────────────────────
+# -- Flights ---------------------------------------------------------------------
 # A "flight" is a contiguous block of telemetry; gaps > GAP_S seconds separate them.
 
 GAP_S = 30.0
@@ -111,7 +111,7 @@ def list_flights():
     if not rows:
         return []
 
-    timestamps = [r["timestamp"] / 1000.0 for r in rows]  # convert ms → s
+    timestamps = [r["timestamp"] / 1000.0 for r in rows]  # convert ms -> s
     flights = []
     start = timestamps[0]
     prev  = timestamps[0]

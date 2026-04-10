@@ -9,7 +9,7 @@ import styles from './AntennaScene.module.css';
 
 const DEG = Math.PI / 180;
 
-// ── Beam cone geometry (constant, based on config half-angle) ──────────────────
+// -- Beam cone geometry (constant, based on config half-angle) ------------------
 // Matches the Cesium cone: N spokes from apex + N ring segments.
 // CONE_RANGE is the visual reach of the beam line in Three.js scene units.
 const N_CONE     = 16;
@@ -33,11 +33,11 @@ const CONE_PTS = (() => {
   return pts;
 })();
 
-// ── Azimuth/elevation maths ────────────────────────────────────────────────────
+// -- Azimuth/elevation maths ----------------------------------------------------
 // Three.js: Y-up, +X east, +Z south (toward viewer), -Z north.
 // Boom extends in +Z local space.
-// rotation.y = π - az·DEG  → az=0 points -Z (north), az=90 points +X (east)
-// rotation.x = -el·DEG     → el=0 horizontal, el=90 points +Y (zenith)
+// rotation.y = π - az·DEG  -> az=0 points -Z (north), az=90 points +X (east)
+// rotation.x = -el·DEG     -> el=0 horizontal, el=90 points +Y (zenith)
 
 function Tracker() {
   const azRef       = useRef<THREE.Group>(null);
@@ -65,7 +65,7 @@ function Tracker() {
 
   return (
     <group>
-      {/* ── Tripod legs ─────────────────────────────────────────────────── */}
+      {/* -- Tripod legs --------------------------------------------------- */}
       {[0, 120, 240].map((a) => (
         <group key={a} rotation={[0, a * DEG, 0]}>
           <mesh position={[0, -0.435, 0.18]} rotation={[2.28, 0, 0]}>
@@ -75,13 +75,13 @@ function Tracker() {
         </group>
       ))}
 
-      {/* ── Vertical mast ──────────────────────────────────────────────── */}
+      {/* -- Vertical mast ------------------------------------------------ */}
       <mesh position={[0, 0.12, 0]}>
         <cylinderGeometry args={[0.028, 0.034, 0.84, 12]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
 
-      {/* ── Azimuth group (actual direction) ───────────────────────────── */}
+      {/* -- Azimuth group (actual direction) ----------------------------- */}
       <group ref={azRef} position={[0, 0.56, 0]}>
         {/* Bearing disk */}
         <mesh>
@@ -103,7 +103,7 @@ function Tracker() {
           <meshStandardMaterial color="#bbbbbb" metalness={0.9} roughness={0.1} />
         </mesh>
 
-        {/* ── Elevation group ─────────────────────────────────────────── */}
+        {/* -- Elevation group ------------------------------------------- */}
         <group ref={elRef} position={[0, 0.35, 0]}>
           {/* Boom — extends in +Z */}
           <mesh position={[0, 0, 0.55]}>
@@ -146,7 +146,7 @@ function Tracker() {
         </group>
       </group>
 
-      {/* ── Target direction (maroon dashed) — mirrors actual az/el pivot ─ */}
+      {/* -- Target direction (maroon dashed) — mirrors actual az/el pivot - */}
       <group ref={targetAzRef} position={[0, 0.56, 0]}>
         <group ref={targetElRef} position={[0, 0.35, 0]}>
           <Line
@@ -163,7 +163,7 @@ function Tracker() {
   );
 }
 
-// ── Compass rose on the ground plane ──────────────────────────────────────────
+// -- Compass rose on the ground plane ------------------------------------------
 function Compass() {
   const y = -0.59;
   const r = 1.0;
@@ -201,7 +201,7 @@ function Compass() {
   );
 }
 
-// ── Scene ─────────────────────────────────────────────────────────────────────
+// -- Scene ---------------------------------------------------------------------
 export function AntennaScene() {
   const antenna = useTelemetryStore((s) => s.antenna);
   const az = antenna?.actual_az ?? 0;
@@ -239,7 +239,7 @@ export function AntennaScene() {
         />
       </Canvas>
 
-      {/* ── AZ / EL readout ──────────────────────────────────────────── */}
+      {/* -- AZ / EL readout -------------------------------------------- */}
       <div className={styles.readout}>
         <span className={styles.metric}>AZ</span>
         <span className={styles.value}>{az.toFixed(1)}°</span>

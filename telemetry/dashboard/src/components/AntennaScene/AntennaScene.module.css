@@ -6,7 +6,7 @@
   background: white;
 }
 
-/* ── AZ / EL readout overlay ─────────────────────────────────────────────── */
+/* -- AZ / EL readout overlay ----------------------------------------------- */
 .readout {
   position: absolute;
   bottom: 8px;
