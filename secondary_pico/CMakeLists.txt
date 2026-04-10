@@ -43,13 +43,13 @@ set(CMAKE_C_COMPILER arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 
-project(gs_pico C CXX ASM)
+project(gs_secondary_pico C CXX ASM)
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
-# LoRa library — provides sx1276_hal (RadioLib) and lr11xx targets.
+# LoRa library — provides radio_hal (RadioLib + PicoHal for SX1276 + RF69)
 if (NOT EXISTS "${LORA_ROOT}/CMakeLists.txt")
     message(FATAL_ERROR "LoRa drivers not found at ${LORA_ROOT}. Set LORA_ROOT.")
 endif()
@@ -60,36 +60,6 @@ add_subdirectory(${LORA_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/lora)
 target_include_directories(lr11xx PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include
 )
-
-# GPS NMEA parser library — provides the 'gps' target.
-if (NOT EXISTS "${GPS_ROOT}/CMakeLists.txt")
-    message(FATAL_ERROR "GPS library not found at ${GPS_ROOT}. Set GPS_ROOT.")
-endif()
-add_subdirectory(${GPS_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/gps)
-
-# LIS3MDL magnetometer driver.
-if (NOT EXISTS "${LIS3MDL_ROOT}/CMakeLists.txt")
-    message(FATAL_ERROR "LIS3MDL driver not found at ${LIS3MDL_ROOT}. Set LIS3MDL_ROOT.")
-endif()
-add_subdirectory(${LIS3MDL_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/lis3mdl)
-
-# ISM330DLC IMU driver.
-if (NOT EXISTS "${ISM330DLC_ROOT}/CMakeLists.txt")
-    message(FATAL_ERROR "ISM330DLC driver not found at ${ISM330DLC_ROOT}. Set ISM330DLC_ROOT.")
-endif()
-add_subdirectory(${ISM330DLC_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/ism330dlc)
-
-# Ground-station math — provides the 'math_utils' target.
-if (NOT EXISTS "${MATH_UTILS_ROOT}/CMakeLists.txt")
-    message(FATAL_ERROR "math_utils not found at ${MATH_UTILS_ROOT}. Set MATH_UTILS_ROOT.")
-endif()
-add_subdirectory(${MATH_UTILS_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/math_utils)
-
-# Fusion AHRS library (x-io Technologies) — provides the 'Fusion' target.
-if (NOT EXISTS "${FUSION_PATH}/Fusion/CMakeLists.txt")
-    message(FATAL_ERROR "Fusion library not found at ${FUSION_PATH}. Set FUSION_PATH.")
-endif()
-add_subdirectory(${FUSION_PATH}/Fusion ${CMAKE_CURRENT_BINARY_DIR}/Fusion)
 
 add_subdirectory(src)
 

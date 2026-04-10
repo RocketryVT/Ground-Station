@@ -4,7 +4,7 @@
 #include "hardware/i2c.h"
 #include "hardware/gpio.h"
 
-// ── Queue handles (exported via i2c_task.hpp) ─────────────────────────────────
+// -- Queue handles (exported via i2c_task.hpp) ---------------------------------
 QueueHandle_t g_i2c0_req_q = nullptr;
 QueueHandle_t g_i2c1_req_q = nullptr;
 
@@ -14,7 +14,7 @@ static uint8_t       s_i2c0_req_storage[ I2C_REQ_QUEUE_DEPTH * sizeof(I2cRequest
 static StaticQueue_t s_i2c1_req_buf;
 static uint8_t       s_i2c1_req_storage[ I2C_REQ_QUEUE_DEPTH * sizeof(I2cRequest) ];
 
-// ── Bus configuration ─────────────────────────────────────────────────────────
+// -- Bus configuration ---------------------------------------------------------
 struct I2cBusCfg {
     i2c_inst_t*    bus;
     uint           sda;
@@ -24,7 +24,7 @@ struct I2cBusCfg {
     const char*    tag;
 };
 
-// ── Generic bus worker ────────────────────────────────────────────────────────
+// -- Generic bus worker --------------------------------------------------------
 // A single task function serves both I2C0 and I2C1; the per-bus config is
 // passed via the FreeRTOS task parameter.
 static void i2c_bus_task( void* arg )
@@ -48,7 +48,7 @@ static void i2c_bus_task( void* arg )
 
         I2cResponse resp = {};
 
-        // ── Write phase ───────────────────────────────────────────────────────
+        // -- Write phase -------------------------------------------------------
         if ( req.tx_len > 0 ) {
             // nostop=true when a read follows so the bus isn't released between
             bool nostop = ( req.rx_len > 0 );
@@ -61,7 +61,7 @@ static void i2c_bus_task( void* arg )
             }
         }
 
-        // ── Read phase ────────────────────────────────────────────────────────
+        // -- Read phase --------------------------------------------------------
         if ( req.rx_len > 0 ) {
             int rc = i2c_read_blocking( cfg->bus, req.addr,
                                         resp.rx_buf, req.rx_len, false );
@@ -79,7 +79,7 @@ static void i2c_bus_task( void* arg )
     }
 }
 
-// ── I2C0 ──────────────────────────────────────────────────────────────────────
+// -- I2C0 ----------------------------------------------------------------------
 static I2cBusCfg s_i2c0_cfg = {
     .bus        = i2c0,
     .sda        = Pins::I2C0_SDA,
@@ -102,7 +102,7 @@ void i2c0_task_init()
                   s_i2c0_stack, &s_i2c0_tcb );
 }
 
-// ── I2C1 ──────────────────────────────────────────────────────────────────────
+// -- I2C1 ----------------------------------------------------------------------
 static I2cBusCfg s_i2c1_cfg = {
     .bus        = i2c1,
     .sda        = Pins::I2C1_SDA,

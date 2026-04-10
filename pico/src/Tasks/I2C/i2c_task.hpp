@@ -3,11 +3,11 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 
-// ── I2C Bus Tasks ─────────────────────────────────────────────────────────────
+// -- I2C Bus Tasks -------------------------------------------------------------
 // Each I2C bus (I2C0, I2C1) runs in its own FreeRTOS task and serialises all
 // bus traffic through a request / response queue pair.
 //
-// ── Usage from a client task ─────────────────────────────────────────────────
+// -- Usage from a client task -------------------------------------------------
 //
 //   // 1. Create a per-task depth-1 static reply queue (once at task start):
 //   static StaticQueue_t  rep_buf;
@@ -53,7 +53,7 @@ struct I2cResponse {
     uint8_t rx_len;                          // actual bytes received
 };
 
-// ── Request queue handles ──────────────────────────────────────────────────────
+// -- Request queue handles ------------------------------------------------------
 // Send an I2cRequest to whichever bus holds your device.
 // The response arrives on req.reply_q.
 extern QueueHandle_t g_i2c0_req_q;
@@ -61,7 +61,7 @@ extern QueueHandle_t g_i2c1_req_q;
 
 #define I2C_REQ_QUEUE_DEPTH  8
 
-// ── Init functions ─────────────────────────────────────────────────────────────
+// -- Init functions -------------------------------------------------------------
 // Call before vTaskStartScheduler().  Each function creates the request queue
 // and spawns the bus task.
 void i2c0_task_init();

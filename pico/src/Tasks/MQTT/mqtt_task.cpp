@@ -12,7 +12,7 @@ static volatile bool   s_mqtt_connected = false;
 
 bool mqtt_is_connected() { return s_mqtt_connected; }
 
-// ── Connection callback (fires in lwIP IRQ context) ───────────────────────────
+// -- Connection callback (fires in lwIP IRQ context) ---------------------------
 // Do NOT call log_print() here — xQueueSend cannot be called from ISR.
 // The MQTT task logs the outcome after the handshake delay instead.
 static void connection_cb( mqtt_client_t* client, void* arg,
@@ -47,7 +47,7 @@ static bool broker_connect()
     return true;
 }
 
-// ── Main task ─────────────────────────────────────────────────────────────────
+// -- Main task -----------------------------------------------------------------
 static void mqtt_task( void* param )
 {
     ( void ) param;

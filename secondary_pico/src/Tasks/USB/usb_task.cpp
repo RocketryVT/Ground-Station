@@ -1,0 +1,113 @@
+#include "usb_task.hpp"
+#include "shared.hpp"
+
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
+
+#include "pico/stdlib.h"
+
+// -- log_print -----------------------------------------------------------------
+void log_print( const char* fmt, ... )
+{
+    LogMessage msg;
+    va_list args;
+    va_start( args, fmt );
+    vsnprintf( msg.buf, sizeof( msg.buf ), fmt, args );
+    va_end( args );
+    xQueueSend( g_log_queue, &msg, 0 );
+}
+
+static bool s_log_enabled = true;
+
+static void cmd_help()
+{
+    printf(
+        "Commands:\n"
+        "  help           show this list\n"
+        "  status         print heap, queue depths, WiFi state\n"
+        "  log  [on|off]  toggle/set log output\n"
+        "  clear          clear terminal screen\n"
+    );
+}
+
+static void cmd_status()
+{
+    printf( "heap free  : %u B (min %u B)\n",
+            (unsigned)xPortGetFreeHeapSize(),
+            (unsigned)xPortGetMinimumEverFreeHeapSize() );
+    printf( "wifi       : %s\n",
+            (xEventGroupGetBits(g_net_events) & EVT_WIFI_CONNECTED) ? "up" : "down" );
+    printf( "log_q      : %u / %u\n",
+            (unsigned)uxQueueMessagesWaiting(g_log_queue), (unsigned)LOG_QUEUE_DEPTH );
+    printf( "udp_q      : %u / %u\n",
+            (unsigned)uxQueueMessagesWaiting(g_udp_queue), (unsigned)UDP_QUEUE_DEPTH );
+    printf( "log output : %s\n", s_log_enabled ? "on" : "off" );
+}
+
+static void dispatch( const char* line, size_t len )
+{
+    if ( len == 0 ) return;
+    if ( strncmp( line, "help",   4 ) == 0 ) { cmd_help();   return; }
+    if ( strncmp( line, "status", 6 ) == 0 ) { cmd_status(); return; }
+    if ( strncmp( line, "clear",  5 ) == 0 ) { printf( "\x1b[2J\x1b[H" ); stdio_flush(); return; }
+    if ( strncmp( line, "log",    3 ) == 0 ) {
+        const char* arg = line + 3;
+        while ( *arg == ' ' ) arg++;
+        if      ( strncmp(arg,"on", 2) == 0 ) s_log_enabled = true;
+        else if ( strncmp(arg,"off",3) == 0 ) s_log_enabled = false;
+        else                                   s_log_enabled = !s_log_enabled;
+        printf( "log output: %s\n", s_log_enabled ? "on" : "off" );
+        return;
+    }
+    printf( "unknown command: '%s'  (type 'help')\n", line );
+}
+
+static void usb_task( void* )
+{
+    char   line[ 128 ] = { 0 };
+    size_t line_len    = 0;
+
+    for ( ;; ) {
+        {
+            LogMessage msg;
+            if ( xQueueReceive( g_log_queue, &msg, pdMS_TO_TICKS(10) ) == pdTRUE ) {
+                bool flushed = false;
+                if ( s_log_enabled ) { printf( "%s", msg.buf ); flushed = true; }
+                while ( xQueueReceive( g_log_queue, &msg, 0 ) == pdTRUE )
+                    if ( s_log_enabled ) { printf( "%s", msg.buf ); flushed = true; }
+                if ( flushed ) stdio_flush();
+            }
+        }
+
+        {
+            int c;
+            while ( (c = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT && c < 256 ) {
+                if ( c == '\r' || c == '\n' ) {
+                    printf( "\r\n" );
+                    line[ line_len ] = '\0';
+                    dispatch( line, line_len );
+                    line_len = 0; line[0] = '\0';
+                    printf( "# " ); stdio_flush();
+                } else if ( (c == '\b' || c == 127) && line_len > 0 ) {
+                    line[ --line_len ] = '\0';
+                    printf( "\b \b" ); stdio_flush();
+                } else if ( c >= 0x20 && line_len < sizeof(line) - 1 ) {
+                    line[ line_len++ ] = (char)c;
+                    stdio_putchar(c); stdio_flush();
+                }
+            }
+        }
+    }
+}
+
+static StaticTask_t s_usb_tcb;
+static StackType_t  s_usb_stack[ 2048 ];
+
+void usb_task_init()
+{
+    TaskHandle_t h = task_create( usb_task, "usb", 2048, nullptr,
+                                   tskIDLE_PRIORITY + 1,
+                                   s_usb_stack, &s_usb_tcb );
+    vTaskCoreAffinitySet( h, 0x01 );
+}

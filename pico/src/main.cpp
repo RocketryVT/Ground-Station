@@ -1,60 +1,65 @@
-// Ground Station — dual LoRa receiver + servo antenna tracker + I2C bus tasks
-// FreeRTOS / RP2350 (Pico 2W)
-//
-// Task layout:
-//   wifi      (pri 3) – connects to Starlink AP; sets EVT_WIFI_CONNECTED
-//   mqtt      (pri 2) – broker connection; drains g_mqtt_queue; TODO: subscribe gs/gps
-//   lora1     (pri 4) – SX1276 / 915 MHz receive → g_rocket_location_q
-//   lora2     (pri 4) – RFM69HCW / 433 MHz receive → mqtt (rocket/rf69)
-//   gps       (pri 1) – placeholder: GPS from Starlink via MQTT (see gps_task.cpp)
-//   i2c0      (pri 2) – I2C0 bus task (barometer – not yet populated)
-//   i2c1      (pri 2) – I2C1 bus task (IMU / mag  – not yet populated)
-//   srv1      (pri 3) – Zenith  servo step/dir  (GPIO 0-3)
-//   srv2      (pri 3) – Azimuth servo step/dir  (GPIO 4-7)
-//   srv_ctrl  (pri 2) – reads location queues; posts ServoCmd to srv1/srv2
-//   usb       (pri 1) – USB CDC logger + serial console
-//
-// All FreeRTOS objects are statically allocated — no heap usage for scheduler
-// infrastructure.
+// Ground Station — Primary Pico
+// Azimuth:  STEP1 GPIO 4-7,   10:1 gearbox × 3:1 belt = 30:1 total
+// Zenith:   STEP2 GPIO 12-15, 10:1 gearbox × 5:1 belt = 50:1 total
 
 #include "shared.hpp"
 
 #include "Tasks/WiFi/wifi_task.hpp"
+#include "Tasks/NTP/ntp_task.hpp"
 #include "Tasks/MQTT/mqtt_task.hpp"
-#include "Tasks/Demo/demo_task.hpp"
-// #include "Tasks/LoRa/lora_task.hpp"
-// #include "Tasks/LoRa/lora2_task.hpp"
-// #include "Tasks/GPS/gps_task.hpp"
-// #include "Tasks/I2C/i2c_task.hpp"
-// #include "Tasks/Servo/servo_task.hpp"
+#include "Tasks/I2C/i2c_task.hpp"
+#include "Tasks/IMU/imu_task.hpp"
+#include "Tasks/Mag/mag_task.hpp"
+#include "Tasks/Baro/baro_task.hpp"
+#include "Tasks/Fusion/fusion_task.hpp"
+#include "Tasks/Stepper/stepper_task.hpp"
 #include "Tasks/USB/usb_task.hpp"
 
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
 #include "pico/stdlib.h"
 #include <stdio.h>
 
-// ── Shared FreeRTOS handles ───────────────────────────────────────────────────
+// -- Shared FreeRTOS handles ---------------------------------------------------
 EventGroupHandle_t g_net_events        = nullptr;
 QueueHandle_t      g_mqtt_queue        = nullptr;
 QueueHandle_t      g_log_queue         = nullptr;
-// QueueHandle_t      g_gs_location_q     = nullptr;
-// QueueHandle_t      g_rocket_location_q = nullptr;
+QueueHandle_t      g_gs_location_q     = nullptr;
+QueueHandle_t      g_rocket_location_q = nullptr;
+QueueHandle_t      g_imu_q             = nullptr;
+QueueHandle_t      g_icm_q             = nullptr;
+QueueHandle_t      g_mag_q             = nullptr;
+QueueHandle_t      g_baro_q            = nullptr;
 
-// ── Static backing storage ────────────────────────────────────────────────────
+// -- Static backing storage ----------------------------------------------------
 static StaticEventGroup_t s_net_events_buf;
 
 static StaticQueue_t s_mqtt_queue_buf;
 static uint8_t       s_mqtt_queue_storage[ MQTT_QUEUE_DEPTH * sizeof(MqttMessage) ];
 
 static StaticQueue_t s_log_queue_buf;
-static uint8_t       s_log_queue_storage[ LOG_QUEUE_DEPTH  * sizeof(LogMessage)   ];
+static uint8_t       s_log_queue_storage[ LOG_QUEUE_DEPTH  * sizeof(LogMessage) ];
 
-// static StaticQueue_t s_gs_location_buf;
-// static uint8_t       s_gs_location_storage[ sizeof(LocationMsg) ];
+static StaticQueue_t s_gs_location_buf;
+static uint8_t       s_gs_location_storage[ 1 * sizeof(LocationMsg) ];
 
-// static StaticQueue_t s_rocket_location_buf;
-// static uint8_t       s_rocket_location_storage[ sizeof(LocationMsg) ];
+static StaticQueue_t s_rocket_location_buf;
+static uint8_t       s_rocket_location_storage[ 1 * sizeof(LocationMsg) ];
 
-// ── FreeRTOS static-allocation callbacks ──────────────────────────────────────
+static StaticQueue_t s_imu_buf;
+static uint8_t       s_imu_storage[ 1 * sizeof(ImuMsg) ];
+
+static StaticQueue_t s_icm_buf;
+static uint8_t       s_icm_storage[ 1 * sizeof(IcmMsg) ];
+
+static StaticQueue_t s_mag_buf;
+static uint8_t       s_mag_storage[ 1 * sizeof(MagMsg) ];
+
+static StaticQueue_t s_baro_buf;
+static uint8_t       s_baro_storage[ 1 * sizeof(BaroMsg) ];
+
+// -- FreeRTOS static-allocation callbacks --------------------------------------
 extern "C" {
 
 void vApplicationGetIdleTaskMemory( StaticTask_t** ppxIdleTaskTCBBuffer,
@@ -94,24 +99,15 @@ void vApplicationGetTimerTaskMemory( StaticTask_t** ppxTimerTaskTCBBuffer,
 
 } // extern "C"
 
-// ── Entry point ───────────────────────────────────────────────────────────────
+// -- Entry point ---------------------------------------------------------------
 int main()
 {
     stdio_init_all();
 
-    // Give the USB CDC host a moment to connect before tasks start printing.
-    // Without this, early log messages are silently dropped when no host is listening.
     sleep_ms( 3000 );
+    printf( "Ground station primary starting...\n" );
 
-    printf( "Ground Station starting...\n" );
-
-    for ( int i = 0; i < 10; ++i ) {
-        printf( "." );
-        sleep_ms( 500 );
-    }
-    printf( "\n" );
-
-    // Shared synchronisation objects
+    // -- Create all shared queues and event groups ------------------------------
     g_net_events = xEventGroupCreateStatic( &s_net_events_buf );
 
     g_mqtt_queue = xQueueCreateStatic( MQTT_QUEUE_DEPTH, sizeof(MqttMessage),
@@ -119,43 +115,33 @@ int main()
     g_log_queue  = xQueueCreateStatic( LOG_QUEUE_DEPTH,  sizeof(LogMessage),
                                         s_log_queue_storage,  &s_log_queue_buf );
 
-    printf( "Initializing tasks...\n" );
+    g_gs_location_q     = xQueueCreateStatic( 1, sizeof(LocationMsg),
+                                               s_gs_location_storage, &s_gs_location_buf );
+    g_rocket_location_q = xQueueCreateStatic( 1, sizeof(LocationMsg),
+                                               s_rocket_location_storage, &s_rocket_location_buf );
 
-    // // Depth-1 overwrite queues — always carry the latest known position
-    // g_gs_location_q     = xQueueCreateStatic( 1, sizeof(LocationMsg),
-    //                                            s_gs_location_storage,
-    //                                            &s_gs_location_buf );
-    // g_rocket_location_q = xQueueCreateStatic( 1, sizeof(LocationMsg),
-    //                                            s_rocket_location_storage,
-    //                                            &s_rocket_location_buf );
+    g_imu_q  = xQueueCreateStatic( 1, sizeof(ImuMsg),  s_imu_storage,  &s_imu_buf  );
+    g_icm_q  = xQueueCreateStatic( 1, sizeof(IcmMsg),  s_icm_storage,  &s_icm_buf  );
+    g_mag_q  = xQueueCreateStatic( 1, sizeof(MagMsg),  s_mag_storage,  &s_mag_buf  );
+    g_baro_q = xQueueCreateStatic( 1, sizeof(BaroMsg), s_baro_storage, &s_baro_buf );
 
-    // ── Spawn tasks ───────────────────────────────────────────────────────────
+    // -- Init tasks (order matters: I2C before sensors, WiFi before MQTT/NTP) --
+    i2c0_task_init();   // I2C0: barometer (MS5611 @ 0x77)
+    i2c1_task_init();   // I2C1: IMU (ICM-42688-P @ 0x68) + mag (LIS3MDL @ 0x1C)
+
+    imu_task_init();
+    mag_task_init();
+    baro_task_init();
+    fusion_task_init();
+
     wifi_task_init();
+    ntp_task_init();
     mqtt_task_init();
-    demo_task_init();
 
-    // lora1_task_init();
-    // lora2_task_init();
-
-    // gps_task_init();
-
-    // i2c0_task_init();
-    // i2c1_task_init();
-
-    // servo1_task_init();
-    // servo2_task_init();
-    // servo_ctrl_task_init();
-
-    printf( "Initializing USB task...\n" );
+    stepper_az_task_init();
+    stepper_zen_task_init();
 
     usb_task_init();
-
-    log_print( "System initialized.\n" );
-
-    // Trigger heap initialization so xPortGetFreeHeapSize() reports real numbers
-    { void *p = pvPortMalloc(1); vPortFree(p); }
-
-    log_print( "Starting scheduler...\n" );
 
     vTaskStartScheduler();
     for ( ;; ) {}

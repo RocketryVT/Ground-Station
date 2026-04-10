@@ -8,7 +8,7 @@
 
 #include "pico/stdlib.h"
 
-// ── log_print ─────────────────────────────────────────────────────────────────
+// -- log_print -----------------------------------------------------------------
 // Sole caller of printf() in the whole project.  All other tasks call
 // log_print() to keep stdio off the FreeRTOS SMP shared stack.
 // Non-blocking: message silently dropped if the queue is full.
@@ -22,12 +22,12 @@ void log_print( const char* fmt, ... )
     xQueueSend( g_log_queue, &msg, 0 );
 }
 
-// ── Console output flag ───────────────────────────────────────────────────────
+// -- Console output flag -------------------------------------------------------
 // Default true for ground station — all log_print() output is visible without
 // needing to type "log on".  Use "log off" to suppress if needed.
 static bool s_log_enabled = true;
 
-// ── Commands ──────────────────────────────────────────────────────────────────
+// -- Commands ------------------------------------------------------------------
 
 static void cmd_help()
 {
@@ -56,7 +56,7 @@ static void cmd_status()
     printf( "log output : %s\n", s_log_enabled ? "on" : "off" );
 }
 
-// ── Command dispatch ──────────────────────────────────────────────────────────
+// -- Command dispatch ----------------------------------------------------------
 
 static void dispatch( const char* line, size_t len )
 {
@@ -84,7 +84,7 @@ static void dispatch( const char* line, size_t len )
     printf( "unknown command: '%s'  (type 'help')\n", line );
 }
 
-// ── USB / serial console task ─────────────────────────────────────────────────
+// -- USB / serial console task -------------------------------------------------
 // Pinned to core 0: TinyUSB IRQ fires on core 0; printf() must live there too.
 //
 // Loop:
@@ -97,7 +97,7 @@ static void usb_task( void* )
     size_t     line_len    = 0;
 
     for ( ;; ) {
-        // ── 1. Drain log queue ────────────────────────────────────────────
+        // -- 1. Drain log queue --------------------------------------------
         {
             LogMessage msg;
             if ( xQueueReceive( g_log_queue, &msg, pdMS_TO_TICKS( 10 ) ) == pdTRUE ) {
@@ -109,7 +109,7 @@ static void usb_task( void* )
             }
         }
 
-        // ── 2. Read characters from USB CDC ──────────────────────────────
+        // -- 2. Read characters from USB CDC ------------------------------
         {
             int c;
             while ( ( c = getchar_timeout_us( 0 ) ) != PICO_ERROR_TIMEOUT && c < 256 ) {

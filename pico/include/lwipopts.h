@@ -46,4 +46,22 @@
 #define LWIP_STATS_DISPLAY              0
 #define LWIP_DEBUG                      0
 
+// -- SNTP ----------------------------------------------------------------------
+// Route SNTP time callbacks to our ntp_task handler.
+// sntp_set_system_time_us() is defined in ntp_task.cpp (extern "C").
+// Forward declaration required so sntp.c can see it when the macro expands.
+#include <stdint.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+void sntp_set_system_time_us(uint32_t sec, uint32_t us);
+#ifdef __cplusplus
+}
+#endif
+#define SNTP_SET_SYSTEM_TIME_US(sec, us)  sntp_set_system_time_us((sec), (us))
+#define SNTP_UPDATE_DELAY                 60000   // re-sync every 60 s
+#define SNTP_STARTUP_DELAY                0       // sync immediately on init
+#define SNTP_MAX_SERVERS                  1
+#define SNTP_SERVER_DNS                   1       // resolve server by hostname
+
 #endif /* _LWIPOPTS_H */

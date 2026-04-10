@@ -10,7 +10,7 @@
 // #include "pico/time.h"
 // #include <string.h>
 
-// // ── Radio instance ────────────────────────────────────────────────────────────
+// // -- Radio instance ------------------------------------------------------------
 // static const SX1276Config s_lora1_cfg {
 //     LoRa1Cfg::FREQ_MHZ,
 //     LoRa1Cfg::BW_KHZ,
@@ -30,7 +30,7 @@
 //                               Pins::LORA1_RST,
 //                               s_lora1_cfg );
 
-// // ── Helpers ───────────────────────────────────────────────────────────────────
+// // -- Helpers -------------------------------------------------------------------
 // static const char* state_name( FlightState s )
 // {
 //     switch ( s ) {
@@ -47,14 +47,14 @@
 //     }
 // }
 
-// // ── SPI diagnostic ────────────────────────────────────────────────────────────
+// // -- SPI diagnostic ------------------------------------------------------------
 // // Reads the SX1276 RegVersion register (0x42) via bare-metal SPI before
 // // RadioLib's begin(), so the raw byte is logged regardless of outcome.
 // // A second read with MISO pulled up disambiguates floating from driven-low:
-// //   read=0x12, pulled=0x12 → SX1276 present and healthy
-// //   read=0x00, pulled=0xFF → MISO not connected (wire missing)
-// //   read=0x00, pulled=0x00 → MISO shorted to GND
-// //   read=0xFF, pulled=0xFF → chip in reset / not powered
+// //   read=0x12, pulled=0x12 -> SX1276 present and healthy
+// //   read=0x00, pulled=0xFF -> MISO not connected (wire missing)
+// //   read=0x00, pulled=0x00 -> MISO shorted to GND
+// //   read=0xFF, pulled=0xFF -> chip in reset / not powered
 // static uint8_t diag_spi_read_reg( bool miso_pullup )
 // {
 //     spi_init( spi0, 1'000'000u );
@@ -105,7 +105,7 @@
 //                     Pins::LORA1_MOSI, Pins::LORA1_MISO, Pins::LORA1_RST );
 // }
 
-// // ── Task ──────────────────────────────────────────────────────────────────────
+// // -- Task ----------------------------------------------------------------------
 // static void lora1_task( void* )
 // {
 //     // Assert power-enable pin

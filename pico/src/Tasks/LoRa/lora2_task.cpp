@@ -8,7 +8,7 @@
 // #include "hardware/gpio.h"
 // #include <string.h>
 
-// // ── Radio instance ────────────────────────────────────────────────────────────
+// // -- Radio instance ------------------------------------------------------------
 // static const RF69Config s_lora2_cfg {
 //     LoRa2Cfg::FREQ_MHZ,
 //     LoRa2Cfg::BR_KBPS,
@@ -28,7 +28,7 @@
 //                             Pins::LORA2_RST,
 //                             s_lora2_cfg );
 
-// // ── Task ──────────────────────────────────────────────────────────────────────
+// // -- Task ----------------------------------------------------------------------
 // static void lora2_task( void* )
 // {
 //     // Assert power-enable pin

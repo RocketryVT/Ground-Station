@@ -1,13 +1,7 @@
 #pragma once
 
-// GPS task – ground-station position from Starlink over WiFi.
-//
-// Ground-station GPS no longer comes from a dedicated UART module.
-// The Pico 2W connects to the Starlink router and receives position via
-// an MQTT subscription on "gs/gps".
-//
-// TODO: extend the MQTT task to call xQueueOverwrite(g_gs_location_q, &loc)
-//       when a "gs/gps" JSON message is received.  Until that is wired up,
-//       g_gs_location_q will remain empty and the servo controller will hold
-//       its last known position.
+// Spawns the Starlink GPS polling task.
+// Polls http://192.168.100.1/api/v1/status every STARLINK_POLL_INTERVAL_MS,
+// extracts latitude/longitude/altitudeMeters from the JSON response, and
+// writes the result to g_gs_location_q via xQueueOverwrite().
 void gps_task_init();
