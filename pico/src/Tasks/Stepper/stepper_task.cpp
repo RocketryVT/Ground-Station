@@ -84,30 +84,16 @@ static void axis_task_body( void* arg )
     // Initialise hardware
     drv.init( ax.drv );
 
-    // Enable motor, then wait for startup (CL57TE ≥ 200 ms settling)
-    drv.enable();
-    vTaskDelay( pdMS_TO_TICKS(200) );
+    vTaskDelay( pdMS_TO_TICKS(200) );  // CL57TE startup settling
 
-    log_print( "[%s] enabled  steps/deg=%.2f\n",
+    log_print( "[%s] ready  steps/deg=%.2f\n",
                ax.tag, drv.steps_per_deg() );
 
     int32_t  pos_steps    = 0;   // commanded position (what we told the drive)
     int32_t  target_steps = 0;   // latest target from command queue
-    int32_t  moving_to_steps = 0;
     bool     move_pending_completion = false;
 
     for ( ;; ) {
-        // -- Fault monitoring -------------------------------------------------
-        if ( drv.is_faulted() ) {
-            drv.stop();
-            drv.disable();
-            log_print( "[%s] FAULT detected — re-enable in 5 s\n", ax.tag );
-            vTaskDelay( pdMS_TO_TICKS(5000) );
-            drv.enable();
-            vTaskDelay( pdMS_TO_TICKS(200) );
-            log_print( "[%s] re-enabled after fault\n", ax.tag );
-        }
-
         // -- Process latest command -------------------------------------------
         StepperCmd cmd = {};
         if ( xQueuePeek( *ax.cmd_q, &cmd, 0 ) == pdTRUE ) {
@@ -115,11 +101,9 @@ static void axis_task_body( void* arg )
             if ( cmd.stop ) {
                 drv.stop();
                 pos_steps = drv.pos_steps();
-                drv.disable();
                 move_pending_completion = false;
-                moving_to_steps = pos_steps;
 
-            } else if ( drv.is_enabled() ) {
+            } else {
                 float clamped = cmd.target_angle_deg;
                 if ( clamped < ax.min_deg ) clamped = ax.min_deg;
                 if ( clamped > ax.max_deg ) clamped = ax.max_deg;
@@ -133,7 +117,6 @@ static void axis_task_body( void* arg )
                         drv.stop();
                         pos_steps = drv.pos_steps();
                         move_pending_completion = false;
-                        moving_to_steps = pos_steps;
                         log_print( "[%s] move interrupted for new target_steps=%ld\n",
                                    ax.tag,
                                    (long)target_steps );
@@ -142,18 +125,8 @@ static void axis_task_body( void* arg )
             }
         }
 
-        // -- Re-enable if a stop command was cleared --------------------------
-        if ( !drv.is_enabled() && !drv.is_faulted() ) {
-            StepperCmd check = {};
-            bool have = ( xQueuePeek( *ax.cmd_q, &check, 0 ) == pdTRUE );
-            if ( have && !check.stop ) {
-                drv.enable();
-                vTaskDelay( pdMS_TO_TICKS(200) );
-            }
-        }
-
         // -- Issue move if needed ---------------------------------------------
-        if ( drv.is_enabled() && !drv.is_faulted() && !drv.is_moving() ) {
+        if ( !cmd.stop && !drv.is_moving() ) {
             if ( move_pending_completion ) {
                 pos_steps = drv.pos_steps();
                 move_pending_completion = false;
@@ -173,7 +146,6 @@ static void axis_task_body( void* arg )
                     : 0;
 
                 if ( drv.start_move( delta, hz ) ) {
-                    moving_to_steps = target_steps;
                     move_pending_completion = true;
                     log_print( "[%s] move delta_steps=%ld target_steps=%ld speed_hz=%lu dir_gpio=%u dir_level=%u dir_readback=%u\n",
                                ax.tag,
@@ -191,8 +163,8 @@ static void axis_task_body( void* arg )
         StepperStatus st = {};
         st.angle_deg    = drv.angle_deg();
         st.moving       = drv.is_moving();
-        st.faulted      = drv.is_faulted();
-        st.enabled      = drv.is_enabled();
+        st.faulted      = false;
+        st.enabled      = true;
         st.timestamp_us = time_us_64();
         xQueueOverwrite( *ax.status_q, &st );
 
@@ -271,18 +243,12 @@ void stepper_az_task_init()
 
     s_az_ctx.cfg = AxisCfg {
         .drv = {
-            .pul             = Pins::STEP1_PUL,
             .pul_n           = Pins::STEP1_PUL_N,
-            .dir             = Pins::STEP1_DIR,
             .dir_n           = Pins::STEP1_DIR_N,
-            .ena             = Pins::STEP1_ENA,
-            .alm             = Pins::STEP1_ALM,
             .pulses_per_rev  = StepCfg::PULSES_PER_REV,
             .gear_ratio      = StepCfg::AZ_GEAR_RATIO,
             .max_speed_dps   = StepCfg::MAX_SPEED_DPS,
             .default_speed_dps = StepCfg::DEFAULT_SPEED_DPS,
-            .pul_active_low  = true,
-            .dir_active_low  = true,
         },
         .cmd_q    = &g_stepper_az_cmd_q,
         .status_q = &g_stepper_az_status_q,
@@ -314,18 +280,12 @@ void stepper_zen_task_init()
 
     s_zen_ctx.cfg = AxisCfg {
         .drv = {
-            .pul             = Pins::STEP2_PUL,
             .pul_n           = Pins::STEP2_PUL_N,
-            .dir             = Pins::STEP2_DIR,
             .dir_n           = Pins::STEP2_DIR_N,
-            .ena             = Pins::STEP2_ENA,
-            .alm             = Pins::STEP2_ALM,
             .pulses_per_rev  = StepCfg::PULSES_PER_REV,
             .gear_ratio      = StepCfg::ZEN_GEAR_RATIO,
             .max_speed_dps   = StepCfg::MAX_SPEED_DPS,
             .default_speed_dps = StepCfg::DEFAULT_SPEED_DPS,
-            .pul_active_low  = true,
-            .dir_active_low  = true,
         },
         .cmd_q    = &g_stepper_zen_cmd_q,
         .status_q = &g_stepper_zen_status_q,

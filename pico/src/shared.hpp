@@ -70,22 +70,16 @@ namespace Pins {
     static constexpr uint I2C1_SCL   =  3;  // GPIO 3,  phys  5
 
     // -- Servo 1 / TOP ---------------------------------------------------------
-    // PUL+ / DIR+ are not GPIO-controlled in the current harness.
-    static constexpr uint STEP1_PUL  =  4;  // GPIO  4, phys  6 — Servo1 PUL-
-    static constexpr uint STEP1_PUL_N= 0xFFu;  // not wired
-    static constexpr uint STEP1_DIR  =  5;  // GPIO  5, phys  7 — Servo1 DIR-
-    static constexpr uint STEP1_DIR_N= 0xFFu;  // not wired
-    static constexpr uint STEP1_ENA  = 0xFFu;  // not wired
-    static constexpr uint STEP1_ALM  = 0xFFu;  // not wired
+    // CL57TE PUL+ / DIR+ are held high by the PCB; Pico drives the active-low
+    // opto inputs only.
+    static constexpr uint STEP1_PUL_N = 4;  // GPIO 4, phys 6 — Servo1 PUL-
+    static constexpr uint STEP1_DIR_N = 5;  // GPIO 5, phys 7 — Servo1 DIR-
 
     // -- Servo 2 / BOTTOM ------------------------------------------------------
-    // PUL+ / DIR+ are not GPIO-controlled in the current harness.
-    static constexpr uint STEP2_PUL  =  6;  // GPIO  6, phys  9 — Servo2 PUL-
-    static constexpr uint STEP2_PUL_N= 0xFFu;  // not wired
-    static constexpr uint STEP2_DIR  =  7;  // GPIO  7, phys 10 — Servo2 DIR-
-    static constexpr uint STEP2_DIR_N= 0xFFu;  // not wired
-    static constexpr uint STEP2_ENA  = 0xFFu;  // not wired
-    static constexpr uint STEP2_ALM  = 0xFFu;  // not wired
+    // CL57TE PUL+ / DIR+ are held high by the PCB; Pico drives the active-low
+    // opto inputs only.
+    static constexpr uint STEP2_PUL_N = 6;  // GPIO 6, phys 9 — Servo2 PUL-
+    static constexpr uint STEP2_DIR_N = 7;  // GPIO 7, phys 10 — Servo2 DIR-
 
     // -- LoRa 1 / LEFT SPI – SPI1 ---------------------------------------------
     static constexpr uint LORA1_MISO =  8;  // GPIO  8, phys 11
