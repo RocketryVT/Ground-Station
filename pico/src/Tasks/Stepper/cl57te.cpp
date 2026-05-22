@@ -4,6 +4,20 @@
 #include "pico/time.h"
 #include <math.h>
 
+static float wrap_360_local( float deg )
+{
+    while ( deg < 0.0f )    deg += 360.0f;
+    while ( deg >= 360.0f ) deg -= 360.0f;
+    return deg;
+}
+
+static float normalize_delta_180( float deg )
+{
+    while ( deg > 180.0f )   deg -= 360.0f;
+    while ( deg <= -180.0f ) deg += 360.0f;
+    return deg;
+}
+
 // -----------------------------------------------------------------------------
 // Hardware timer ISR  –  runs in IRQ context, no FreeRTOS calls allowed
 // -----------------------------------------------------------------------------
@@ -52,6 +66,54 @@ void Cl57te::init( const Config& cfg )
 
     remaining_ = 0;
     pos_steps_ = 0;
+}
+
+// -----------------------------------------------------------------------------
+// Angle reference and targeting
+// -----------------------------------------------------------------------------
+
+int32_t Cl57te::angle_to_steps( float angle_deg ) const
+{
+    return static_cast<int32_t>( roundf( angle_deg * steps_per_deg_ ) );
+}
+
+void Cl57te::set_current_angle( float angle_deg )
+{
+    stop();
+    pos_steps_ = angle_to_steps( angle_deg );
+}
+
+int32_t Cl57te::target_steps_for_angle( float target_angle_deg,
+                                        bool shortest_path ) const
+{
+    if ( !shortest_path ) {
+        return angle_to_steps( target_angle_deg );
+    }
+
+    const float current_angle = angle_deg();
+    const float current_wrapped = wrap_360_local( current_angle );
+    const float target_wrapped = wrap_360_local( target_angle_deg );
+    const float delta = normalize_delta_180( target_wrapped - current_wrapped );
+    return angle_to_steps( current_angle + delta );
+}
+
+uint32_t Cl57te::step_hz_for_speed( float speed_dps ) const
+{
+    float dps = ( speed_dps > 0.0f ) ? speed_dps : cfg_.default_speed_dps;
+    if ( dps > cfg_.max_speed_dps ) dps = cfg_.max_speed_dps;
+
+    uint32_t step_hz = static_cast<uint32_t>( dps * steps_per_deg_ );
+    return step_hz < 1u ? 1u : step_hz;
+}
+
+bool Cl57te::set_angle( float target_angle_deg,
+                        float speed_dps,
+                        bool shortest_path )
+{
+    const int32_t target_steps =
+        target_steps_for_angle( target_angle_deg, shortest_path );
+    const int32_t delta_steps = target_steps - pos_steps_;
+    return start_move( delta_steps, step_hz_for_speed( speed_dps ) );
 }
 
 // -----------------------------------------------------------------------------
@@ -122,4 +184,9 @@ void Cl57te::stop()
 float Cl57te::angle_deg() const
 {
     return static_cast<float>( pos_steps_ ) / steps_per_deg_;
+}
+
+float Cl57te::wrapped_angle_deg() const
+{
+    return wrap_360_local( angle_deg() );
 }

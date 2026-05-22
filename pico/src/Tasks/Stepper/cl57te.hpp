@@ -48,6 +48,18 @@ public:
     void init( const Config& cfg );
 
     // -- Motion ----------------------------------------------------------------
+    // Define the current mechanical position in the driver's software reference
+    // frame. Use zero() when a homing/calibration source says "this is zero".
+    void zero() { set_current_angle( 0.0f ); }
+    void set_current_angle( float angle_deg );
+
+    // Command an absolute angle in degrees. When shortest_path is true, the
+    // driver chooses the nearest equivalent target modulo 360 while preserving
+    // its continuous turn count. Example: at 350 deg, set_angle(0) moves +10 deg.
+    bool set_angle( float target_angle_deg,
+                    float speed_dps = 0.0f,
+                    bool shortest_path = true );
+
     // start_move: begin stepping toward |n_steps| from current position.
     //   n_steps > 0  -> positive direction (DIR- LOW)
     //   n_steps < 0  -> negative direction (DIR- HIGH)
@@ -73,6 +85,7 @@ public:
     // commanded mechanical position, not an encoder measurement.
     int32_t  pos_steps() const  { return pos_steps_; }
     float    angle_deg()  const;
+    float    wrapped_angle_deg() const;
 
     // Called by task once is_moving() becomes false to finalise pos_steps_.
     void commit_position( int32_t pos ) { pos_steps_ = pos; }
@@ -95,4 +108,9 @@ private:
     // Modified by ISR, read by task — volatile is sufficient here because
     // the task only reads (never writes while the timer is running).
     volatile int32_t  remaining_ = 0;
+
+    int32_t angle_to_steps( float angle_deg ) const;
+    int32_t target_steps_for_angle( float target_angle_deg,
+                                    bool shortest_path ) const;
+    uint32_t step_hz_for_speed( float speed_dps ) const;
 };

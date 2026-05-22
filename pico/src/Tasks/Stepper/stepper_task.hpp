@@ -13,7 +13,7 @@
 // Command interface:
 //   Write a StepperCmd to g_stepper_az_cmd_q or g_stepper_zen_cmd_q using
 //   xQueueOverwrite().  The task always acts on the latest value.
-//   Set .stop = true to abort motion and disable the drive immediately.
+//   Set .stop = true to abort motion immediately.
 //
 // Status interface:
 //   Peek g_stepper_az_status_q / g_stepper_zen_status_q (depth-1 overwrite)
@@ -21,9 +21,9 @@
 //
 // Home position:
 //   At start-up the drive has no knowledge of absolute position; pos=0 is
-//   defined as wherever the motor shaft was when the task enabled the drive.
-//   Implement a homing sequence externally if needed and reset by sending
-//   a command with target_angle_deg = 0 from the known home position.
+//   defined as wherever the motor shaft was when the driver initialized.
+//   Cl57te::zero() / set_current_angle() can later be called from a homing or
+//   calibration source to redefine that software reference.
 // -----------------------------------------------------------------------------
 
 #include "FreeRTOS.h"
@@ -31,14 +31,14 @@
 
 // Sent TO the stepper tasks
 struct StepperCmd {
-    float  target_angle_deg;    // absolute angle from home in degrees
+    float  target_angle_deg;    // absolute angle in degrees (az: 0-360; zen: 0-90)
     float  speed_dps;           // desired speed (deg/s); 0 = use default
-    bool   stop;                // true -> abort move and disable drive
+    bool   stop;                // true -> abort move
 };
 
 // Published BY the stepper tasks (depth-1 overwrite, use xQueuePeek)
 struct StepperStatus {
-    float    angle_deg;         // current position in degrees
+    float    angle_deg;         // continuous current software angle in degrees
     bool     moving;            // currently executing a move
     bool     faulted;           // ALM pin asserted
     bool     enabled;           // motor is energised

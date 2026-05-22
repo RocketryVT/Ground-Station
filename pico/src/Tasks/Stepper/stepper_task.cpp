@@ -30,13 +30,13 @@ namespace StepCfg {
     static constexpr float    MAX_SPEED_DPS         = 90.0f;
     static constexpr float    DEFAULT_SPEED_DPS     = 30.0f;
 
-    // Azimuth: shortest-path rotation, no cable-wrap limit yet
-    static constexpr float    AZ_MIN_DEG            = -180.0f;
-    static constexpr float    AZ_MAX_DEG            =  180.0f;
+    // Azimuth: half-circle travel around north/up: 270° west -> 0° -> 90° east.
+    static constexpr float    AZ_MIN_DEG            = 270.0f;
+    static constexpr float    AZ_MAX_DEG            =  90.0f;
 
-    // Zenith: mechanical travel limits
-    static constexpr float    ZEN_MIN_DEG           =   0.0f;
-    static constexpr float    ZEN_MAX_DEG           =  90.0f;
+    // Zenith: 0° is horizontal/up. Allow slight down travel and larger up travel.
+    static constexpr float    ZEN_MIN_DEG           = 345.0f;
+    static constexpr float    ZEN_MAX_DEG           =  80.0f;
 
     static constexpr uint32_t STATE_PUBLISH_MS      = 1000;
 }
@@ -46,6 +46,40 @@ static float wrap_360( float deg )
     while ( deg < 0.0f )    deg += 360.0f;
     while ( deg >= 360.0f ) deg -= 360.0f;
     return deg;
+}
+
+static float normalize_delta_180( float deg )
+{
+    while ( deg > 180.0f )   deg -= 360.0f;
+    while ( deg <= -180.0f ) deg += 360.0f;
+    return deg;
+}
+
+static bool angle_in_wrapped_range( float deg, float min_deg, float max_deg )
+{
+    const float angle = wrap_360( deg );
+    const float min_w = wrap_360( min_deg );
+    const float max_w = wrap_360( max_deg );
+
+    if ( min_w <= max_w ) {
+        return angle >= min_w && angle <= max_w;
+    }
+    return angle >= min_w || angle <= max_w;
+}
+
+static float clamp_wrapped_angle( float deg, float min_deg, float max_deg )
+{
+    const float angle = wrap_360( deg );
+    const float min_w = wrap_360( min_deg );
+    const float max_w = wrap_360( max_deg );
+
+    if ( angle_in_wrapped_range( angle, min_w, max_w ) ) {
+        return angle;
+    }
+
+    const float to_min = fabsf( normalize_delta_180( min_w - angle ) );
+    const float to_max = fabsf( normalize_delta_180( max_w - angle ) );
+    return to_min <= to_max ? min_w : max_w;
 }
 
 // -----------------------------------------------------------------------------
@@ -67,6 +101,8 @@ struct AxisCfg {
     QueueHandle_t* status_q;    // pointer to status queue handle
     float min_deg;              // soft travel limit (lower)
     float max_deg;              // soft travel limit (upper)
+    bool  wrapped_limits;       // true when allowed range crosses 0°
+    bool  shortest_path;        // true for modulo-360 axes such as azimuth
     const char*    tag;
 };
 
@@ -89,8 +125,9 @@ static void axis_task_body( void* arg )
     log_print( "[%s] ready  steps/deg=%.2f\n",
                ax.tag, drv.steps_per_deg() );
 
-    int32_t  pos_steps    = 0;   // commanded position (what we told the drive)
-    int32_t  target_steps = 0;   // latest target from command queue
+    float    target_angle_deg = 0.0f;
+    bool     have_target = false;
+    bool     target_dirty = false;
     bool     move_pending_completion = false;
 
     for ( ;; ) {
@@ -100,26 +137,29 @@ static void axis_task_body( void* arg )
 
             if ( cmd.stop ) {
                 drv.stop();
-                pos_steps = drv.pos_steps();
+                target_dirty = false;
                 move_pending_completion = false;
 
             } else {
-                float clamped = cmd.target_angle_deg;
-                if ( clamped < ax.min_deg ) clamped = ax.min_deg;
-                if ( clamped > ax.max_deg ) clamped = ax.max_deg;
+                float clamped = ax.wrapped_limits
+                    ? clamp_wrapped_angle( cmd.target_angle_deg, ax.min_deg, ax.max_deg )
+                    : cmd.target_angle_deg;
+                if ( !ax.wrapped_limits ) {
+                    if ( clamped < ax.min_deg ) clamped = ax.min_deg;
+                    if ( clamped > ax.max_deg ) clamped = ax.max_deg;
+                }
 
-                int32_t new_target = static_cast<int32_t>(
-                    roundf( clamped * drv.steps_per_deg() ) );
-
-                if ( new_target != target_steps ) {
-                    target_steps = new_target;
+                if ( !have_target
+                     || fabsf( clamped - target_angle_deg ) > 0.001f ) {
+                    target_angle_deg = clamped;
+                    have_target = true;
+                    target_dirty = true;
                     if ( drv.is_moving() ) {
                         drv.stop();
-                        pos_steps = drv.pos_steps();
                         move_pending_completion = false;
-                        log_print( "[%s] move interrupted for new target_steps=%ld\n",
+                        log_print( "[%s] move interrupted for new target=%.2f\n",
                                    ax.tag,
-                                   (long)target_steps );
+                                   (double)target_angle_deg );
                     }
                 }
             }
@@ -128,7 +168,7 @@ static void axis_task_body( void* arg )
         // -- Issue move if needed ---------------------------------------------
         if ( !cmd.stop && !drv.is_moving() ) {
             if ( move_pending_completion ) {
-                pos_steps = drv.pos_steps();
+                int32_t pos_steps = drv.pos_steps();
                 move_pending_completion = false;
                 log_print( "[%s] move complete pos_steps=%ld angle=%.2f\n",
                            ax.tag,
@@ -136,25 +176,23 @@ static void axis_task_body( void* arg )
                            (double)drv.angle_deg() );
             }
 
-            pos_steps = drv.pos_steps();
-            int32_t delta = target_steps - pos_steps;
-            if ( delta != 0 ) {
+            if ( target_dirty && have_target ) {
                 StepperCmd c = {};
                 xQueuePeek( *ax.cmd_q, &c, 0 );
-                uint32_t hz = ( c.speed_dps > 0.0f )
-                    ? static_cast<uint32_t>( c.speed_dps * drv.steps_per_deg() )
-                    : 0;
 
-                if ( drv.start_move( delta, hz ) ) {
-                    move_pending_completion = true;
-                    log_print( "[%s] move delta_steps=%ld target_steps=%ld speed_hz=%lu dir_gpio=%u dir_level=%u dir_readback=%u\n",
-                               ax.tag,
-                               (long)delta,
-                               (long)target_steps,
-                               (unsigned long)hz,
-                               (unsigned)drv.dir_pin(),
-                               drv.dir_level_for_steps( delta ) ? 1u : 0u,
-                               drv.dir_gpio_level() ? 1u : 0u );
+                const float before_angle = drv.angle_deg();
+                if ( drv.set_angle( target_angle_deg, c.speed_dps, ax.shortest_path ) ) {
+                    target_dirty = false;
+                    if ( drv.is_moving() ) {
+                        move_pending_completion = true;
+                        log_print( "[%s] move target=%.2f from=%.2f speed_dps=%.2f dir_gpio=%u dir_readback=%u\n",
+                                   ax.tag,
+                                   (double)target_angle_deg,
+                                   (double)before_angle,
+                                   (double)c.speed_dps,
+                                   (unsigned)drv.dir_pin(),
+                                   drv.dir_gpio_level() ? 1u : 0u );
+                    }
                 }
             }
         }
@@ -197,11 +235,7 @@ static void stepper_ctrl_task( void* )
             double az  = rocket_math::GroundStationMath::calculateAzimuth(  station, rocket );
             double zen = rocket_math::GroundStationMath::calculateElevation( station, rocket );
 
-            // Normalise azimuth to [-180, 180] for shortest-path rotation
-            while ( az >  180.0 ) az -= 360.0;
-            while ( az < -180.0 ) az += 360.0;
-
-            StepperCmd az_cmd  { static_cast<float>( az  ), 0.0f, false };
+            StepperCmd az_cmd  { wrap_360( static_cast<float>( az ) ), 0.0f, false };
             StepperCmd zen_cmd { static_cast<float>( zen ), 0.0f, false };
 
             if ( g_stepper_az_cmd_q  ) xQueueOverwrite( g_stepper_az_cmd_q,  &az_cmd  );
@@ -226,7 +260,7 @@ static uint8_t s_zen_status_storage[ sizeof(StepperStatus) ];
 
 // -----------------------------------------------------------------------------
 // Azimuth axis  (STEP1 – PUL- GPIO 4, DIR- GPIO 5)
-// 10:1 planetary gearbox × 3:1 belt = 30:1 total, travel ±180°
+// 10:1 planetary gearbox × 3:1 belt = 30:1 total, travel 270°..0°..90°
 // -----------------------------------------------------------------------------
 
 static AxisContext s_az_ctx;
@@ -254,6 +288,8 @@ void stepper_az_task_init()
         .status_q = &g_stepper_az_status_q,
         .min_deg  = StepCfg::AZ_MIN_DEG,
         .max_deg  = StepCfg::AZ_MAX_DEG,
+        .wrapped_limits = true,
+        .shortest_path = true,
         .tag      = "az",
     };
 
@@ -263,7 +299,7 @@ void stepper_az_task_init()
 
 // -----------------------------------------------------------------------------
 // Zenith axis  (STEP2 – PUL- GPIO 6, DIR- GPIO 7)
-// 10:1 planetary gearbox × 5:1 belt = 50:1 total, travel 0–90°
+// 10:1 planetary gearbox × 5:1 belt = 50:1 total, travel 345°..0°..80°
 // -----------------------------------------------------------------------------
 
 static AxisContext s_zen_ctx;
@@ -291,6 +327,8 @@ void stepper_zen_task_init()
         .status_q = &g_stepper_zen_status_q,
         .min_deg  = StepCfg::ZEN_MIN_DEG,
         .max_deg  = StepCfg::ZEN_MAX_DEG,
+        .wrapped_limits = true,
+        .shortest_path = true,
         .tag      = "zen",
     };
 
@@ -342,9 +380,9 @@ static void stepper_state_task( void* )
                       "}",
                       (unsigned long long)( time_us_64() / 1000u ),
                       (double)wrap_360( az_st.angle_deg ),
-                      (double)zen_st.angle_deg,
+                      (double)wrap_360( zen_st.angle_deg ),
                       (double)wrap_360( az_cmd.target_angle_deg ),
-                      (double)zen_cmd.target_angle_deg,
+                      (double)wrap_360( zen_cmd.target_angle_deg ),
                       (double)az_st.angle_deg,
                       (double)az_cmd.target_angle_deg,
                       az_st.moving ? "true" : "false",
