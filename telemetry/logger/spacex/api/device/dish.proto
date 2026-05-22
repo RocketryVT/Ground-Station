@@ -1,0 +1,75 @@
+syntax = "proto3";
+package SpaceX.API.Device;
+
+// Minimal subset of the Starlink dish API protoset.
+// Field numbers verified from a live protoset extracted with extract_protoset.py.
+// Only the fields the ground station actually displays are declared.
+
+// -- Shared sub-messages -------------------------------------------------------
+
+message LLAPosition {
+  double lat = 1;
+  double lon = 2;
+  double alt = 3;
+}
+
+message DeviceInfo {
+  string id               = 1;
+  string hardware_version = 2;
+  string software_version = 3;
+  string country_code     = 4;
+}
+
+message DeviceState {
+  uint64 uptime_s = 1;
+}
+
+message DishGpsStats {
+  bool   gps_valid = 1;
+  uint32 gps_sats  = 2;
+}
+
+// -- GetLocation ---------------------------------------------------------------
+
+message GetLocationRequest {}
+
+message GetLocationResponse {
+  LLAPosition lla                  = 1;
+  double       horizontal_speed_mps = 5;
+  double       vertical_speed_mps   = 6;
+}
+
+// -- GetStatus -----------------------------------------------------------------
+
+message GetStatusRequest {}
+
+message DishGetStatusResponse {
+  DeviceInfo  device_info  = 1;
+  DeviceState device_state = 2;
+
+  float  pop_ping_drop_rate        = 1003;
+  float  downlink_throughput_bps   = 1007;
+  float  uplink_throughput_bps     = 1008;
+  float  pop_ping_latency_ms       = 1009;
+  float  boresight_azimuth_deg     = 1011;
+  float  boresight_elevation_deg   = 1012;
+  DishGpsStats gps_stats           = 1015;
+}
+
+// -- Top-level request / response envelope -------------------------------------
+
+message Request {
+  GetLocationRequest get_location = 1017;
+  GetStatusRequest   get_status   = 1004;
+}
+
+message Response {
+  GetLocationResponse    get_location    = 1017;
+  DishGetStatusResponse  dish_get_status = 2004;
+}
+
+// -- Service -------------------------------------------------------------------
+
+service Device {
+  rpc Handle (Request) returns (Response);
+}

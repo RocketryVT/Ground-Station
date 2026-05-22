@@ -10,6 +10,9 @@ import { RocketScene }      from './components/Scene3D/RocketScene';
 import { AntennaScene }     from './components/AntennaScene/AntennaScene';
 import { TelemetryCharts }  from './components/Charts/TelemetryCharts';
 import { VideoFeed }        from './components/VideoFeed/VideoFeed';
+import { DebugPanel }       from './components/DebugPanel/DebugPanel';
+
+export type AppTab = 'flight' | 'debug';
 
 function Handle() {
   return (
@@ -21,63 +24,68 @@ function Handle() {
 
 export default function App() {
   const [demo, setDemo] = useState(false);
+  const [tab,  setTab]  = useState<AppTab>('flight');
 
-  useMQTT(!demo);
+  const mqtt = useMQTT(!demo);
   useDemoMode(demo);
 
   return (
     <div className="root">
       <header className="status-bar">
-        <StatusBar demo={demo} onToggleDemo={() => setDemo((d) => !d)} />
+        <StatusBar
+          demo={demo}
+          tab={tab}
+          onToggleDemo={() => setDemo((d) => !d)}
+          onSetTab={setTab}
+        />
       </header>
 
       <div className="content">
-        <Group orientation="horizontal">
+        {tab === 'flight' && (
+          <Group orientation="horizontal">
 
-          {/* -- Left column: map + 3-D views --------------------------- */}
-          <Panel defaultSize={50} minSize={20} className="fill">
-            <Group orientation="vertical">
-              <Panel defaultSize={50} minSize={15} className="fill">
-                <div className="panel"><TrajectoryMap /></div>
-              </Panel>
-              <Handle />
-              {/* Orientation + antenna tracker side by side */}
-              <Panel defaultSize={50} minSize={10} className="fill">
-                <Group orientation="horizontal">
-                  <Panel defaultSize={50} minSize={20} className="fill">
-                    <div className="panel"><RocketScene /></div>
-                  </Panel>
-                  <Handle />
-                  <Panel defaultSize={50} minSize={20} className="fill">
-                    <div className="panel"><AntennaScene /></div>
-                  </Panel>
-                </Group>
-              </Panel>
-            </Group>
-          </Panel>
+            {/* -- Left column: map + 3-D views --------------------------- */}
+            <Panel defaultSize={50} minSize={20} className="fill">
+              <Group orientation="vertical">
+                <Panel defaultSize={50} minSize={15} className="fill">
+                  <div className="panel"><TrajectoryMap /></div>
+                </Panel>
+                <Handle />
+                <Panel defaultSize={50} minSize={10} className="fill">
+                  <Group orientation="horizontal">
+                    <Panel defaultSize={50} minSize={20} className="fill">
+                      <div className="panel"><RocketScene /></div>
+                    </Panel>
+                    <Handle />
+                    <Panel defaultSize={50} minSize={20} className="fill">
+                      <div className="panel"><AntennaScene /></div>
+                    </Panel>
+                  </Group>
+                </Panel>
+              </Group>
+            </Panel>
 
-          <Handle />
+            <Handle />
 
-          {/* -- Right column: video + charts --------------------------- */}
-          <Panel defaultSize={50} minSize={20} className="fill">
-            <Group orientation="vertical">
+            {/* -- Right column: video + charts --------------------------- */}
+            <Panel defaultSize={50} minSize={20} className="fill">
+              <Group orientation="vertical">
+                <Panel defaultSize={66} minSize={15} className="fill">
+                  <div className="panel"><VideoFeed /></div>
+                </Panel>
+                <Handle />
+                <Panel defaultSize={40} minSize={12} className="fill">
+                  <div className="panel"><TelemetryCharts /></div>
+                </Panel>
+              </Group>
+            </Panel>
 
-              {/* Video feed */}
-              <Panel defaultSize={66} minSize={15} className="fill">
-                <div className="panel"><VideoFeed /></div>
-              </Panel>
+          </Group>
+        )}
 
-              <Handle />
-
-              {/* Live telemetry charts */}
-              <Panel defaultSize={40} minSize={12} className="fill">
-                <div className="panel"><TelemetryCharts /></div>
-              </Panel>
-
-            </Group>
-          </Panel>
-
-        </Group>
+        {tab === 'debug' && (
+          <DebugPanel mqtt={mqtt} />
+        )}
       </div>
     </div>
   );

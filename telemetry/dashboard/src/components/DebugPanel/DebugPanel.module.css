@@ -1,0 +1,751 @@
+/* -- Root layout ------------------------------------------------------------- */
+.root {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  background: #1a1a1a;
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-sm);
+  color: #e0e0e0;
+  overflow: hidden;
+}
+
+/* -- Left pane: console / topic inspector ------------------------------------ */
+.left {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid #333;
+}
+
+/* -- Right pane: antenna command --------------------------------------------- */
+.right {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  background: #1e1e1e;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+  min-width: 0;
+}
+
+/* -- Control panel grid ------------------------------------------------------ */
+.ctrlGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ctrlCard {
+  background: #242424;
+  border: 1px solid #2e2e2e;
+  border-radius: 3px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ctrlCardFull {
+  grid-column: 1 / -1;
+}
+
+.ctrlCardTitle {
+  font-size: var(--font-2xs);
+  font-weight: bold;
+  color: #CA4F00;
+  letter-spacing: 2px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
+.ctrlInlineRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ctrlInlineRow .cmdLabel {
+  flex-shrink: 0;
+}
+
+.cmdInputSm {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #ffffff;
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-sm);
+  padding: 3px 6px;
+  border-radius: 2px;
+  width: 52px;
+  outline: none;
+  min-width: 0;
+}
+.cmdInputSm:focus { border-color: #CA4F00; }
+
+.oscRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.oscBtns {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* -- Toolbar ----------------------------------------------------------------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #242424;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.subTab {
+  padding: 2px 10px;
+  background: transparent;
+  border: 1px solid #444;
+  color: rgba(255,255,255,0.45);
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-2xs);
+  cursor: pointer;
+  border-radius: 2px;
+  letter-spacing: 1px;
+}
+.subTab:hover    { border-color: #CA4F00; color: #CA4F00; }
+.subTabActive    { border-color: #CA4F00 !important; color: #CA4F00 !important; }
+
+.filterInput {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #e0e0e0;
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-xs);
+  padding: 2px 6px;
+  border-radius: 2px;
+  width: 160px;
+  outline: none;
+}
+.filterInput:focus { border-color: #CA4F00; }
+
+.spacer { flex: 1; }
+
+.scrollToggle {
+  font-size: var(--font-2xs);
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  user-select: none;
+}
+
+.clearBtn {
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid #555;
+  color: rgba(255,255,255,0.4);
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-2xs);
+  cursor: pointer;
+  border-radius: 2px;
+  letter-spacing: 1px;
+}
+.clearBtn:hover { border-color: #ff4444; color: #ff4444; }
+
+/* -- Console ----------------------------------------------------------------- */
+.console {
+  flex: 1 1 0;
+  overflow-y: auto;
+  padding: 4px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+.logLine {
+  display: flex;
+  gap: 8px;
+  padding: 1px 8px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.logLine:hover { background: rgba(255,255,255,0.04); }
+
+.rawLine {
+  display: flex;
+  gap: 8px;
+  padding: 2px 8px;
+  line-height: 1.5;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  word-break: break-all;
+}
+.rawLine:hover { background: rgba(255,255,255,0.04); }
+
+.logTs {
+  color: rgba(255,255,255,0.3);
+  flex-shrink: 0;
+  font-size: var(--font-2xs);
+  align-self: flex-start;
+  padding-top: 1px;
+}
+
+.logText {
+  color: #b0ffb0;
+  flex: 1;
+  white-space: pre-wrap;
+}
+
+.rawTopic {
+  color: #CA4F00;
+  flex-shrink: 0;
+  min-width: 160px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-xs);
+}
+
+.rawPayload {
+  color: #ccc;
+  flex: 1;
+  white-space: pre-wrap;
+  font-size: var(--font-xs);
+}
+
+/* -- Starlink tab ------------------------------------------------------------ */
+.starlinkRoot {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+.starlinkHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.starlinkTitle {
+  font-size: var(--font-sm);
+  font-weight: bold;
+  color: #00ccff;
+  letter-spacing: 2px;
+}
+
+.starlinkPoll  { font-size: var(--font-2xs); color: rgba(255,255,255,0.3); }
+.starlinkStale { font-size: var(--font-2xs); color: #CA4F00; letter-spacing: 1px; }
+.starlinkErr   { font-size: var(--font-2xs); color: #ff4444; flex: 1; }
+
+.starlinkGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.starlinkCard {
+  background: #242424;
+  border: 1px solid #333;
+  border-radius: 3px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cardTitle {
+  font-size: var(--font-2xs);
+  font-weight: bold;
+  color: #00ccff;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 4px;
+}
+
+.starlinkRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.starlinkLabel { font-size: var(--font-2xs); color: rgba(255,255,255,0.4); }
+.starlinkValue { font-size: var(--font-sm); color: #e0e0e0; font-weight: bold; }
+.starlinkHighlight { color: #00ccff; }
+
+/* -- Orientation tab --------------------------------------------------------- */
+.orientationRoot {
+  flex: 1 1 0;
+  overflow: auto;
+  padding: 12px 16px;
+}
+
+.orientationGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.orientationCard {
+  background: #242424;
+  border: 1px solid #333;
+  border-radius: 3px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.compass {
+  position: relative;
+  width: min(260px, 100%);
+  aspect-ratio: 1;
+  margin: 8px auto 10px;
+  border: 1px solid #444;
+  border-radius: 50%;
+  background:
+    linear-gradient(90deg, transparent calc(50% - 1px), #333 50%, transparent calc(50% + 1px)),
+    linear-gradient(0deg, transparent calc(50% - 1px), #333 50%, transparent calc(50% + 1px)),
+    #202020;
+}
+
+.north, .east, .south, .west {
+  position: absolute;
+  color: rgba(255,255,255,0.45);
+  font-size: var(--font-2xs);
+  font-weight: bold;
+}
+.north { top: 8px; left: 50%; transform: translateX(-50%); }
+.east  { right: 10px; top: 50%; transform: translateY(-50%); }
+.south { bottom: 8px; left: 50%; transform: translateX(-50%); }
+.west  { left: 10px; top: 50%; transform: translateY(-50%); }
+
+.baseNeedle, .imuNeedle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 42%;
+  transform-origin: 50% 100%;
+  border-radius: 2px;
+}
+.baseNeedle { background: #00ccff; }
+.imuNeedle  { background: #CA4F00; width: 2px; height: 36%; }
+.compassHub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #e0e0e0;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(255,255,255,0.65);
+  font-size: var(--font-xs);
+  line-height: 1.6;
+}
+.swatchBase, .swatchImu {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.swatchBase { background: #00ccff; }
+.swatchImu  { background: #CA4F00; }
+
+.sideView {
+  position: relative;
+  height: 180px;
+  margin: 12px 0;
+  border: 1px solid #444;
+  background: #202020;
+  overflow: hidden;
+}
+.sideBase {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 35px;
+  height: 3px;
+  background: #555;
+}
+.zenithArm {
+  position: absolute;
+  left: 50%;
+  bottom: 35px;
+  width: 42%;
+  height: 5px;
+  background: #00ccff;
+  transform-origin: 0 50%;
+  border-radius: 3px;
+}
+.sideHub {
+  position: absolute;
+  left: 50%;
+  bottom: 29px;
+  width: 16px;
+  height: 16px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: #e0e0e0;
+}
+
+.kvGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 10px;
+  font-size: var(--font-xs);
+}
+.kvGrid span { color: rgba(255,255,255,0.42); }
+.kvGrid strong { color: #e0e0e0; text-align: right; }
+
+.vectorBlock {
+  display: grid;
+  gap: 6px;
+  font-size: var(--font-xs);
+}
+.vectorBlock span { color: rgba(255,255,255,0.42); }
+.vectorBlock code {
+  color: #b0ffb0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.orientationNote {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(202,79,0,0.35);
+  border-radius: 3px;
+  color: rgba(255,255,255,0.65);
+  background: rgba(202,79,0,0.08);
+  font-size: var(--font-xs);
+  line-height: 1.5;
+}
+
+/* -- Raw sensor tab ---------------------------------------------------------- */
+.rawSensorsRoot {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 12px 16px;
+  gap: 10px;
+}
+
+.rawSensorToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.rawSensorToolbar .axisBtn,
+.rawSensorToolbar .stopBtn,
+.rawSensorToolbar .clearBtn {
+  flex: 0 0 auto;
+  min-width: 112px;
+  padding: 6px 10px;
+}
+
+.rawSensorCount {
+  margin-left: auto;
+  color: rgba(255,255,255,0.45);
+  font-size: var(--font-2xs);
+  letter-spacing: 1px;
+}
+
+.rawChartGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  min-height: 0;
+}
+
+.rawChart {
+  height: 240px;
+  min-width: 0;
+  background: #242424;
+  border: 1px solid #333;
+  border-radius: 3px;
+  padding: 10px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rawChartTitle {
+  color: #00ccff;
+  font-size: var(--font-2xs);
+  font-weight: bold;
+  letter-spacing: 2px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 5px;
+  flex-shrink: 0;
+}
+
+/* -- Antenna command pane ---------------------------------------------------- */
+.cmdTitle {
+  font-size: var(--font-xs);
+  font-weight: bold;
+  color: #CA4F00;
+  letter-spacing: 2px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 8px;
+}
+
+.cmdForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  padding: 8px;
+  border: 1px solid #333;
+  border-radius: 2px;
+  background: #242424;
+  font-size: var(--font-2xs);
+}
+.statusGrid span {
+  color: rgba(255,255,255,0.35);
+}
+.statusGrid strong {
+  color: #e0e0e0;
+  text-align: right;
+}
+
+.cmdLabel {
+  font-size: var(--font-2xs);
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.5px;
+}
+
+.cmdInput {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #ffffff;
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-md);
+  padding: 4px 8px;
+  border-radius: 2px;
+  width: 100%;
+  outline: none;
+}
+.cmdInput:focus { border-color: #CA4F00; }
+
+/* .sendBtn defined in oscillation section below */
+
+.cmdNote {
+  font-size: var(--font-2xs);
+  color: rgba(255,255,255,0.25);
+  line-height: 1.6;
+}
+.cmdNote code {
+  color: rgba(255,255,255,0.4);
+  font-size: var(--font-2xs);
+}
+
+.cmdDivider {
+  border: none;
+  border-top: 1px solid #333;
+  margin: 4px 0;
+}
+
+/* -- Oscillation buttons ---------------------------------------------------- */
+.axisToggle {
+  display: flex;
+  gap: 4px;
+}
+
+.jogGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.axisBtn {
+  flex: 1;
+  padding: 4px 0;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: rgba(255,255,255,0.45);
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-xs);
+  font-weight: bold;
+  letter-spacing: 1px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 0.12s;
+}
+.axisBtn:hover    { border-color: #CA4F00; color: #CA4F00; }
+.axisBtnActive    { border-color: #CA4F00 !important; color: #CA4F00 !important; background: rgba(202,79,0,0.12) !important; }
+
+.oscButtons {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sendBtn {
+  flex: 1;
+  padding: 7px 0;
+  background: #861F41;
+  border: none;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-sm);
+  font-weight: bold;
+  letter-spacing: 2px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+.sendBtn:hover:not(:disabled)    { background: #a82550; }
+.sendBtn:disabled                { opacity: 0.35; cursor: not-allowed; }
+.sendBtnActive                   { opacity: 0.35; cursor: not-allowed; }
+
+.stopBtn {
+  flex: 1;
+  padding: 7px 0;
+  background: transparent;
+  border: 1px solid #555;
+  color: rgba(255,255,255,0.5);
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-sm);
+  font-weight: bold;
+  letter-spacing: 2px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+}
+.stopBtn:hover:not(:disabled) { border-color: #ff4444; color: #ff4444; }
+.stopBtn:disabled              { opacity: 0.25; cursor: not-allowed; }
+
+.oscStatus {
+  font-size: var(--font-2xs);
+  color: #CA4F00;
+  letter-spacing: 1px;
+  text-align: center;
+  padding: 4px;
+  border: 1px solid rgba(202,79,0,0.3);
+  border-radius: 2px;
+  background: rgba(202,79,0,0.07);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* -- Confirmation dialog ----------------------------------------------------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: #1e1e1e;
+  border: 1px solid #CA4F00;
+  border-radius: 4px;
+  padding: 24px;
+  min-width: 320px;
+  box-shadow: 0 0 40px rgba(202,79,0,0.3);
+}
+
+.dialogTitle {
+  font-size: var(--font-md);
+  font-weight: bold;
+  color: #CA4F00;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.dialogRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dialogLabel { color: rgba(255,255,255,0.5); font-size: var(--font-xs); }
+.dialogValue { color: #ffffff; font-size: var(--font-md); font-weight: bold; }
+
+.dialogWarning {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(202,79,0,0.12);
+  border: 1px solid rgba(202,79,0,0.3);
+  border-radius: 2px;
+  color: #e07040;
+  font-size: var(--font-xs);
+  line-height: 1.5;
+}
+
+.dialogButtons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cancelBtn {
+  padding: 6px 16px;
+  background: transparent;
+  border: 1px solid #555;
+  color: rgba(255,255,255,0.5);
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-xs);
+  cursor: pointer;
+  border-radius: 2px;
+  letter-spacing: 1px;
+}
+.cancelBtn:hover { border-color: #888; color: #fff; }
+
+.confirmBtn {
+  padding: 6px 16px;
+  background: #861F41;
+  border: none;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-xs);
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 2px;
+  letter-spacing: 1px;
+  transition: background 0.15s;
+}
+.confirmBtn:hover { background: #a82550; }

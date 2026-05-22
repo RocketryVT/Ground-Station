@@ -1,0 +1,4 @@
+=== starlink started 2026-04-12 22:49:41 ===
+22:49:41  2026-04-12 22:49:41,769  INFO  Starlink proxy listening on http://localhost:8001/starlink
+22:49:41  2026-04-12 22:49:41,770  INFO  Polling dish at 192.168.100.1:9200 every 2 s
+22:50:01  2026-04-12 22:50:01,757  WARNING  dish unreachable: failed to connect to all addresses; last error: UNKNOWN: ipv4:192.168.100.1:9200: tcp handshaker shutdown

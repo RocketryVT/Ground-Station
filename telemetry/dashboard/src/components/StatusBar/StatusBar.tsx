@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTelemetryStore } from '../../store/telemetryStore';
+import type { AppTab } from '../../App';
 import styles from './StatusBar.module.css';
 
 function formatElapsed(startMs: number): string {
@@ -10,11 +11,13 @@ function formatElapsed(startMs: number): string {
 }
 
 interface Props {
-  demo: boolean;
+  demo:         boolean;
+  tab:          AppTab;
   onToggleDemo: () => void;
+  onSetTab:     (t: AppTab) => void;
 }
 
-export function StatusBar({ demo, onToggleDemo }: Props) {
+export function StatusBar({ demo, tab, onToggleDemo, onSetTab }: Props) {
   const { latest, antenna, connected, flightStart, clearFlight } = useTelemetryStore();
   const [elapsed, setElapsed] = useState('T+00:00');
   const [fullscreen, setFullscreen] = useState(false);
@@ -73,6 +76,21 @@ export function StatusBar({ demo, onToggleDemo }: Props) {
       <span className={styles.value}>{antenna ? `${antenna.actual_el.toFixed(1)}°` : '--'}</span>
 
       <span className={styles.spacer} />
+
+      <button
+        className={`${styles.tabBtn} ${tab === 'flight' ? styles.tabActive : ''}`}
+        onClick={() => onSetTab('flight')}
+      >
+        FLIGHT
+      </button>
+      <button
+        className={`${styles.tabBtn} ${tab === 'debug' ? styles.tabActive : ''}`}
+        onClick={() => onSetTab('debug')}
+      >
+        DEBUG
+      </button>
+
+      <span className={styles.sep} />
       <button
         className={`${styles.clearBtn} ${demo ? styles.demoActive : ''}`}
         onClick={onToggleDemo}

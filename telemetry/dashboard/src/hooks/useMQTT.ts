@@ -1,11 +1,20 @@
-import { useEffect } from 'react';
-import mqtt from 'mqtt';
+import { useEffect, useRef } from 'react';
+import mqtt, { type MqttClient } from 'mqtt';
 import { useTelemetryStore } from '../store/telemetryStore';
 import { MQTT_BROKER_URL, TOPICS } from '../config';
-import type { RocketTelemetry, AntennaState, MobileNode } from '../types/telemetry';
+import type {
+  RocketTelemetry, AntennaState, MobileNode, GroundImuState,
+  RawImuSample, RawMagSample,
+} from '../types/telemetry';
 
-export function useMQTT(enabled = true) {
-  const { addTelemetry, setAntenna, updateNode, setConnected } = useTelemetryStore();
+export interface MQTTHandle {
+  publish: (topic: string, payload: string) => void;
+}
+
+export function useMQTT(enabled = true): MQTTHandle {
+    const { addTelemetry, setAntenna, setGroundImu, addRawImu, addRawMag, updateNode, setConnected,
+          addLogLine, addRawMessage } = useTelemetryStore();
+  const clientRef = useRef<MqttClient | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -14,14 +23,12 @@ export function useMQTT(enabled = true) {
       connectTimeout:  5000,
       keepalive:       30,
     });
+    clientRef.current = client;
 
     client.on('connect', () => {
       setConnected(true);
-      client.subscribe([
-        TOPICS.ROCKET_TELEMETRY,
-        TOPICS.ANTENNA_STATE,
-        TOPICS.NODES_WILDCARD,
-      ]);
+      // Subscribe to all topics — raw inspector needs everything
+      client.subscribe('#');
     });
 
     client.on('disconnect', () => setConnected(false));
@@ -29,21 +36,37 @@ export function useMQTT(enabled = true) {
     client.on('error',      () => setConnected(false));
 
     client.on('message', (topic: string, payload: Buffer) => {
+      const raw = payload.toString();
+      addRawMessage(topic, raw);
+
       try {
-        const data = JSON.parse(payload.toString());
+        const data = JSON.parse(raw);
         if (topic === TOPICS.ROCKET_TELEMETRY) {
           addTelemetry(data as RocketTelemetry);
         } else if (topic === TOPICS.ANTENNA_STATE) {
           setAntenna(data as AntennaState);
+        } else if (topic === TOPICS.GROUND_IMU) {
+          setGroundImu({ ...(data as Omit<GroundImuState, 'timestamp'>), timestamp: Date.now() });
+        } else if (topic === TOPICS.RAW_IMU) {
+          addRawImu(data as RawImuSample);
+        } else if (topic === TOPICS.RAW_MAG) {
+          addRawMag(data as RawMagSample);
         } else if (topic.startsWith('nodes/')) {
           const id = topic.split('/')[1];
           updateNode({ ...(data as Omit<MobileNode, 'id'>), id });
+        } else if (topic === TOPICS.GS_LOG) {
+          addLogLine(typeof data === 'string' ? data : raw);
         }
-      } catch (e) {
-        console.error('MQTT parse error:', topic, e);
+      } catch {
+        // Non-JSON topics (e.g. gs/log plain text)
+        if (topic === TOPICS.GS_LOG) addLogLine(raw);
       }
     });
 
-    return () => { client.end(); };
+    return () => { client.end(); clientRef.current = null; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return {
+    publish: (topic, payload) => clientRef.current?.publish(topic, payload),
+  };
 }
