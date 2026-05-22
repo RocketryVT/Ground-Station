@@ -18,14 +18,16 @@ bool Cl57te::isr_tick()
 {
     if ( remaining_ <= 0 ) return false;
 
-    // Differential step pulse: PUL+=HIGH/PUL-=LOW for 2 µs, then restore idle.
-    gpio_put( cfg_.pul, true );
-    if ( cfg_.pul_n != INVALID_PIN ) gpio_put( cfg_.pul_n, false );
+    // Step pulse: assert active level for >= 2 µs, then return to idle.
+    const bool pul_active = !cfg_.pul_active_low;
+    gpio_put( cfg_.pul, pul_active );
+    if ( cfg_.pul_n != INVALID_PIN ) gpio_put( cfg_.pul_n, !pul_active );
     busy_wait_us_32( 5 );   // spec minimum 2.5 µs; 5 µs gives 2× margin
-    gpio_put( cfg_.pul, false );
-    if ( cfg_.pul_n != INVALID_PIN ) gpio_put( cfg_.pul_n, true );
+    gpio_put( cfg_.pul, !pul_active );
+    if ( cfg_.pul_n != INVALID_PIN ) gpio_put( cfg_.pul_n, pul_active );
 
-    --remaining_;
+    pos_steps_ = pos_steps_ + step_sign_;
+    remaining_ = remaining_ - 1;
     return remaining_ > 0;      // false -> timer self-cancels
 }
 
@@ -37,28 +39,28 @@ void Cl57te::init( const Config& cfg )
 {
     cfg_ = cfg;
 
-    // PUL+ – output, idle LOW
+    // PUL – output, idle at inactive level.
     gpio_init( cfg_.pul );
     gpio_set_dir( cfg_.pul, GPIO_OUT );
-    gpio_put( cfg_.pul, false );
+    gpio_put( cfg_.pul, cfg_.pul_active_low );
 
-    // PUL- – output, idle HIGH (complement; skipped if single-ended)
+    // PUL complement – output, idle at opposite level (skipped if hardwired/unused)
     if ( cfg_.pul_n != INVALID_PIN ) {
         gpio_init( cfg_.pul_n );
         gpio_set_dir( cfg_.pul_n, GPIO_OUT );
-        gpio_put( cfg_.pul_n, true );
+        gpio_put( cfg_.pul_n, !cfg_.pul_active_low );
     }
 
-    // DIR+ – output, idle LOW (positive direction)
+    // DIR – output, idle = positive direction.
     gpio_init( cfg_.dir );
     gpio_set_dir( cfg_.dir, GPIO_OUT );
-    gpio_put( cfg_.dir, false );
+    gpio_put( cfg_.dir, cfg_.dir_active_low );
 
-    // DIR- – output, idle HIGH (complement; skipped if single-ended)
+    // DIR complement – output (skipped if hardwired/unused)
     if ( cfg_.dir_n != INVALID_PIN ) {
         gpio_init( cfg_.dir_n );
         gpio_set_dir( cfg_.dir_n, GPIO_OUT );
-        gpio_put( cfg_.dir_n, true );
+        gpio_put( cfg_.dir_n, !cfg_.dir_active_low );
     }
 
     // ENA – output, HIGH disables the drive; start disabled (safe)
@@ -111,6 +113,17 @@ void Cl57te::disable()
 // Cl57te::start_move
 // -----------------------------------------------------------------------------
 
+bool Cl57te::dir_level_for_steps( int32_t n_steps ) const
+{
+    bool forward = ( n_steps > 0 );
+    return cfg_.dir_active_low ? !forward : forward;
+}
+
+bool Cl57te::dir_gpio_level() const
+{
+    return gpio_get( cfg_.dir );
+}
+
 bool Cl57te::start_move( int32_t n_steps, uint32_t step_hz )
 {
     if ( !enabled_ || is_faulted() ) return false;
@@ -121,8 +134,9 @@ bool Cl57te::start_move( int32_t n_steps, uint32_t step_hz )
 
     // Set direction first, then observe DIR setup time (≥ 5 µs)
     bool forward = ( n_steps > 0 );
-    gpio_put( cfg_.dir, forward );
-    if ( cfg_.dir_n != INVALID_PIN ) gpio_put( cfg_.dir_n, !forward );
+    bool dir_level = dir_level_for_steps( n_steps );
+    gpio_put( cfg_.dir, dir_level );
+    if ( cfg_.dir_n != INVALID_PIN ) gpio_put( cfg_.dir_n, !dir_level );
     busy_wait_us_32( 10 );  // 10 µs ≥ the 5 µs minimum
 
     // Choose step rate
@@ -138,6 +152,7 @@ bool Cl57te::start_move( int32_t n_steps, uint32_t step_hz )
     int64_t period_us = -( static_cast<int64_t>( 1'000'000 ) / step_hz );
 
     remaining_ = ( n_steps > 0 ) ? n_steps : -n_steps;
+    step_sign_ = forward ? 1 : -1;
     add_repeating_timer_us( period_us, step_isr_cb, this, &timer );
     return true;
 }

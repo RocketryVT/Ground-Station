@@ -1,6 +1,6 @@
 // Ground Station — Primary Pico
-// Azimuth:  STEP1 GPIO 4-7,   10:1 gearbox × 3:1 belt = 30:1 total
-// Zenith:   STEP2 GPIO 12-15, 10:1 gearbox × 5:1 belt = 50:1 total
+// Azimuth:  STEP1 GPIO 4/5, 10:1 gearbox × 3:1 belt = 30:1 total
+// Zenith:   STEP2 GPIO 6/7, 10:1 gearbox × 5:1 belt = 50:1 total
 
 #include "shared.hpp"
 
@@ -10,8 +10,10 @@
 #include "Tasks/I2C/i2c_task.hpp"
 #include "Tasks/IMU/imu_task.hpp"
 #include "Tasks/Mag/mag_task.hpp"
-#include "Tasks/Baro/baro_task.hpp"
+// #include "Tasks/Baro/baro_task.hpp"
 #include "Tasks/Fusion/fusion_task.hpp"
+#include "Tasks/LoRa/lora1_task.hpp"
+#include "Tasks/LoRa/lora_task.hpp"
 #include "Tasks/Stepper/stepper_task.hpp"
 #include "Tasks/USB/usb_task.hpp"
 
@@ -126,20 +128,24 @@ int main()
     g_baro_q = xQueueCreateStatic( 1, sizeof(BaroMsg), s_baro_storage, &s_baro_buf );
 
     // -- Init tasks (order matters: I2C before sensors, WiFi before MQTT/NTP) --
-    i2c0_task_init();   // I2C0: barometer (MS5611 @ 0x77)
-    i2c1_task_init();   // I2C1: IMU (ICM-42688-P @ 0x68) + mag (LIS3MDL @ 0x1C)
+    i2c0_task_init();   // I2C0: ISM330DLC IMU + LIS3MDL magnetometer
+    i2c1_task_init();   // I2C1: reserved / expansion
 
     imu_task_init();
     mag_task_init();
-    baro_task_init();
+    // baro_task_init();
     fusion_task_init();
 
     wifi_task_init();
     ntp_task_init();
     mqtt_task_init();
 
+    lora0_task_init();
+    lora1_task_init();
+
     stepper_az_task_init();
     stepper_zen_task_init();
+    stepper_state_task_init();
 
     usb_task_init();
 

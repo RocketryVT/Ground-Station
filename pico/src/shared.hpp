@@ -52,16 +52,16 @@ extern EventGroupHandle_t g_net_events;
 // All tasks publish by enqueuing an MqttMessage.  The MQTT task drains it.
 struct MqttMessage {
     char topic  [ 64 ];
-    char payload[ 384 ];
+    char payload[ 1024 ];
 };
 
-#define MQTT_QUEUE_DEPTH  8
+#define MQTT_QUEUE_DEPTH  64
 extern QueueHandle_t g_mqtt_queue;
 
 // -- Pin assignments (GPIO number, Pico 2W) ------------------------------------
 namespace Pins {
 
-    // -- I2C0 (Barometer + IMU + Magnetometer) ---------------------------------
+    // -- I2C0 (ISM330DLC IMU + LIS3MDL magnetometer) ---------------------------
     static constexpr uint I2C0_SDA   =  0;  // GPIO 0,  phys  1
     static constexpr uint I2C0_SCL   =  1;  // GPIO 1,  phys  2
 
@@ -69,45 +69,55 @@ namespace Pins {
     static constexpr uint I2C1_SDA   =  2;  // GPIO 2,  phys  4
     static constexpr uint I2C1_SCL   =  3;  // GPIO 3,  phys  5
 
-    // -- Servo 1 (Elevation / Zenith) – full differential drive ---------------
-    // ENA and ALM are not wired; pass INVALID_PIN in Cl57te::Config.
-    static constexpr uint STEP1_PUL  =  4;  // GPIO  4, phys  6 — Servo1 PUL+
-    static constexpr uint STEP1_PUL_N=  5;  // GPIO  5, phys  7 — Servo1 PUL-
-    static constexpr uint STEP1_DIR  =  6;  // GPIO  6, phys  9 — Servo1 DIR+
-    static constexpr uint STEP1_DIR_N=  7;  // GPIO  7, phys 10 — Servo1 DIR-
+    // -- Servo 1 / TOP ---------------------------------------------------------
+    // PUL+ / DIR+ are not GPIO-controlled in the current harness.
+    static constexpr uint STEP1_PUL  =  4;  // GPIO  4, phys  6 — Servo1 PUL-
+    static constexpr uint STEP1_PUL_N= 0xFFu;  // not wired
+    static constexpr uint STEP1_DIR  =  5;  // GPIO  5, phys  7 — Servo1 DIR-
+    static constexpr uint STEP1_DIR_N= 0xFFu;  // not wired
     static constexpr uint STEP1_ENA  = 0xFFu;  // not wired
     static constexpr uint STEP1_ALM  = 0xFFu;  // not wired
 
-    // -- Servo 2 (Azimuth / Horizontal) – full differential drive -------------
-    static constexpr uint STEP2_PUL  = 12;  // GPIO 12, phys 16 — Servo2 PUL+
-    static constexpr uint STEP2_PUL_N= 13;  // GPIO 13, phys 17 — Servo2 PUL-
-    static constexpr uint STEP2_DIR  = 14;  // GPIO 14, phys 19 — Servo2 DIR+
-    static constexpr uint STEP2_DIR_N= 15;  // GPIO 15, phys 20 — Servo2 DIR-
+    // -- Servo 2 / BOTTOM ------------------------------------------------------
+    // PUL+ / DIR+ are not GPIO-controlled in the current harness.
+    static constexpr uint STEP2_PUL  =  6;  // GPIO  6, phys  9 — Servo2 PUL-
+    static constexpr uint STEP2_PUL_N= 0xFFu;  // not wired
+    static constexpr uint STEP2_DIR  =  7;  // GPIO  7, phys 10 — Servo2 DIR-
+    static constexpr uint STEP2_DIR_N= 0xFFu;  // not wired
     static constexpr uint STEP2_ENA  = 0xFFu;  // not wired
     static constexpr uint STEP2_ALM  = 0xFFu;  // not wired
 
-    // -- LoRa 0 / BOTTOM (SX1276 / 915 MHz) – SPI0 ---------------------------
-    static constexpr uint LORA1_EN   = 16;  // GPIO 16, phys 21 (power enable)
-    static constexpr uint LORA1_DIO0 = 17;  // GPIO 17, phys 22 (G0 / IRQ)
-    static constexpr uint LORA1_SCK  = 18;  // GPIO 18, phys 24
-    static constexpr uint LORA1_MOSI = 19;  // GPIO 19, phys 25
-    static constexpr uint LORA1_MISO = 20;  // GPIO 20, phys 26
-    static constexpr uint LORA1_NSS  = 21;  // GPIO 21, phys 27 (CS)
-    static constexpr uint LORA1_RST  = 22;  // GPIO 22, phys 29
+    // -- LoRa 1 / LEFT SPI – SPI1 ---------------------------------------------
+    static constexpr uint LORA1_MISO =  8;  // GPIO  8, phys 11
+    static constexpr uint LORA1_NSS  =  9;  // GPIO  9, phys 12  (CS)
+    static constexpr uint LORA1_SCK  = 10;  // GPIO 10, phys 14
+    static constexpr uint LORA1_MOSI = 11;  // GPIO 11, phys 15
+    static constexpr uint LORA1_RST  = 26;  // GPIO 26, phys 31
+    static constexpr uint LORA1_DIO0 = 27;  // GPIO 27, phys 32  (G0 / IRQ)
+    static constexpr uint LORA1_EN   = 28;  // GPIO 28, phys 34  (power enable)
 
-    // -- LoRa 2 / TOP (RFM69HCW / 433 MHz) – SPI1 ----------------------------
-    static constexpr uint LORA2_MISO =  8;  // GPIO 8,  phys 11
-    static constexpr uint LORA2_NSS  =  9;  // GPIO 9,  phys 12  (CS)
-    static constexpr uint LORA2_SCK  = 10;  // GPIO 10, phys 14
-    static constexpr uint LORA2_MOSI = 11;  // GPIO 11, phys 15
-    static constexpr uint LORA2_RST  = 26;  // GPIO 26, phys 31
-    static constexpr uint LORA2_DIO0 = 27;  // GPIO 27, phys 32  (G0 / IRQ)
-    static constexpr uint LORA2_EN   = 28;  // GPIO 28, phys 34  (power enable)
+    // -- LoRa 0 / RIGHT SPI – SPI0 --------------------------------------------
+    static constexpr uint LORA0_EN   = 16;  // GPIO 16, phys 21 (power enable)
+    static constexpr uint LORA0_DIO0 = 17;  // GPIO 17, phys 22 (G0 / IRQ)
+    static constexpr uint LORA0_SCK  = 18;  // GPIO 18, phys 24
+    static constexpr uint LORA0_MOSI = 19;  // GPIO 19, phys 25
+    static constexpr uint LORA0_MISO = 20;  // GPIO 20, phys 26
+    static constexpr uint LORA0_NSS  = 21;  // GPIO 21, phys 27 (CS)
+    static constexpr uint LORA0_RST  = 22;  // GPIO 22, phys 29
+
+    // Legacy aliases for code that still refers to the second radio as LORA2.
+    static constexpr uint LORA2_MISO = LORA1_MISO;
+    static constexpr uint LORA2_NSS  = LORA1_NSS;
+    static constexpr uint LORA2_SCK  = LORA1_SCK;
+    static constexpr uint LORA2_MOSI = LORA1_MOSI;
+    static constexpr uint LORA2_RST  = LORA1_RST;
+    static constexpr uint LORA2_DIO0 = LORA1_DIO0;
+    static constexpr uint LORA2_EN   = LORA1_EN;
 
 } // namespace Pins
 
 // -- LoRa radio parameters -----------------------------------------------------
-namespace LoRa1Cfg {
+namespace LoRa0Cfg {
     static constexpr float    FREQ_MHZ   = 915.0f;
     static constexpr float    BW_KHZ     = 125.0f;
     static constexpr uint8_t  SF         = 7;
@@ -117,7 +127,7 @@ namespace LoRa1Cfg {
     static constexpr uint16_t PREAMBLE   = 8;
 }
 
-namespace LoRa2Cfg {
+namespace LoRa1Cfg {
     static constexpr float   FREQ_MHZ    = 433.0f;
     static constexpr float   BR_KBPS     = 4.8f;
     static constexpr float   FREQ_DEV_KHZ = 5.0f;
@@ -126,13 +136,15 @@ namespace LoRa2Cfg {
     static constexpr uint8_t PREAMBLE    = 16;
 }
 
+namespace LoRa2Cfg = LoRa1Cfg;
+
 // -- Shared location queues -----------------------------------------------------
 // Depth-1 overwrite queues carrying the latest known positions.
 // Writers use xQueueOverwrite(); readers use xQueuePeek().
 //
 // g_gs_location_q     – written by gps_task when ground station position is known
 //                       (Starlink WiFi -> MQTT subscription, see gps_task.cpp).
-// g_rocket_location_q – written by lora1_task when a GPS-valid SIGMA frame arrives.
+// g_rocket_location_q – written by lora0_task when a GPS-valid SIGMA frame arrives.
 struct LocationMsg {
     double lat;
     double lon;
@@ -187,9 +199,9 @@ struct ImuMsg {
 extern QueueHandle_t g_imu_q;
 
 // -- WiFi / MQTT configuration --------------------------------------------------
-#define WIFI_SSID         "ssid"     // change to your Starlink SSID
-#define WIFI_PASSWORD     "password"   // change to your Starlink password
-#define MQTT_BROKER_HOST   "192.168.8.171"
+#define WIFI_SSID         "RocketryAtVT"     // change to your Starlink SSID
+#define WIFI_PASSWORD     "RocketryAtVT147"   // change to your Starlink password
+#define MQTT_BROKER_HOST   "192.168.1.170"
 #define MQTT_BROKER_PORT   1883
 #define MQTT_CLIENT_ID     "gs_pico"
 

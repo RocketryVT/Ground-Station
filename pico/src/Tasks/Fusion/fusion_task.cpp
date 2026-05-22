@@ -1,5 +1,6 @@
 #include "fusion_task.hpp"
 #include "shared.hpp"
+#include "Tasks/MQTT/mqtt_task.hpp"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -44,7 +45,10 @@ static const FusionVector k_mag_hard_iron  = {0.0f, 0.0f, 0.0f};
 
 #define FUSION_SAMPLE_RATE_HZ   100
 #define FUSION_PERIOD_MS        ( 1000 / FUSION_SAMPLE_RATE_HZ )    // 10 ms
-#define FUSION_MQTT_INTERVAL_MS 1000
+// AHRS runs internally at 100 Hz. Keep MQTT below that so JSON formatting and
+// lwIP queueing do not become part of every filter cycle.
+#define FUSION_MQTT_INTERVAL_MS 50
+#define FUSION_STATUS_INTERVAL_MS 1000
 
 // Seconds of recovery time after initialisation or disturbance (×sample rate)
 #define FUSION_RECOVERY_SAMPLES ( 5 * FUSION_SAMPLE_RATE_HZ )
@@ -53,8 +57,38 @@ static const FusionVector k_mag_hard_iron  = {0.0f, 0.0f, 0.0f};
 // Task
 // -----------------------------------------------------------------------------
 
-static StackType_t  s_stack[ 1536 ];
+static StackType_t  s_stack[ 4096 ];
 static StaticTask_t s_tcb;
+static FusionAhrs   s_ahrs;
+static FusionBias   s_bias;
+
+static float wrap_360( float deg )
+{
+    while ( deg < 0.0f )    deg += 360.0f;
+    while ( deg >= 360.0f ) deg -= 360.0f;
+    return deg;
+}
+
+static void fusion_publish_status( bool have_icm, bool have_mag, uint32_t update_count )
+{
+    if ( !mqtt_is_connected() ) return;
+
+    MqttMessage m = {};
+    snprintf( m.topic, sizeof(m.topic), "gs/pico/primary/ahrs/status" );
+    snprintf( m.payload, sizeof(m.payload),
+              "{"
+              "\"timestamp\":%llu,"
+              "\"running\":true,"
+              "\"have_imu\":%s,"
+              "\"have_mag\":%s,"
+              "\"updates\":%lu"
+              "}",
+              (unsigned long long)( time_us_64() / 1000u ),
+              have_icm ? "true" : "false",
+              have_mag ? "true" : "false",
+              (unsigned long)update_count );
+    xQueueSend( g_mqtt_queue, &m, 0 );
+}
 
 static void fusion_task( void* )
 {
@@ -62,11 +96,8 @@ static void fusion_task( void* )
     vTaskDelay( pdMS_TO_TICKS(500) );
 
     // -- AHRS initialisation ---------------------------------------------------
-    FusionAhrs ahrs;
-    FusionBias bias;
-
-    FusionAhrsInitialise( &ahrs );
-    FusionBiasInitialise( &bias );
+    FusionAhrsInitialise( &s_ahrs );
+    FusionBiasInitialise( &s_bias );
 
     const FusionAhrsSettings ahrs_cfg = {
         .convention            = FusionConventionNed,
@@ -76,14 +107,14 @@ static void fusion_task( void* )
         .magneticRejection     = 10.0f,
         .recoveryTriggerPeriod = (unsigned int)FUSION_RECOVERY_SAMPLES,
     };
-    FusionAhrsSetSettings( &ahrs, &ahrs_cfg );
+    FusionAhrsSetSettings( &s_ahrs, &ahrs_cfg );
 
     const FusionBiasSettings bias_cfg = {
         .sampleRate          = (float)FUSION_SAMPLE_RATE_HZ,
         .stationaryThreshold = 3.0f,    // deg/s — below this = stationary
         .stationaryPeriod    = 3.0f,    // seconds stationary before correcting
     };
-    FusionBiasSetSettings( &bias, &bias_cfg );
+    FusionBiasSetSettings( &s_bias, &bias_cfg );
 
     log_print( "[fusion] AHRS starting at %d Hz\n", FUSION_SAMPLE_RATE_HZ );
 
@@ -91,7 +122,9 @@ static void fusion_task( void* )
     uint64_t   last_icm_ts   = 0;       // tracks when we last advanced the filter
     uint64_t   last_update_us = time_us_64();
     TickType_t last_mqtt     = xTaskGetTickCount();
+    TickType_t last_status   = xTaskGetTickCount();
     TickType_t last_tick     = xTaskGetTickCount();
+    uint32_t   update_count  = 0;
 
     for ( ;; ) {
         // -- 1. Peek latest sensor readings ------------------------------------
@@ -129,21 +162,22 @@ static void fusion_task( void* )
             mag_v = FusionRemap( mag_v, SENSOR_REMAP );
 
             // -- 5. Gyro bias estimation ----------------------------------------
-            gyro = FusionBiasUpdate( &bias, gyro );
+            gyro = FusionBiasUpdate( &s_bias, gyro );
 
             // -- 6. AHRS update ------------------------------------------------
             if ( have_mag && !FusionVectorIsZero( mag_v ) ) {
-                FusionAhrsUpdate( &ahrs, gyro, accel, mag_v, delta_t );
+                FusionAhrsUpdate( &s_ahrs, gyro, accel, mag_v, delta_t );
             } else {
-                FusionAhrsUpdateNoMagnetometer( &ahrs, gyro, accel, delta_t );
+                FusionAhrsUpdateNoMagnetometer( &s_ahrs, gyro, accel, delta_t );
             }
+            update_count++;
         }
 
         // -- 7. Extract outputs and publish to g_imu_q -------------------------
-        FusionQuaternion q           = FusionAhrsGetQuaternion( &ahrs );
+        FusionQuaternion q           = FusionAhrsGetQuaternion( &s_ahrs );
         FusionEuler      euler       = FusionQuaternionToEuler( q );
-        FusionVector     earth_accel = FusionAhrsGetEarthAcceleration( &ahrs );
-        FusionAhrsFlags  flags       = FusionAhrsGetFlags( &ahrs );
+        FusionVector     earth_accel = FusionAhrsGetEarthAcceleration( &s_ahrs );
+        FusionAhrsFlags  flags       = FusionAhrsGetFlags( &s_ahrs );
 
         ImuMsg out = {};
         out.q[0]           = q.element.w;
@@ -165,27 +199,47 @@ static void fusion_task( void* )
 
         // -- 8. MQTT publish (~1 Hz) -------------------------------------------
         TickType_t now_ticks = xTaskGetTickCount();
+        if ( ( now_ticks - last_status ) >= pdMS_TO_TICKS(FUSION_STATUS_INTERVAL_MS) ) {
+            last_status = now_ticks;
+            fusion_publish_status( have_icm, have_mag, update_count );
+        }
+
         if ( ( now_ticks - last_mqtt ) >= pdMS_TO_TICKS(FUSION_MQTT_INTERVAL_MS) ) {
             last_mqtt = now_ticks;
 
-            MqttMessage m = {};
-            snprintf( m.topic, sizeof(m.topic), "gs/pico/primary/imu" );
-            snprintf( m.payload, sizeof(m.payload),
-                      "{"
-                      "\"roll\":%.2f,\"pitch\":%.2f,\"yaw\":%.2f,"
-                      "\"q\":[%.4f,%.4f,%.4f,%.4f],"
-                      "\"alt_baro\":%.1f,\"temp\":%.1f,"
-                      "\"valid\":%s"
-                      "}",
-                      (double)euler.angle.roll,
-                      (double)euler.angle.pitch,
-                      (double)euler.angle.yaw,
-                      (double)q.element.w, (double)q.element.x,
-                      (double)q.element.y, (double)q.element.z,
-                      (double)out.baro_alt_m,
-                      (double)out.temp_c,
-                      out.valid ? "true" : "false" );
-            xQueueSend( g_mqtt_queue, &m, 0 );
+            if ( mqtt_is_connected() ) {
+                MqttMessage m = {};
+                snprintf( m.topic, sizeof(m.topic), "gs/pico/primary/imu" );
+                snprintf( m.payload, sizeof(m.payload),
+                          "{"
+                          "\"timestamp\":%llu,"
+                          "\"roll\":%.2f,\"pitch\":%.2f,\"yaw\":%.2f,\"yaw360\":%.2f,"
+                          "\"q\":[%.4f,%.4f,%.4f,%.4f],"
+                          "\"a\":[%.3f,%.3f,%.3f],"
+                          "\"m\":[%.3f,%.3f,%.3f],"
+                          "\"have_mag\":%s,"
+                          "\"startup\":%s,\"mag_rec\":%s,\"acc_rec\":%s,"
+                          "\"alt_baro\":%.1f,\"temp\":%.1f,"
+                          "\"valid\":%s"
+                          "}",
+                          (unsigned long long)( time_us_64() / 1000u ),
+                          (double)euler.angle.roll,
+                          (double)euler.angle.pitch,
+                          (double)euler.angle.yaw,
+                          (double)wrap_360( euler.angle.yaw ),
+                          (double)q.element.w, (double)q.element.x,
+                          (double)q.element.y, (double)q.element.z,
+                          (double)icm.accel[0], (double)icm.accel[1], (double)icm.accel[2],
+                          (double)mag.mag[0], (double)mag.mag[1], (double)mag.mag[2],
+                          have_mag ? "true" : "false",
+                          flags.startup ? "true" : "false",
+                          flags.magneticRecovery ? "true" : "false",
+                          flags.accelerationRecovery ? "true" : "false",
+                          (double)out.baro_alt_m,
+                          (double)out.temp_c,
+                          out.valid ? "true" : "false" );
+                xQueueSend( g_mqtt_queue, &m, 0 );
+            }
         }
 
         // -- 9. Sleep remainder of 10 ms period --------------------------------
@@ -195,6 +249,6 @@ static void fusion_task( void* )
 
 void fusion_task_init()
 {
-    task_create( fusion_task, "fusion", 1536, nullptr, tskIDLE_PRIORITY + 3,
+    task_create( fusion_task, "fusion", 4096, nullptr, tskIDLE_PRIORITY + 3,
                  s_stack, &s_tcb );
 }

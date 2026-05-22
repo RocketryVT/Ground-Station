@@ -1,6 +1,7 @@
 #include "imu_task.hpp"
 #include "shared.hpp"
 #include "Tasks/I2C/i2c_task.hpp"
+#include "Tasks/MQTT/mqtt_task.hpp"
 
 #include "ism330dlc/ISM330DLC.hpp"
 
@@ -10,9 +11,11 @@
 #include "pico/time.h"
 
 #include <string.h>
+#include <stdio.h>
 
 #define IMU_SAMPLE_RATE_HZ  100
 #define IMU_PERIOD_MS       ( 1000 / IMU_SAMPLE_RATE_HZ )
+#define IMU_RAW_MQTT_INTERVAL_MS  50
 
 // -----------------------------------------------------------------------------
 // I2C reply queue (private to this task)
@@ -98,7 +101,7 @@ static bool imu_init( ism330dlc::Device& device )
         return false;
     }
 
-    log_print( "[imu] ISM330DLC OK (WHO_AM_I=0x%02X)\n", who );
+    log_print( "[imu] ISM330DLC OK on I2C0 (WHO_AM_I=0x%02X)\n", who );
     return true;
 }
 
@@ -149,6 +152,7 @@ static void imu_task( void* )
     }
 
     TickType_t last_tick = xTaskGetTickCount();
+    TickType_t last_raw_mqtt = xTaskGetTickCount();
 
     for ( ;; ) {
         IcmMsg m = {};
@@ -157,6 +161,28 @@ static void imu_task( void* )
         if ( imu_read( device, m ) ) {
             m.valid = true;
             xQueueOverwrite( g_icm_q, &m );
+
+            TickType_t now_ticks = xTaskGetTickCount();
+            if ( mqtt_raw_imu_enabled()
+                 && mqtt_is_connected()
+                 && ( now_ticks - last_raw_mqtt ) >= pdMS_TO_TICKS(IMU_RAW_MQTT_INTERVAL_MS) )
+            {
+                last_raw_mqtt = now_ticks;
+                MqttMessage msg = {};
+                snprintf( msg.topic, sizeof(msg.topic), "gs/pico/primary/raw/imu" );
+                snprintf( msg.payload, sizeof(msg.payload),
+                          "{"
+                          "\"timestamp\":%llu,"
+                          "\"ax\":%.5f,\"ay\":%.5f,\"az\":%.5f,"
+                          "\"gx\":%.5f,\"gy\":%.5f,\"gz\":%.5f,"
+                          "\"temp\":%.2f"
+                          "}",
+                          (unsigned long long)( m.timestamp_us / 1000u ),
+                          (double)m.accel[0], (double)m.accel[1], (double)m.accel[2],
+                          (double)m.gyro[0],  (double)m.gyro[1],  (double)m.gyro[2],
+                          (double)m.temp_c );
+                xQueueSend( g_mqtt_queue, &msg, 0 );
+            }
         } else {
             log_print( "[imu] read fail\n" );
         }

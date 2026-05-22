@@ -1,6 +1,7 @@
 #include "stepper_task.hpp"
 #include "cl57te.hpp"
 #include "shared.hpp"
+#include "Tasks/MQTT/mqtt_task.hpp"
 
 #include "math_utils/GroundStationMath.h"
 
@@ -10,6 +11,7 @@
 #include "pico/time.h"
 
 #include <math.h>
+#include <stdio.h>
 
 // -----------------------------------------------------------------------------
 // Motor / drive configuration
@@ -35,6 +37,15 @@ namespace StepCfg {
     // Zenith: mechanical travel limits
     static constexpr float    ZEN_MIN_DEG           =   0.0f;
     static constexpr float    ZEN_MAX_DEG           =  90.0f;
+
+    static constexpr uint32_t STATE_PUBLISH_MS      = 1000;
+}
+
+static float wrap_360( float deg )
+{
+    while ( deg < 0.0f )    deg += 360.0f;
+    while ( deg >= 360.0f ) deg -= 360.0f;
+    return deg;
 }
 
 // -----------------------------------------------------------------------------
@@ -82,6 +93,8 @@ static void axis_task_body( void* arg )
 
     int32_t  pos_steps    = 0;   // commanded position (what we told the drive)
     int32_t  target_steps = 0;   // latest target from command queue
+    int32_t  moving_to_steps = 0;
+    bool     move_pending_completion = false;
 
     for ( ;; ) {
         // -- Fault monitoring -------------------------------------------------
@@ -101,7 +114,10 @@ static void axis_task_body( void* arg )
 
             if ( cmd.stop ) {
                 drv.stop();
+                pos_steps = drv.pos_steps();
                 drv.disable();
+                move_pending_completion = false;
+                moving_to_steps = pos_steps;
 
             } else if ( drv.is_enabled() ) {
                 float clamped = cmd.target_angle_deg;
@@ -113,7 +129,15 @@ static void axis_task_body( void* arg )
 
                 if ( new_target != target_steps ) {
                     target_steps = new_target;
-                    if ( drv.is_moving() ) drv.stop();
+                    if ( drv.is_moving() ) {
+                        drv.stop();
+                        pos_steps = drv.pos_steps();
+                        move_pending_completion = false;
+                        moving_to_steps = pos_steps;
+                        log_print( "[%s] move interrupted for new target_steps=%ld\n",
+                                   ax.tag,
+                                   (long)target_steps );
+                    }
                 }
             }
         }
@@ -130,6 +154,16 @@ static void axis_task_body( void* arg )
 
         // -- Issue move if needed ---------------------------------------------
         if ( drv.is_enabled() && !drv.is_faulted() && !drv.is_moving() ) {
+            if ( move_pending_completion ) {
+                pos_steps = drv.pos_steps();
+                move_pending_completion = false;
+                log_print( "[%s] move complete pos_steps=%ld angle=%.2f\n",
+                           ax.tag,
+                           (long)pos_steps,
+                           (double)drv.angle_deg() );
+            }
+
+            pos_steps = drv.pos_steps();
             int32_t delta = target_steps - pos_steps;
             if ( delta != 0 ) {
                 StepperCmd c = {};
@@ -139,8 +173,16 @@ static void axis_task_body( void* arg )
                     : 0;
 
                 if ( drv.start_move( delta, hz ) ) {
-                    pos_steps = target_steps;
-                    drv.commit_position( pos_steps );
+                    moving_to_steps = target_steps;
+                    move_pending_completion = true;
+                    log_print( "[%s] move delta_steps=%ld target_steps=%ld speed_hz=%lu dir_gpio=%u dir_level=%u dir_readback=%u\n",
+                               ax.tag,
+                               (long)delta,
+                               (long)target_steps,
+                               (unsigned long)hz,
+                               (unsigned)drv.dir_pin(),
+                               drv.dir_level_for_steps( delta ) ? 1u : 0u,
+                               drv.dir_gpio_level() ? 1u : 0u );
                 }
             }
         }
@@ -211,7 +253,7 @@ static uint8_t s_az_status_storage[ sizeof(StepperStatus) ];
 static uint8_t s_zen_status_storage[ sizeof(StepperStatus) ];
 
 // -----------------------------------------------------------------------------
-// Azimuth axis  (STEP1 – PUL+ GPIO 4, PUL- GPIO 5, DIR+ GPIO 6, DIR- GPIO 7)
+// Azimuth axis  (STEP1 – PUL- GPIO 4, DIR- GPIO 5)
 // 10:1 planetary gearbox × 3:1 belt = 30:1 total, travel ±180°
 // -----------------------------------------------------------------------------
 
@@ -239,6 +281,8 @@ void stepper_az_task_init()
             .gear_ratio      = StepCfg::AZ_GEAR_RATIO,
             .max_speed_dps   = StepCfg::MAX_SPEED_DPS,
             .default_speed_dps = StepCfg::DEFAULT_SPEED_DPS,
+            .pul_active_low  = true,
+            .dir_active_low  = true,
         },
         .cmd_q    = &g_stepper_az_cmd_q,
         .status_q = &g_stepper_az_status_q,
@@ -252,7 +296,7 @@ void stepper_az_task_init()
 }
 
 // -----------------------------------------------------------------------------
-// Zenith axis  (STEP2 – PUL+ GPIO 12, PUL- GPIO 13, DIR+ GPIO 14, DIR- GPIO 15)
+// Zenith axis  (STEP2 – PUL- GPIO 6, DIR- GPIO 7)
 // 10:1 planetary gearbox × 5:1 belt = 50:1 total, travel 0–90°
 // -----------------------------------------------------------------------------
 
@@ -280,6 +324,8 @@ void stepper_zen_task_init()
             .gear_ratio      = StepCfg::ZEN_GEAR_RATIO,
             .max_speed_dps   = StepCfg::MAX_SPEED_DPS,
             .default_speed_dps = StepCfg::DEFAULT_SPEED_DPS,
+            .pul_active_low  = true,
+            .dir_active_low  = true,
         },
         .cmd_q    = &g_stepper_zen_cmd_q,
         .status_q = &g_stepper_zen_status_q,
@@ -290,6 +336,72 @@ void stepper_zen_task_init()
 
     task_create( axis_task_body, "step_zen", 512, &s_zen_ctx,
                  tskIDLE_PRIORITY + 3, s_zen_stack, &s_zen_tcb );
+}
+
+// -----------------------------------------------------------------------------
+// Antenna state publisher
+// -----------------------------------------------------------------------------
+
+static StaticTask_t s_state_tcb;
+static StackType_t  s_state_stack[ 512 ];
+
+static void stepper_state_task( void* )
+{
+    TickType_t last_tick = xTaskGetTickCount();
+
+    for ( ;; ) {
+        StepperStatus az_st  = {};
+        StepperStatus zen_st = {};
+        StepperCmd    az_cmd = {};
+        StepperCmd    zen_cmd = {};
+
+        const bool have_az  = g_stepper_az_status_q
+            && xQueuePeek( g_stepper_az_status_q, &az_st, 0 ) == pdTRUE;
+        const bool have_zen = g_stepper_zen_status_q
+            && xQueuePeek( g_stepper_zen_status_q, &zen_st, 0 ) == pdTRUE;
+
+        if ( have_az && have_zen && mqtt_is_connected() ) {
+            if ( g_stepper_az_cmd_q )
+                xQueuePeek( g_stepper_az_cmd_q, &az_cmd, 0 );
+            if ( g_stepper_zen_cmd_q )
+                xQueuePeek( g_stepper_zen_cmd_q, &zen_cmd, 0 );
+
+            MqttMessage m = {};
+            snprintf( m.topic, sizeof(m.topic), "antenna/state" );
+            snprintf( m.payload, sizeof(m.payload),
+                      "{"
+                      "\"timestamp\":%llu,"
+                      "\"actual_az\":%.2f,\"actual_el\":%.2f,"
+                      "\"target_az\":%.2f,\"target_el\":%.2f,"
+                      "\"actual_az_mech\":%.2f,\"target_az_mech\":%.2f,"
+                      "\"az_calibrated\":false,\"zen_calibrated\":false,"
+                      "\"tracking_enabled\":false,"
+                      "\"mode\":\"manual\","
+                      "\"az_moving\":%s,\"zen_moving\":%s,"
+                      "\"az_faulted\":%s,\"zen_faulted\":%s"
+                      "}",
+                      (unsigned long long)( time_us_64() / 1000u ),
+                      (double)wrap_360( az_st.angle_deg ),
+                      (double)zen_st.angle_deg,
+                      (double)wrap_360( az_cmd.target_angle_deg ),
+                      (double)zen_cmd.target_angle_deg,
+                      (double)az_st.angle_deg,
+                      (double)az_cmd.target_angle_deg,
+                      az_st.moving ? "true" : "false",
+                      zen_st.moving ? "true" : "false",
+                      az_st.faulted ? "true" : "false",
+                      zen_st.faulted ? "true" : "false" );
+            xQueueSend( g_mqtt_queue, &m, 0 );
+        }
+
+        vTaskDelayUntil( &last_tick, pdMS_TO_TICKS( StepCfg::STATE_PUBLISH_MS ) );
+    }
+}
+
+void stepper_state_task_init()
+{
+    task_create( stepper_state_task, "step_state", 512, nullptr,
+                 tskIDLE_PRIORITY + 2, s_state_stack, &s_state_tcb );
 }
 
 // -----------------------------------------------------------------------------

@@ -5,7 +5,7 @@ add_executable(gs_pico
     Tasks/MQTT/mqtt_task.cpp
     Tasks/Demo/demo_task.cpp
     Tasks/LoRa/lora_task.cpp
-    Tasks/LoRa/lora2_task.cpp
+    Tasks/LoRa/lora1_task.cpp
     Tasks/GPS/gps_task.cpp
     Tasks/Starlink/starlink.cpp
     Tasks/UDP/udp_recv_task.cpp

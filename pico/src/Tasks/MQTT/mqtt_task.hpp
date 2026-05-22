@@ -8,3 +8,7 @@ void mqtt_task_init();
 
 // True while the broker TCP connection is accepted and active.
 bool mqtt_is_connected();
+
+// Raw sensor streaming toggles, controlled by gs/cmd/raw_sensors.
+bool mqtt_raw_imu_enabled();
+bool mqtt_raw_mag_enabled();

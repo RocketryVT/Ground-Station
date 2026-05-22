@@ -11,11 +11,17 @@ static constexpr uint INVALID_PIN = 0xFFu;
 // -----------------------------------------------------------------------------
 // Cl57te  –  CL57TE closed-loop stepper drive hardware abstraction
 //
-// Supports both single-ended and full differential wiring.
+// Supports active-high PUL+/DIR+ outputs, active-low PUL-/DIR- outputs with
+// the + inputs tied to 5V, and optional full differential wiring.
 //
-// Single-ended (pul_n / dir_n = INVALID_PIN):
+// Active-high single-ended (pul_n / dir_n = INVALID_PIN):
 //   PUL+  ← Pico GPIO (step pulses)         PUL-/COM- → GND
 //   DIR+  ← Pico GPIO (direction)            DIR-      → GND
+//
+// Active-low single-ended (pul_active_low / dir_active_low = true):
+//   PUL+  → +5V                              PUL-      ← Pico GPIO
+//   DIR+  → +5V                              DIR-      ← Pico GPIO
+//   Idle: PUL-/DIR- HIGH, pulse/forward active state LOW
 //
 // Differential (pul_n / dir_n assigned):
 //   PUL+  ← Pico GPIO   PUL-  ← Pico GPIO (complement)
@@ -43,10 +49,10 @@ class Cl57te {
 public:
     // -- Hardware configuration ------------------------------------------------
     struct Config {
-        uint    pul;            // PUL+ GPIO – step pulse output
-        uint    pul_n;          // PUL- GPIO – complement (INVALID_PIN = single-ended)
-        uint    dir;            // DIR+ GPIO – direction output
-        uint    dir_n;          // DIR- GPIO – complement (INVALID_PIN = single-ended)
+        uint    pul;            // step pulse GPIO (PUL+ normally; PUL- if pul_active_low)
+        uint    pul_n;          // complement GPIO (INVALID_PIN = single-ended or hardwired)
+        uint    dir;            // direction GPIO  (DIR+ normally; DIR- if dir_active_low)
+        uint    dir_n;          // complement GPIO (INVALID_PIN = single-ended or hardwired)
         uint    ena;            // ENA+ GPIO – HIGH disables the drive
         uint    alm;            // ALM  GPIO – input, LOW = fault (open-collector)
 
@@ -56,6 +62,9 @@ public:
 
         float    max_speed_dps;    // hard ceiling on degrees/sec
         float    default_speed_dps;
+
+        bool    pul_active_low;    // true when cfg.pul drives PUL- with PUL+ tied high
+        bool    dir_active_low;    // true when cfg.dir drives DIR- with DIR+ tied high
     };
 
     // -- Lifecycle -------------------------------------------------------------
@@ -85,7 +94,8 @@ public:
     // Returns false if faulted or not enabled.
     bool start_move( int32_t n_steps, uint32_t step_hz = 0 );
 
-    // Abort the current move (cancels the timer).  Position is NOT updated.
+    // Abort the current move (cancels the timer). Position remains at the last
+    // emitted step.
     void stop();
 
     bool is_moving() const  { return remaining_ > 0; }
@@ -96,8 +106,8 @@ public:
     bool isr_tick();
 
     // -- Position --------------------------------------------------------------
-    // pos_steps_ is authoritative only after is_moving() returns false.
-    // The stepper task updates it via commit_position() at move completion.
+    // pos_steps_ is advanced by the timer ISR for each emitted step. It is the
+    // commanded mechanical position, not an encoder measurement.
     int32_t  pos_steps() const  { return pos_steps_; }
     float    angle_deg()  const;
 
@@ -105,6 +115,9 @@ public:
     void commit_position( int32_t pos ) { pos_steps_ = pos; }
 
     float steps_per_deg() const { return steps_per_deg_; }
+    uint  dir_pin() const { return cfg_.dir; }
+    bool  dir_level_for_steps( int32_t n_steps ) const;
+    bool  dir_gpio_level() const;
 
     // -- Public timer handle (needed for add_repeating_timer_us user_data) ----
     repeating_timer_t timer;
@@ -112,7 +125,8 @@ public:
 private:
     Config   cfg_{};
     bool     enabled_  = false;
-    int32_t  pos_steps_ = 0;
+    volatile int32_t  pos_steps_ = 0;
+    volatile int8_t   step_sign_ = 1;
 
     float    steps_per_deg_ = 1.0f;   // cached at init
 

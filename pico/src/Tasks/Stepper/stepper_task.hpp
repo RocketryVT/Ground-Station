@@ -46,14 +46,15 @@ struct StepperStatus {
 };
 
 // -- Command queues (depth 1, use xQueueOverwrite to send) --------------------
-extern QueueHandle_t g_stepper_az_cmd_q;    // Azimuth  (STEP1 – GPIO 4-7)
-extern QueueHandle_t g_stepper_zen_cmd_q;   // Zenith   (STEP2 – GPIO 12-15)
+extern QueueHandle_t g_stepper_az_cmd_q;    // Azimuth  (STEP1 – GPIO 4/5)
+extern QueueHandle_t g_stepper_zen_cmd_q;   // Zenith   (STEP2 – GPIO 6/7)
 
 // -- Status queues (depth 1, use xQueuePeek to read) --------------------------
 extern QueueHandle_t g_stepper_az_status_q;
 extern QueueHandle_t g_stepper_zen_status_q;
 
 // -- Init ----------------------------------------------------------------------
-void stepper_az_task_init();    // azimuth axis  (STEP1 – GPIO 4-7)
-void stepper_zen_task_init();   // zenith axis   (STEP2 – GPIO 12-15)
+void stepper_az_task_init();    // azimuth axis  (STEP1 – GPIO 4/5)
+void stepper_zen_task_init();   // zenith axis   (STEP2 – GPIO 6/7)
+void stepper_state_task_init(); // publishes antenna/state from axis status
 void stepper_ctrl_task_init();  // controller: reads location queues -> posts StepperCmd

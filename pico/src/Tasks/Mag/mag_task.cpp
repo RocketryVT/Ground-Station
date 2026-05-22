@@ -1,6 +1,7 @@
 #include "mag_task.hpp"
 #include "shared.hpp"
 #include "Tasks/I2C/i2c_task.hpp"
+#include "Tasks/MQTT/mqtt_task.hpp"
 
 #include "lis3mdl/LIS3MDL.hpp"
 
@@ -10,9 +11,11 @@
 #include "pico/time.h"
 
 #include <string.h>
+#include <stdio.h>
 
 #define MAG_SAMPLE_RATE_HZ  80
 #define MAG_PERIOD_MS       ( 1000 / MAG_SAMPLE_RATE_HZ )  // 12 ms (rounds down, ~83 Hz)
+#define MAG_RAW_MQTT_INTERVAL_MS  50
 
 // -----------------------------------------------------------------------------
 // I2C reply queue (private to this task)
@@ -88,7 +91,7 @@ static bool lis_init( lis3mdl::Device& device )
         log_print( "[mag] LIS3MDL init failed\n" );
         return false;
     }
-    log_print( "[mag] LIS3MDL OK\n" );
+    log_print( "[mag] LIS3MDL OK on I2C0\n" );
     return true;
 }
 
@@ -135,6 +138,7 @@ static void mag_task( void* )
     }
 
     TickType_t last_tick = xTaskGetTickCount();
+    TickType_t last_raw_mqtt = xTaskGetTickCount();
 
     for ( ;; ) {
         MagMsg m = {};
@@ -143,6 +147,24 @@ static void mag_task( void* )
         if ( lis_read( device, m ) ) {
             m.valid = true;
             xQueueOverwrite( g_mag_q, &m );
+
+            TickType_t now_ticks = xTaskGetTickCount();
+            if ( mqtt_raw_mag_enabled()
+                 && mqtt_is_connected()
+                 && ( now_ticks - last_raw_mqtt ) >= pdMS_TO_TICKS(MAG_RAW_MQTT_INTERVAL_MS) )
+            {
+                last_raw_mqtt = now_ticks;
+                MqttMessage msg = {};
+                snprintf( msg.topic, sizeof(msg.topic), "gs/pico/primary/raw/mag" );
+                snprintf( msg.payload, sizeof(msg.payload),
+                          "{"
+                          "\"timestamp\":%llu,"
+                          "\"mx\":%.6f,\"my\":%.6f,\"mz\":%.6f"
+                          "}",
+                          (unsigned long long)( m.timestamp_us / 1000u ),
+                          (double)m.mag[0], (double)m.mag[1], (double)m.mag[2] );
+                xQueueSend( g_mqtt_queue, &msg, 0 );
+            }
         } else {
             log_print( "[mag] read fail\n" );
         }
