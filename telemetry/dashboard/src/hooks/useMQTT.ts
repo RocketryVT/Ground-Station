@@ -12,12 +12,22 @@ export interface MQTTHandle {
 }
 
 export function useMQTT(enabled = true): MQTTHandle {
-    const { addTelemetry, setAntenna, setGroundImu, addRawImu, addRawMag, updateNode, setConnected,
-          addLogLine, addRawMessage } = useTelemetryStore();
   const clientRef = useRef<MqttClient | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
+    const {
+      addTelemetry,
+      setAntenna,
+      setGroundImu,
+      addRawImu,
+      addRawMag,
+      updateNode,
+      setConnected,
+      addLogLine,
+      addRawMessage,
+    } = useTelemetryStore.getState();
+
     const client = mqtt.connect(MQTT_BROKER_URL, {
       reconnectPeriod: 2000,
       connectTimeout:  5000,
@@ -63,8 +73,13 @@ export function useMQTT(enabled = true): MQTTHandle {
       }
     });
 
-    return () => { client.end(); clientRef.current = null; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      client.removeAllListeners();
+      client.end(true);
+      if (clientRef.current === client) clientRef.current = null;
+      setConnected(false);
+    };
+  }, [enabled]);
 
   return {
     publish: (topic, payload) => clientRef.current?.publish(topic, payload),

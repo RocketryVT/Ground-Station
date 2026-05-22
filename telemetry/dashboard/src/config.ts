@@ -32,9 +32,8 @@ export const API_BASE_URL = 'http://localhost:8000';
 // -- Starlink proxy (starlink_proxy.py, polls dish at 192.168.100.1:9200) -----
 export const STARLINK_PROXY_URL = 'http://localhost:8001/starlink';
 
-// How many telemetry samples to keep in memory (live ring buffer).
-// At 10 Hz this is ~5 minutes of data.
-export const MAX_HISTORY = 3000;
+// How many live telemetry samples to keep in memory per streamed MQTT history.
+export const MAX_HISTORY = 500;
 
 // -- Antenna beam visualization ------------------------------------------------
 // Adjust BEAM_HALF_ANGLE_DEG to match your actual antenna's half-power beamwidth.

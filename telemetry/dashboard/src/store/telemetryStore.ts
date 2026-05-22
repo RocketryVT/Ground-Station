@@ -7,13 +7,40 @@ import { MAX_HISTORY } from '../config';
 
 const MAX_LOG = 500;
 const MAX_RAW = 500;
-const MAX_SENSOR_RAW = 800;
-const MAX_AHRS = 800;
+const MAX_SENSOR_RAW = 500;
+const MAX_AHRS = 500;
 
 let _seq = 0;
 
 export interface LogLine    { id: number; ts: number; text: string; }
 export interface RawMessage { id: number; ts: number; topic: string; payload: string; }
+
+function appendCapped<T>(items: T[], next: T, limit: number): T[] {
+  return items.length >= limit
+    ? [...items.slice(items.length - limit + 1), next]
+    : [...items, next];
+}
+
+function appendTopicCapped<T extends { topic: string }>(items: T[], next: T, limit: number): T[] {
+  const topicCount = items.reduce((count, item) => count + (item.topic === next.topic ? 1 : 0), 0);
+  const removeCount = Math.max(0, topicCount - limit + 1);
+
+  if (removeCount === 0) return [...items, next];
+
+  let removed = 0;
+  return [
+    ...items.filter((item) => {
+      if (item.topic !== next.topic || removed >= removeCount) return true;
+      removed += 1;
+      return false;
+    }),
+    next,
+  ];
+}
+
+function capTail<T>(items: T[], limit: number): T[] {
+  return items.length > limit ? items.slice(-limit) : items;
+}
 
 interface TelemetryState {
   latest:      RocketTelemetry | null;
@@ -62,7 +89,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   addTelemetry: (t) =>
     set((s) => ({
       latest:      t,
-      history:     [...s.history.slice(-(MAX_HISTORY - 1)), t],
+      history:     appendCapped(s.history, t, MAX_HISTORY),
       flightStart: s.flightStart ?? t.timestamp,
     })),
 
@@ -71,7 +98,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   setGroundImu: (i) =>
     set((s) => ({
       groundImu: i,
-      ahrsHistory: [...s.ahrsHistory.slice(-(MAX_AHRS - 1)), i],
+      ahrsHistory: appendCapped(s.ahrsHistory, i, MAX_AHRS),
     })),
 
   updateNode: (n) =>
@@ -83,23 +110,30 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
     set({ history: [], latest: null, flightStart: null }),
 
   loadHistory: (rows) =>
-    set({ history: rows, latest: rows.at(-1) ?? null }),
+    set(() => {
+      const history = capTail(rows, MAX_HISTORY);
+      return { history, latest: history.at(-1) ?? null };
+    }),
 
   addLogLine: (text) =>
     set((s) => ({
-      logLines: [...s.logLines.slice(-(MAX_LOG - 1)), { id: _seq++, ts: Date.now(), text }],
+      logLines: appendCapped(s.logLines, { id: _seq++, ts: Date.now(), text }, MAX_LOG),
     })),
 
   addRawMessage: (topic, payload) =>
     set((s) => ({
-      rawMessages: [...s.rawMessages.slice(-(MAX_RAW - 1)), { id: _seq++, ts: Date.now(), topic, payload }],
+      rawMessages: appendTopicCapped(
+        s.rawMessages,
+        { id: _seq++, ts: Date.now(), topic, payload },
+        MAX_RAW,
+      ),
     })),
 
   addRawImu: (sample) =>
-    set((s) => ({ rawImu: [...s.rawImu.slice(-(MAX_SENSOR_RAW - 1)), sample] })),
+    set((s) => ({ rawImu: appendCapped(s.rawImu, sample, MAX_SENSOR_RAW) })),
 
   addRawMag: (sample) =>
-    set((s) => ({ rawMag: [...s.rawMag.slice(-(MAX_SENSOR_RAW - 1)), sample] })),
+    set((s) => ({ rawMag: appendCapped(s.rawMag, sample, MAX_SENSOR_RAW) })),
 
   clearRawSensors: () => set({ rawImu: [], rawMag: [] }),
 

@@ -18,7 +18,6 @@ export function VideoFeed() {
       .then((d) => {
         const vids = d.filter((x) => x.kind === 'videoinput');
         setDevices(vids);
-        if (vids.length > 0) setDeviceId(vids[0].deviceId);
       })
       .catch(() => setError('Cannot enumerate devices'));
   }, []);
@@ -27,17 +26,18 @@ export function VideoFeed() {
   useEffect(() => {
     if (source !== 'device' || !deviceId) return;
     let stream: MediaStream;
+    const video = videoRef.current;
     navigator.mediaDevices
       .getUserMedia({ video: { deviceId: { exact: deviceId } } })
       .then((s) => {
         stream = s;
-        if (videoRef.current) videoRef.current.srcObject = s;
+        if (video) video.srcObject = s;
         setError('');
       })
       .catch((e) => setError(String(e)));
     return () => {
       stream?.getTracks().forEach((t) => t.stop());
-      if (videoRef.current) videoRef.current.srcObject = null;
+      if (video) video.srcObject = null;
     };
   }, [source, deviceId]);
 
@@ -81,6 +81,9 @@ export function VideoFeed() {
             value={deviceId}
             onChange={(e) => setDeviceId(e.target.value)}
           >
+            <option value="" disabled>
+              Select camera
+            </option>
             {devices.map((d) => (
               <option key={d.deviceId} value={d.deviceId}>
                 {d.label || d.deviceId.slice(0, 20)}
