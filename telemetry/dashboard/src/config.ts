@@ -10,21 +10,28 @@ export const MQTT_BROKER_URL = 'ws://localhost:9001';
 
 export const TOPICS = {
   ROCKET_TELEMETRY:  'rocket/telemetry',
+  ROCKET_LORA0:      'rocket/lora0',
+  ROCKET_LORA1_RF69: 'rocket/lora1/rf69',
+  ROCKET_INTER_PICO: 'rocket/inter_pico',
   ANTENNA_STATE:     'antenna/state',
   GROUND_IMU:        'gs/pico/primary/imu',
   AHRS_STATUS:       'gs/pico/primary/ahrs/status',
   RAW_IMU:           'gs/pico/primary/raw/imu',
   RAW_MAG:           'gs/pico/primary/raw/mag',
   NODES_WILDCARD:    'nodes/+/position',
+  GS_DEMO:           'gs/demo',
   GS_LOG:            'gs/log',
   STEPPER_AZ_CMD:    'gs/cmd/az',
-  STEPPER_ZEN_CMD:   'gs/cmd/zen',
+  // Backward-compatible topic name; payload is elevation degrees.
+  STEPPER_EL_CMD:    'gs/cmd/zen',
   STEPPER_JOG_CMD:   'gs/cmd/jog',
   CALIBRATION_CMD:   'gs/cmd/calibration',
   RAW_SENSORS_CMD:   'gs/cmd/raw_sensors',
   DEBUG_AZ_OSC:      'gs/cmd/debug/az',
-  DEBUG_ZEN_OSC:     'gs/cmd/debug/zen',
+  DEBUG_EL_OSC:      'gs/cmd/debug/zen',
 } as const;
+
+export const KNOWN_MQTT_TOPICS = Object.values(TOPICS);
 
 // -- History API (Python logger) -----------------------------------------------
 export const API_BASE_URL = 'http://localhost:8000';

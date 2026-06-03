@@ -1,7 +1,7 @@
 #pragma once
 
 // -----------------------------------------------------------------------------
-// Stepper axis tasks  –  one task per axis (azimuth + zenith)
+// Stepper axis tasks  –  one task per axis (azimuth + elevation)
 //
 // Motor hardware: CL57TE closed-loop stepper drive
 //
@@ -14,6 +14,7 @@
 //   Write a StepperCmd to g_stepper_az_cmd_q or g_stepper_zen_cmd_q using
 //   xQueueOverwrite().  The task always acts on the latest value.
 //   Set .stop = true to abort motion immediately.
+//   STEP2 command angles use elevation convention: 0° = horizon, 90° = up.
 //
 // Status interface:
 //   Peek g_stepper_az_status_q / g_stepper_zen_status_q (depth-1 overwrite)
@@ -31,7 +32,7 @@
 
 // Sent TO the stepper tasks
 struct StepperCmd {
-    float  target_angle_deg;    // absolute angle in degrees (az: 0-360; zen: 0-90)
+    float  target_angle_deg;    // absolute angle in degrees (az: 0-360; el: 0 horizon, 90 up)
     float  speed_dps;           // desired speed (deg/s); 0 = use default
     bool   stop;                // true -> abort move
 };
@@ -47,7 +48,7 @@ struct StepperStatus {
 
 // -- Command queues (depth 1, use xQueueOverwrite to send) --------------------
 extern QueueHandle_t g_stepper_az_cmd_q;    // Azimuth  (STEP1 – GPIO 4/5)
-extern QueueHandle_t g_stepper_zen_cmd_q;   // Zenith   (STEP2 – GPIO 6/7)
+extern QueueHandle_t g_stepper_zen_cmd_q;   // Elevation (STEP2 – GPIO 6/7)
 
 // -- Status queues (depth 1, use xQueuePeek to read) --------------------------
 extern QueueHandle_t g_stepper_az_status_q;
@@ -55,6 +56,6 @@ extern QueueHandle_t g_stepper_zen_status_q;
 
 // -- Init ----------------------------------------------------------------------
 void stepper_az_task_init();    // azimuth axis  (STEP1 – GPIO 4/5)
-void stepper_zen_task_init();   // zenith axis   (STEP2 – GPIO 6/7)
+void stepper_zen_task_init();   // elevation axis (STEP2 – GPIO 6/7)
 void stepper_state_task_init(); // publishes antenna/state from axis status
 void stepper_ctrl_task_init();  // controller: reads location queues -> posts StepperCmd

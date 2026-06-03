@@ -8,22 +8,22 @@
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #E5E1E6;
+  background: #f2f4f7;
 }
 
 /* -- Status bar -------------------------------------------------------------- */
 .status-bar {
-  flex: 0 0 48px;
-  background: #861F41;
-  border-bottom: 2px solid #6b1834;
+  flex: 0 0 64px;
+  background: #101216;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* -- Content area below status bar ------------------------------------------ */
 .content {
   flex: 1 1 0;
   min-height: 0;       /* critical — lets flex child shrink below content size */
-  padding: 4px;
-  background: #E5E1E6;
+  padding: 10px;
+  background: #f2f4f7;
 }
 
 /* react-resizable-panels Group already sets height:100%/width:100%,
@@ -41,8 +41,9 @@
   height: 100%;
   overflow: hidden;
   background: #ffffff;
-  border: 1px solid #D7D2CB;
-  border-radius: 2px;
+  border: 1px solid rgba(16, 18, 22, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(16, 18, 22, 0.06);
 }
 
 /* -- Resize handle ----------------------------------------------------------- */
@@ -61,8 +62,8 @@
 [data-group][data-orientation="horizontal"] > .handle { width:  5px; cursor: col-resize; height: 100%; }
 
 .handle__bar {
-  background: #D7D2CB;
-  border-radius: 2px;
+  background: rgba(16, 18, 22, 0.16);
+  border-radius: 999px;
   transition: background 0.15s;
 }
 
@@ -70,4 +71,4 @@
 [data-group][data-orientation="horizontal"] > .handle .handle__bar { width: 2px; height: 40px; }
 
 .handle:hover  .handle__bar,
-.handle:active .handle__bar { background: #CA4F00; }
+.handle:active .handle__bar { background: #861F41; }

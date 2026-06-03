@@ -1,6 +1,6 @@
 // Ground Station — Primary Pico
 // Azimuth:  STEP1 GPIO 4/5, 10:1 gearbox × 3:1 belt = 30:1 total
-// Zenith:   STEP2 GPIO 6/7, 10:1 gearbox × 5:1 belt = 50:1 total
+// Elevation: STEP2 GPIO 6/7, 10:1 gearbox × 5:1 belt = 50:1 total
 
 #include "shared.hpp"
 
@@ -9,6 +9,7 @@
 #include "Tasks/MQTT/mqtt_task.hpp"
 #include "Tasks/I2C/i2c_task.hpp"
 #include "Tasks/IMU/imu_task.hpp"
+#include "Tasks/YawIMU/yaw_imu_task.hpp"
 #include "Tasks/Mag/mag_task.hpp"
 // #include "Tasks/Baro/baro_task.hpp"
 #include "Tasks/Fusion/fusion_task.hpp"
@@ -32,6 +33,7 @@ QueueHandle_t      g_rocket_location_q = nullptr;
 QueueHandle_t      g_imu_q             = nullptr;
 QueueHandle_t      g_icm_q             = nullptr;
 QueueHandle_t      g_mag_q             = nullptr;
+QueueHandle_t      g_yaw_imu_q         = nullptr;
 QueueHandle_t      g_baro_q            = nullptr;
 
 // -- Static backing storage ----------------------------------------------------
@@ -57,6 +59,9 @@ static uint8_t       s_icm_storage[ 1 * sizeof(IcmMsg) ];
 
 static StaticQueue_t s_mag_buf;
 static uint8_t       s_mag_storage[ 1 * sizeof(MagMsg) ];
+
+static StaticQueue_t s_yaw_imu_buf;
+static uint8_t       s_yaw_imu_storage[ 1 * sizeof(YawImuMsg) ];
 
 static StaticQueue_t s_baro_buf;
 static uint8_t       s_baro_storage[ 1 * sizeof(BaroMsg) ];
@@ -125,14 +130,17 @@ int main()
     g_imu_q  = xQueueCreateStatic( 1, sizeof(ImuMsg),  s_imu_storage,  &s_imu_buf  );
     g_icm_q  = xQueueCreateStatic( 1, sizeof(IcmMsg),  s_icm_storage,  &s_icm_buf  );
     g_mag_q  = xQueueCreateStatic( 1, sizeof(MagMsg),  s_mag_storage,  &s_mag_buf  );
+    g_yaw_imu_q = xQueueCreateStatic( 1, sizeof(YawImuMsg),
+                                      s_yaw_imu_storage, &s_yaw_imu_buf );
     g_baro_q = xQueueCreateStatic( 1, sizeof(BaroMsg), s_baro_storage, &s_baro_buf );
 
     // -- Init tasks (order matters: I2C before sensors, WiFi before MQTT/NTP) --
     i2c0_task_init();   // I2C0: ISM330DLC IMU + LIS3MDL magnetometer
-    i2c1_task_init();   // I2C1: reserved / expansion
+    i2c1_task_init();   // I2C1: yaw-body ICM-20948 9-axis IMU
 
     imu_task_init();
     mag_task_init();
+    yaw_imu_task_init();
     // baro_task_init();
     fusion_task_init();
 

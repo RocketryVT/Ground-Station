@@ -48,58 +48,63 @@ export function StatusBar({ demo, tab, onToggleDemo, onSetTab }: Props) {
 
   return (
     <div className={styles.bar}>
-      <span className={styles.title}>GROUND STATION</span>
+      <div className={styles.brand}>
+        <span className={styles.title}>Ground Station</span>
+        <span className={styles.subtitle}>{flightStart ? elapsed : 'Standby'}</span>
+      </div>
 
-      <div className={`${styles.dot} ${connected ? styles.green : styles.red}`} />
-      <span className={styles.label}>{connected ? 'CONNECTED' : 'NO LINK'}</span>
+      <div className={`${styles.linkPill} ${connected ? styles.linkPillConnected : styles.linkPillOffline}`}>
+        <span className={styles.dot} />
+        {connected ? 'Connected' : 'No link'}
+      </div>
 
-      <span className={styles.sep} />
-      <span className={styles.timer}>{flightStart ? elapsed : 'STANDBY'}</span>
-
-      <span className={styles.sep} />
-      <span className={styles.metric}>ALT</span>
-      <span className={styles.value}>{latest ? `${latest.alt_m.toFixed(0)} m` : '--'}</span>
-
-      <span className={styles.sep} />
-      <span className={styles.metric}>SPD</span>
-      <span className={styles.value}>{speed !== '--' ? `${speed} m/s` : '--'}</span>
-
-      <span className={styles.sep} />
-      <span className={styles.metric}>RSSI</span>
-      <span className={styles.value}>{latest ? `${latest.rssi} dBm` : '--'}</span>
-
-      <span className={styles.sep} />
-      <span className={styles.metric}>AZ</span>
-      <span className={styles.value}>{antenna ? `${antenna.actual_az.toFixed(1)}°` : '--'}</span>
-
-      <span className={styles.metric}>EL</span>
-      <span className={styles.value}>{antenna ? `${antenna.actual_el.toFixed(1)}°` : '--'}</span>
+      <div className={styles.metrics}>
+        <div className={styles.metricBlock}>
+          <span className={styles.metric}>Altitude</span>
+          <strong className={styles.value}>{latest ? `${latest.alt_m.toFixed(0)} m` : '--'}</strong>
+        </div>
+        <div className={styles.metricBlock}>
+          <span className={styles.metric}>Speed</span>
+          <strong className={styles.value}>{speed !== '--' ? `${speed} m/s` : '--'}</strong>
+        </div>
+        <div className={styles.metricBlock}>
+          <span className={styles.metric}>RSSI</span>
+          <strong className={styles.value}>{latest ? `${latest.rssi} dBm` : '--'}</strong>
+        </div>
+        <div className={styles.metricBlock}>
+          <span className={styles.metric}>Antenna</span>
+          <strong className={styles.value}>
+            {antenna ? `${antenna.actual_az.toFixed(1)}° / ${antenna.actual_el.toFixed(1)}°` : '--'}
+          </strong>
+        </div>
+      </div>
 
       <span className={styles.spacer} />
 
-      <button
-        className={`${styles.tabBtn} ${tab === 'flight' ? styles.tabActive : ''}`}
-        onClick={() => onSetTab('flight')}
-      >
-        FLIGHT
-      </button>
-      <button
-        className={`${styles.tabBtn} ${tab === 'debug' ? styles.tabActive : ''}`}
-        onClick={() => onSetTab('debug')}
-      >
-        DEBUG
-      </button>
+      <div className={styles.navGroup}>
+        <button
+          className={`${styles.tabBtn} ${tab === 'flight' ? styles.tabActive : ''}`}
+          onClick={() => onSetTab('flight')}
+        >
+          Mission
+        </button>
+        <button
+          className={`${styles.tabBtn} ${tab === 'debug' ? styles.tabActive : ''}`}
+          onClick={() => onSetTab('debug')}
+        >
+          Systems
+        </button>
+      </div>
 
-      <span className={styles.sep} />
       <button
         className={`${styles.clearBtn} ${demo ? styles.demoActive : ''}`}
         onClick={onToggleDemo}
       >
-        {demo ? 'DEMO ON' : 'DEMO'}
+        {demo ? 'Demo on' : 'Demo'}
       </button>
-      <button className={styles.clearBtn} onClick={clearFlight}>CLEAR</button>
+      <button className={styles.clearBtn} onClick={clearFlight}>Clear</button>
       <button className={styles.clearBtn} onClick={toggleFullscreen} title="Toggle fullscreen">
-        {fullscreen ? '[ ]' : '[+]'}
+        {fullscreen ? 'Exit' : 'Full'}
       </button>
     </div>
   );

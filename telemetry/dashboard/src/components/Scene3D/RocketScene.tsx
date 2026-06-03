@@ -1,13 +1,108 @@
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { useTelemetryStore } from '../../store/telemetryStore';
 import styles from './RocketScene.module.css';
+
+const FLAP_MAX_ANGLE_DEG = 60;
+const OPENROCKET_BASE = '/models/openrocket/';
+const OPENROCKET_OBJ = 'full_rocket.obj';
+const OPENROCKET_MTL = 'full_rocket.mtl';
+const OPENROCKET_DISPLAY_LENGTH = 2.2;
+const ACTIVE_DRAG_Y = -0.57;
+
+function OpenRocketAssembly() {
+  const [model, setModel] = useState<THREE.Group | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadModel() {
+      const mtlLoader = new MTLLoader();
+      mtlLoader.setPath(OPENROCKET_BASE);
+      mtlLoader.setResourcePath(OPENROCKET_BASE);
+      const materials = await mtlLoader.loadAsync(OPENROCKET_MTL);
+      materials.preload();
+
+      const objLoader = new OBJLoader();
+      objLoader.setPath(OPENROCKET_BASE);
+      objLoader.setMaterials(materials);
+      const assembly = await objLoader.loadAsync(OPENROCKET_OBJ);
+      assembly.traverse((child) => {
+        if (child.name.includes('ADS Flaps')) child.visible = false;
+        if (child instanceof THREE.Mesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          child.material = Array.isArray(child.material)
+            ? child.material.map((material) => material.clone())
+            : child.material.clone();
+        }
+      });
+
+      const box = new THREE.Box3().setFromObject(assembly);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      assembly.position.sub(center);
+
+      const normalized = new THREE.Group();
+      normalized.add(assembly);
+      normalized.scale.setScalar(OPENROCKET_DISPLAY_LENGTH / Math.max(size.z, 0.001));
+      normalized.rotation.x = -Math.PI / 2;
+
+      if (mounted) setModel(normalized);
+    }
+
+    loadModel().catch((error) => {
+      console.error('Failed to load OpenRocket OBJ model', error);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!model) return null;
+  return <primitive object={model} />;
+}
+
+function ActiveDragFlap({ angleDeg, deployDeg }: { angleDeg: number; deployDeg: number }) {
+  const shape = useMemo(() => {
+    const s = new THREE.Shape();
+    s.moveTo(-0.055, -0.18);
+    s.lineTo(0.048, -0.18);
+    s.quadraticCurveTo(0.085, 0, 0.048, 0.18);
+    s.lineTo(-0.055, 0.18);
+    s.quadraticCurveTo(-0.078, 0, -0.055, -0.18);
+    return s;
+  }, []);
+
+  const deploy = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(deployDeg, 0, FLAP_MAX_ANGLE_DEG));
+
+  return (
+    <group rotation={[0, THREE.MathUtils.degToRad(angleDeg), 0]} position={[0, ACTIVE_DRAG_Y, 0]}>
+      <mesh position={[0, 0, 0.078]}>
+        <cylinderGeometry args={[0.008, 0.008, 0.42, 10]} />
+        <meshStandardMaterial color="#30343a" metalness={0.7} roughness={0.35} />
+      </mesh>
+      <group position={[0, 0, 0.089]} rotation={[0, deploy, 0]}>
+        <mesh>
+          <extrudeGeometry args={[shape, { depth: 0.012, bevelEnabled: true, bevelSize: 0.003, bevelThickness: 0.003 }]} />
+          <meshStandardMaterial color="#f0a03d" metalness={0.42} roughness={0.3} side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
 
 // -- Rocket geometry (procedural — swap for a GLTF if you have a model) ---------
 function RocketModel() {
   const groupRef = useRef<THREE.Group>(null);
+  const latest = useTelemetryStore((s) => s.latest);
+  const flapAngle = latest?.flap_angle_deg
+    ?? (latest?.flap_deployment_percent != null ? latest.flap_deployment_percent * 0.6 : 0);
 
   useFrame(() => {
     const latest = useTelemetryStore.getState().latest;
@@ -21,39 +116,12 @@ function RocketModel() {
 
   return (
     <group ref={groupRef}>
-      {/* Body */}
-      <mesh>
-        <cylinderGeometry args={[0.08, 0.08, 1.6, 24]} />
-        <meshStandardMaterial color="#cccccc" metalness={0.8} roughness={0.25} />
-      </mesh>
+      <OpenRocketAssembly />
 
-      {/* Nose cone */}
-      <mesh position={[0, 0.95, 0]}>
-        <coneGeometry args={[0.08, 0.5, 24]} />
-        <meshStandardMaterial color="#dd3333" metalness={0.5} roughness={0.3} />
-      </mesh>
-
-      {/* 4 fins */}
+      {/* Telemetry-driven active-drag flaps. The static OpenRocket ADS flap group is hidden. */}
       {[0, 90, 180, 270].map((deg) => (
-        <mesh
-          key={deg}
-          position={[
-            Math.sin(THREE.MathUtils.degToRad(deg)) * 0.12,
-            -0.55,
-            Math.cos(THREE.MathUtils.degToRad(deg)) * 0.12,
-          ]}
-          rotation={[0, THREE.MathUtils.degToRad(deg), 0]}
-        >
-          <boxGeometry args={[0.28, 0.35, 0.015]} />
-          <meshStandardMaterial color="#999999" metalness={0.7} roughness={0.3} />
-        </mesh>
+        <ActiveDragFlap key={deg} angleDeg={deg} deployDeg={flapAngle} />
       ))}
-
-      {/* Motor nozzle */}
-      <mesh position={[0, -0.85, 0]}>
-        <cylinderGeometry args={[0.04, 0.07, 0.12, 16]} />
-        <meshStandardMaterial color="#555555" metalness={0.9} roughness={0.2} />
-      </mesh>
     </group>
   );
 }
@@ -88,11 +156,20 @@ function BodyAxes() {
 function AttitudeReadout() {
   const latest = useTelemetryStore((s) => s.latest);
   if (!latest) return null;
+  const flapAngle = latest.flap_angle_deg
+    ?? (latest.flap_deployment_percent != null ? latest.flap_deployment_percent * 0.6 : 0);
   return (
     <div className={styles.readout}>
       <div className={styles.row}><span>ROLL</span><span>{latest.roll.toFixed(1)}°</span></div>
       <div className={styles.row}><span>PITCH</span><span>{latest.pitch.toFixed(1)}°</span></div>
       <div className={styles.row}><span>YAW</span><span>{latest.yaw.toFixed(1)}°</span></div>
+      <div className={styles.row}><span>FLAP</span><span>{flapAngle.toFixed(1)}°</span></div>
+      {latest.predicted_apogee_m != null && (
+        <div className={styles.row}><span>APOGEE</span><span>{latest.predicted_apogee_m.toFixed(0)} m</span></div>
+      )}
+      {latest.target_apogee_m != null && (
+        <div className={styles.row}><span>TARGET</span><span>{latest.target_apogee_m.toFixed(0)} m</span></div>
+      )}
     </div>
   );
 }

@@ -102,8 +102,9 @@ static void store_axis_cmd( const char* payload, volatile PendingAxisCmd* pendin
 static void store_jog_cmd( const char* payload )
 {
     const bool az_axis  = strstr( payload, "\"axis\":\"az\"" ) != nullptr;
-    const bool zen_axis = strstr( payload, "\"axis\":\"zen\"" ) != nullptr;
-    if ( !az_axis && !zen_axis ) return;
+    const bool el_axis = strstr( payload, "\"axis\":\"el\"" ) != nullptr
+                      || strstr( payload, "\"axis\":\"zen\"" ) != nullptr;
+    if ( !az_axis && !el_axis ) return;
 
     float delta = 0.0f;
     if ( !json_number_field( payload, "\"delta_deg\"", &delta ) ) return;
@@ -196,13 +197,13 @@ static void process_pending_commands()
         apply_axis_cmd( g_stepper_az_cmd_q, "az", axis );
     }
     if ( take_pending_axis_cmd( &s_pending_zen_cmd, &axis ) ) {
-        apply_axis_cmd( g_stepper_zen_cmd_q, "zen", axis );
+        apply_axis_cmd( g_stepper_zen_cmd_q, "el", axis );
     }
 
     PendingJogCmd jog = {};
     if ( take_pending_jog_cmd( &jog ) ) {
         QueueHandle_t q = jog.axis_is_az ? g_stepper_az_cmd_q : g_stepper_zen_cmd_q;
-        const char* axis = jog.axis_is_az ? "az" : "zen";
+        const char* axis = jog.axis_is_az ? "az" : "el";
 
         StepperCmd cmd = {};
         if ( q ) xQueuePeek( q, &cmd, 0 );

@@ -117,6 +117,18 @@ export function useDemoMode(enabled: boolean) {
       );
       const rssi = Math.round(-60 - 20 * Math.log10(Math.max(1, slantRange / 100)));
       const snr  = parseFloat((15 - slantRange / 500).toFixed(1));
+      const targetApogee = 3000;
+      const predictedApogee = t < 3
+        ? 3250
+        : t < 14
+          ? 3180 - 160 * Math.min(1, (t - 3) / 11)
+          : MAX_ALT;
+      const deploymentPercent = t < 3
+        ? 0
+        : t < 12
+          ? Math.max(0, Math.min(70, ((predictedApogee - targetApogee) / 220) * 70))
+          : 0;
+      const flapAngleDeg = deploymentPercent * 0.6;
 
       addTelemetry({
         timestamp: Date.now(),
@@ -124,6 +136,10 @@ export function useDemoMode(enabled: boolean) {
         vel_n, vel_e, vel_d,
         roll, pitch, yaw,
         rssi, snr,
+        flap_angle_deg: flapAngleDeg,
+        flap_deployment_percent: deploymentPercent,
+        predicted_apogee_m: predictedApogee,
+        target_apogee_m: targetApogee,
       });
 
       // -- Antenna tracking (az/el from GS node position, not pad) ---------

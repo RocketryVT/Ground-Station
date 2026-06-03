@@ -14,6 +14,10 @@ export interface RocketTelemetry {
   yaw: number;         // degrees (0 = north)
   rssi: number;        // dBm
   snr?: number;        // dB
+  flap_angle_deg?: number;            // active-drag flap deployment angle
+  flap_deployment_percent?: number;   // 0..100, when angle is not sent directly
+  target_apogee_m?: number;
+  predicted_apogee_m?: number;
 }
 
 export interface AntennaState {

@@ -11,6 +11,7 @@ add_executable(gs_pico
     Tasks/UDP/udp_recv_task.cpp
     Tasks/I2C/i2c_task.cpp
     Tasks/IMU/imu_task.cpp
+    Tasks/YawIMU/yaw_imu_task.cpp
     Tasks/Mag/mag_task.cpp
     Tasks/Baro/baro_task.cpp
     Tasks/Fusion/fusion_task.cpp
@@ -43,6 +44,7 @@ target_link_libraries(gs_pico
     gps                                     # NMEA parser (unused now, kept for future)
     lis3mdl                                 # LIS3MDL magnetometer driver
     ism330dlc                               # ISM330DLC accelerometer/gyroscope driver
+    nine_axis_imu                           # ICM-20948 yaw-body 9-axis IMU driver
     math_utils                              # haversine / azimuth / elevation
     Fusion                                  # x-io Fusion AHRS (Madgwick-derived)
 )

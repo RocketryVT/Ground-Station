@@ -79,6 +79,12 @@ if (NOT EXISTS "${ISM330DLC_ROOT}/CMakeLists.txt")
 endif()
 add_subdirectory(${ISM330DLC_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/ism330dlc)
 
+# ICM-20948 9-axis IMU driver.
+if (NOT EXISTS "${NINE_AXIS_IMU_ROOT}/CMakeLists.txt")
+    message(FATAL_ERROR "ICM-20948 driver not found at ${NINE_AXIS_IMU_ROOT}. Set NINE_AXIS_IMU_ROOT.")
+endif()
+add_subdirectory(${NINE_AXIS_IMU_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/nine_axis_imu)
+
 # Ground-station math — provides the 'math_utils' target.
 if (NOT EXISTS "${MATH_UTILS_ROOT}/CMakeLists.txt")
     message(FATAL_ERROR "math_utils not found at ${MATH_UTILS_ROOT}. Set MATH_UTILS_ROOT.")

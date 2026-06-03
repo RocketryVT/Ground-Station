@@ -165,6 +165,17 @@ struct MagMsg {
     bool     valid;
 };
 
+struct YawImuMsg {
+    float    accel[3];      // g           (ICM-20948 on yaw moving body)
+    float    gyro[3];       // deg/s
+    float    mag_ut[3];     // microtesla  (AK09916 inside ICM-20948)
+    float    temp_c;
+    uint64_t timestamp_us;
+    bool     mag_valid;
+    bool     mag_overflow;
+    bool     valid;
+};
+
 struct BaroMsg {
     float    pressure_pa;   // calibrated pressure, Pa
     float    alt_m;         // ISA altitude, metres MSL
@@ -175,6 +186,7 @@ struct BaroMsg {
 
 extern QueueHandle_t g_icm_q;
 extern QueueHandle_t g_mag_q;
+extern QueueHandle_t g_yaw_imu_q;
 extern QueueHandle_t g_baro_q;
 
 // -- IMU / AHRS output queue ---------------------------------------------------

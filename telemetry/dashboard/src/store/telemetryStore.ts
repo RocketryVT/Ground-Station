@@ -70,6 +70,9 @@ interface TelemetryState {
   clearRawSensors: () => void;
   clearAhrsHistory: () => void;
   clearDebug:   () => void;
+  setActiveDrag: (d: Partial<Pick<RocketTelemetry,
+    'flap_angle_deg' | 'flap_deployment_percent' | 'target_apogee_m' | 'predicted_apogee_m'
+  >>) => void;
 }
 
 export const useTelemetryStore = create<TelemetryState>((set) => ({
@@ -140,4 +143,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   clearAhrsHistory: () => set({ ahrsHistory: [] }),
 
   clearDebug: () => set({ logLines: [], rawMessages: [] }),
+
+  setActiveDrag: (d) =>
+    set((s) => (s.latest ? { latest: { ...s.latest, ...d } } : {})),
 }));

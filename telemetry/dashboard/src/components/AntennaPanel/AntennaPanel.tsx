@@ -64,7 +64,7 @@ function Compass({ az }: { az: number }) {
   );
 }
 
-// -- Elevation arc — filled arc shows zenith angle ----------------------------
+// -- Elevation arc — filled arc shows angle above horizon ---------------------
 function ElevationArc({ el }: { el: number }) {
   // Arc from 0° (horizon) to el° on a 180° semicircle.
   const clamp = Math.max(0, Math.min(90, el));

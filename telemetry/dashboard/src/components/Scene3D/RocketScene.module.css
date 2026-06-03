@@ -43,11 +43,11 @@
 .row span:first-child {
   color: #75787B;
   font-size: 10px;
-  width: 40px;
+  width: 54px;
 }
 
 .row span:last-child {
   color: #1a1a1a;
   text-align: right;
-  min-width: 55px;
+  min-width: 64px;
 }

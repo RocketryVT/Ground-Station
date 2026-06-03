@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip,
 } from 'recharts';
 import { useTelemetryStore } from '../../store/telemetryStore';
-import { TOPICS, STARLINK_PROXY_URL } from '../../config';
+import { TOPICS, KNOWN_MQTT_TOPICS, STARLINK_PROXY_URL } from '../../config';
 import type { MQTTHandle } from '../../hooks/useMQTT';
 import type { AntennaState, GroundImuState, RawImuSample, RawMagSample } from '../../types/telemetry';
 import { SimTab } from './SimTab';
@@ -34,8 +34,9 @@ interface StarlinkData {
   software_version:         string | null;
   uptime_s:                 number | null;
   // meta
-  error:   string | null;
-  last_ok: number | null;
+  error:          string | null;
+  location_error: string | null;
+  last_ok:        number | null;
 }
 
 interface AhrsStatus {
@@ -45,6 +46,18 @@ interface AhrsStatus {
   have_mag: boolean;
   updates: number;
 }
+
+type DebugTab = 'log' | 'topics' | 'orientation' | 'ahrs' | 'raw' | 'starlink' | 'sim';
+
+const DEBUG_TABS: Array<{ id: DebugTab; label: string; section: string }> = [
+  { id: 'log',         label: 'Console',     section: 'Streams' },
+  { id: 'topics',      label: 'MQTT Topics', section: 'Streams' },
+  { id: 'orientation', label: 'Orientation', section: 'Avionics' },
+  { id: 'ahrs',        label: 'AHRS',        section: 'Avionics' },
+  { id: 'raw',         label: 'Raw Sensors', section: 'Avionics' },
+  { id: 'starlink',    label: 'Starlink',    section: 'Network' },
+  { id: 'sim',         label: 'Simulation',  section: 'Tools' },
+];
 
 // -- Starlink tab component ---------------------------------------------------
 function StarlinkTab() {
@@ -76,6 +89,10 @@ function StarlinkTab() {
   function fmt(v: number | null | undefined, decimals = 1, unit = ''): string {
     if (v == null) return '--';
     return `${v.toFixed(decimals)}${unit}`;
+  }
+  function fmtLocation(v: number | null | undefined, decimals = 1, unit = ''): string {
+    if (data?.location_error && v == null) return 'NO RESPONSE';
+    return fmt(v, decimals, unit);
   }
   function fmtMbps(bps: number | null): string {
     if (bps == null) return '--';
@@ -115,11 +132,11 @@ function StarlinkTab() {
         {/* -- Location ----------------------------------------------------- */}
         <div className={styles.starlinkCard}>
           <div className={styles.cardTitle}>LOCATION</div>
-          <Row label="Latitude"   value={fmt(data?.lat,  6, '°')} />
-          <Row label="Longitude"  value={fmt(data?.lon,  6, '°')} />
-          <Row label="Altitude"   value={fmt(data?.alt,  1, ' m')} />
-          <Row label="Horiz spd" value={fmt(data?.horizontal_speed_mps, 2, ' m/s')} />
-          <Row label="Vert spd"  value={fmt(data?.vertical_speed_mps,  2, ' m/s')} />
+          <Row label="Latitude"   value={fmtLocation(data?.lat,  6, '°')} />
+          <Row label="Longitude"  value={fmtLocation(data?.lon,  6, '°')} />
+          <Row label="Altitude"   value={fmtLocation(data?.alt,  1, ' m')} />
+          <Row label="Horiz spd" value={fmtLocation(data?.horizontal_speed_mps, 2, ' m/s')} />
+          <Row label="Vert spd"  value={fmtLocation(data?.vertical_speed_mps,  2, ' m/s')} />
         </div>
 
         {/* -- Pointing ----------------------------------------------------- */}
@@ -155,27 +172,27 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
 }
 
 // -- Confirmation dialog -------------------------------------------------------
+type DirectAxis = 'az' | 'el';
+
 interface ConfirmDialogProps {
-  az:     string;
-  zen:    string;
+  axis:   DirectAxis;
+  value:  string;
   speed:  string;
   onConfirm: () => void;
   onCancel:  () => void;
 }
 
-function ConfirmDialog({ az, zen, speed, onConfirm, onCancel }: ConfirmDialogProps) {
+function ConfirmDialog({ axis, value, speed, onConfirm, onCancel }: ConfirmDialogProps) {
+  const label = axis === 'az' ? 'Azimuth' : 'Elevation';
+
   return (
     <div className={styles.overlay}>
       <div className={styles.dialog}>
-        <div className={styles.dialogTitle}>⚠ CONFIRM ANTENNA COMMAND</div>
+        <div className={styles.dialogTitle}>CONFIRM ANTENNA COMMAND</div>
         <div className={styles.dialogBody}>
           <div className={styles.dialogRow}>
-            <span className={styles.dialogLabel}>Azimuth</span>
-            <span className={styles.dialogValue}>{az}°</span>
-          </div>
-          <div className={styles.dialogRow}>
-            <span className={styles.dialogLabel}>Zenith (elevation)</span>
-            <span className={styles.dialogValue}>{zen}°</span>
+            <span className={styles.dialogLabel}>{label}</span>
+            <span className={styles.dialogValue}>{value}°</span>
           </div>
           <div className={styles.dialogRow}>
             <span className={styles.dialogLabel}>Speed</span>
@@ -238,6 +255,21 @@ function jsonHistory<T>(messages: { ts: number; topic: string; payload: string }
   return parsed;
 }
 
+function mqttFilterMatches(filter: string, topic: string): boolean {
+  if (!filter.includes('+') && !filter.includes('#')) return topic.includes(filter);
+
+  const filterParts = filter.split('/');
+  const topicParts = topic.split('/');
+
+  for (let i = 0; i < filterParts.length; i++) {
+    const part = filterParts[i];
+    if (part === '#') return i === filterParts.length - 1;
+    if (part !== '+' && part !== topicParts[i]) return false;
+  }
+
+  return filterParts.length === topicParts.length;
+}
+
 function OrientationTab({
   antenna,
   imu,
@@ -252,7 +284,7 @@ function OrientationTab({
   antennaSeen: number | null;
 }) {
   const baseAz = antenna?.actual_az ?? 0;
-  const zenith = antenna?.actual_el ?? 0;
+  const elevation = antenna?.actual_el ?? 0;
   const imuYaw = imu?.yaw360 ?? norm360(imu?.yaw) ?? 0;
   const yawDelta = imu && antenna
     ? ((((imuYaw - antenna.actual_az + 540) % 360) - 180))
@@ -287,17 +319,17 @@ function OrientationTab({
           <div className={styles.sideView}>
             <div className={styles.sideBase} />
             <div
-              className={styles.zenithArm}
-              style={{ transform: `rotate(${-zenith}deg)` }}
+              className={styles.elevationArm}
+              style={{ transform: `rotate(${-elevation}deg)` }}
             />
             <div className={styles.sideHub} />
           </div>
-          <div className={styles.legendRow}>Zenith / elevation {fmtDeg(antenna?.actual_el)}</div>
+          <div className={styles.legendRow}>Elevation {fmtDeg(antenna?.actual_el)}</div>
           <div className={styles.legendRow}>Target {fmtDeg(antenna?.target_el)}</div>
         </div>
 
         <div className={styles.orientationCard}>
-          <div className={styles.cardTitle}>SENSOR ON ZENITH BAR</div>
+          <div className={styles.cardTitle}>SENSOR ON ELEVATION BAR</div>
           <div className={styles.kvGrid}>
             <span>MQTT</span><strong>{connected ? 'CONNECTED' : 'OFFLINE'}</strong>
             <span>IMU seen</span><strong>{fmtSeen(imuSeen)}</strong>
@@ -327,7 +359,7 @@ function OrientationTab({
         </div>
       </div>
       <div className={styles.orientationNote}>
-        The base azimuth is the true tracker yaw reference. The IMU is mounted after the azimuth joint on the zenith bar, so its quaternion includes base rotation, zenith tilt, and the fixed sensor mount offset.
+        The base azimuth is the true tracker yaw reference. The IMU is mounted after the azimuth joint on the elevation bar, so its quaternion includes base rotation, elevation tilt, and the fixed sensor mount offset.
       </div>
     </div>
   );
@@ -430,14 +462,22 @@ function RawSensorsTab({
   return (
     <div className={styles.rawSensorsRoot}>
       <div className={styles.rawSensorToolbar}>
-        <button className={`${styles.axisBtn} ${imuEnabled ? styles.axisBtnActive : ''}`} onClick={toggleImu}>
-          IMU RAW {imuEnabled ? 'ON' : 'OFF'}
+        <button
+          className={`${styles.rawToggleBtn} ${imuEnabled ? styles.rawToggleBtnActive : ''}`}
+          onClick={toggleImu}
+          aria-pressed={imuEnabled}
+        >
+          {imuEnabled ? 'IMU RAW ON' : 'START IMU RAW'}
         </button>
-        <button className={`${styles.axisBtn} ${magEnabled ? styles.axisBtnActive : ''}`} onClick={toggleMag}>
-          MAG RAW {magEnabled ? 'ON' : 'OFF'}
+        <button
+          className={`${styles.rawToggleBtn} ${magEnabled ? styles.rawToggleBtnActive : ''}`}
+          onClick={toggleMag}
+          aria-pressed={magEnabled}
+        >
+          {magEnabled ? 'MAG RAW ON' : 'START MAG RAW'}
         </button>
-        <button className={styles.stopBtn} onClick={stopBoth}>STOP STREAMS</button>
-        <button className={styles.clearBtn} onClick={clearRawSensors}>CLEAR DATA</button>
+        <button className={styles.rawStopBtn} onClick={stopBoth}>STOP STREAMS</button>
+        <button className={styles.rawClearDataBtn} onClick={clearRawSensors}>CLEAR DATA</button>
         <span className={styles.rawSensorCount}>
           IMU {rawImu.length} samples / MAG {rawMag.length} samples
         </span>
@@ -605,22 +645,21 @@ export function DebugPanel({ mqtt }: Props) {
     rawImu, rawMag, clearRawSensors, ahrsHistory, clearAhrsHistory,
   } = useTelemetryStore();
 
-  // Tab within the debug panel
-  const [subTab, setSubTab] = useState<'log' | 'topics' | 'orientation' | 'ahrs' | 'raw' | 'starlink' | 'sim'>('log');
+  const [subTab, setSubTab] = useState<DebugTab>('log');
 
   // Topic filter for the inspector
   const [topicFilter, setTopicFilter] = useState('');
 
   // Antenna command state
   const [az,    setAz]    = useState('0');
-  const [zen,   setZen]   = useState('0');
+  const [el,    setEl]    = useState('90');
   const [speed, setSpeed] = useState('30');
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingDirectAxis, setPendingDirectAxis] = useState<DirectAxis | null>(null);
   const [jogStep,  setJogStep]  = useState('2');
   const [jogSpeed, setJogSpeed] = useState('10');
 
   // Debug oscillation state
-  const [oscAxis,    setOscAxis]    = useState<'az' | 'zen'>('zen');
+  const [oscAxis,    setOscAxis]    = useState<'az' | 'el'>('el');
   const [oscDeg,     setOscDeg]     = useState('5');
   const [oscSpeed,   setOscSpeed]   = useState('30');
   const [oscActive,  setOscActive]  = useState(false);
@@ -641,33 +680,32 @@ export function DebugPanel({ mqtt }: Props) {
     const deg   = parseFloat(oscDeg);
     const spd   = parseFloat(oscSpeed);
     if (isNaN(deg) || isNaN(spd)) return;
-    const topic = oscAxis === 'az' ? TOPICS.DEBUG_AZ_OSC : TOPICS.DEBUG_ZEN_OSC;
+    const topic = oscAxis === 'az' ? TOPICS.DEBUG_AZ_OSC : TOPICS.DEBUG_EL_OSC;
     mqtt.publish(topic, JSON.stringify({ deg, speed_dps: spd, stop: false }));
     setOscActive(true);
   }
 
   function handleOscStop() {
-    const topic = oscAxis === 'az' ? TOPICS.DEBUG_AZ_OSC : TOPICS.DEBUG_ZEN_OSC;
+    const topic = oscAxis === 'az' ? TOPICS.DEBUG_AZ_OSC : TOPICS.DEBUG_EL_OSC;
     mqtt.publish(topic, JSON.stringify({ stop: true }));
     setOscActive(false);
   }
 
-  function handleSendCmd() {
-    const azVal    = parseFloat(az);
-    const zenVal   = parseFloat(zen);
+  function handleSendCmd(axis: DirectAxis) {
     const speedVal = parseFloat(speed);
-    if (isNaN(azVal) || isNaN(zenVal) || isNaN(speedVal)) return;
+    const targetVal = parseFloat(axis === 'az' ? az : el);
+    if (isNaN(targetVal) || isNaN(speedVal)) return;
 
-    mqtt.publish(TOPICS.STEPPER_AZ_CMD,  JSON.stringify({ target_angle_deg: azVal,  speed_dps: speedVal, stop: false }));
-    mqtt.publish(TOPICS.STEPPER_ZEN_CMD, JSON.stringify({ target_angle_deg: zenVal, speed_dps: speedVal, stop: false }));
-    setShowConfirm(false);
+    const topic = axis === 'az' ? TOPICS.STEPPER_AZ_CMD : TOPICS.STEPPER_EL_CMD;
+    mqtt.publish(topic, JSON.stringify({ target_angle_deg: targetVal, speed_dps: speedVal, stop: false }));
+    setPendingDirectAxis(null);
   }
 
   function publishCalibration(action: string) {
     mqtt.publish(TOPICS.CALIBRATION_CMD, JSON.stringify({ action }));
   }
 
-  function handleJog(axis: 'az' | 'zen', sign: 1 | -1) {
+  function handleJog(axis: 'az' | 'el', sign: 1 | -1) {
     const step = parseFloat(jogStep);
     const spd  = parseFloat(jogSpeed);
     if (isNaN(step) || isNaN(spd)) return;
@@ -680,13 +718,24 @@ export function DebugPanel({ mqtt }: Props) {
 
   function handleStopMotion() {
     mqtt.publish(TOPICS.STEPPER_AZ_CMD,  JSON.stringify({ stop: true }));
-    mqtt.publish(TOPICS.STEPPER_ZEN_CMD, JSON.stringify({ stop: true }));
+    mqtt.publish(TOPICS.STEPPER_EL_CMD, JSON.stringify({ stop: true }));
     publishCalibration('disable_tracking');
   }
 
-  const filteredMessages = topicFilter.trim()
-    ? rawMessages.filter(m => m.topic.includes(topicFilter.trim()))
-    : rawMessages;
+  const topicOptions = useMemo(
+    () => Array.from(new Set([
+      ...KNOWN_MQTT_TOPICS,
+      ...rawMessages.map((message) => message.topic),
+    ])).sort((a, b) => a.localeCompare(b)),
+    [rawMessages],
+  );
+
+  const filteredMessages = useMemo(() => {
+    const filter = topicFilter.trim();
+    return filter
+      ? rawMessages.filter((message) => mqttFilterMatches(filter, message.topic))
+      : rawMessages;
+  }, [rawMessages, topicFilter]);
 
   const fallbackImu = useMemo(
     () => latestJson<GroundImuState>(rawMessages, TOPICS.GROUND_IMU),
@@ -713,6 +762,13 @@ export function DebugPanel({ mqtt }: Props) {
   const imuSeen = groundImu?.timestamp ?? fallbackImu?.timestamp ?? null;
   const antennaSeen = fallbackAntenna?.timestamp ?? null;
   const displayAhrsHistory = ahrsHistory.length > 0 ? ahrsHistory : fallbackAhrsHistory;
+  const activeTab = DEBUG_TABS.find((item) => item.id === subTab) ?? DEBUG_TABS[0];
+  const tabCounts: Partial<Record<DebugTab, number>> = {
+    log: logLines.length,
+    topics: rawMessages.length,
+    raw: rawImu.length + rawMag.length,
+    ahrs: displayAhrsHistory.length,
+  };
 
   function formatTs(ts: number): string {
     return new Date(ts).toISOString().slice(11, 23); // HH:MM:SS.mmm
@@ -720,132 +776,137 @@ export function DebugPanel({ mqtt }: Props) {
 
   return (
     <div className={styles.root}>
-      {showConfirm && (
+      {pendingDirectAxis && (
         <ConfirmDialog
-          az={az} zen={zen} speed={speed}
-          onConfirm={handleSendCmd}
-          onCancel={() => setShowConfirm(false)}
+          axis={pendingDirectAxis}
+          value={pendingDirectAxis === 'az' ? az : el}
+          speed={speed}
+          onConfirm={() => handleSendCmd(pendingDirectAxis)}
+          onCancel={() => setPendingDirectAxis(null)}
         />
       )}
 
-      {/* ---- Left: log / topic inspector ---- */}
-      <div className={styles.left}>
-        <div className={styles.toolbar}>
-          <button
-            className={`${styles.subTab} ${subTab === 'log' ? styles.subTabActive : ''}`}
-            onClick={() => setSubTab('log')}
-          >
-            CONSOLE ({logLines.length})
-          </button>
-          <button
-            className={`${styles.subTab} ${subTab === 'topics' ? styles.subTabActive : ''}`}
-            onClick={() => setSubTab('topics')}
-          >
-            TOPICS ({rawMessages.length})
-          </button>
-          <button
-            className={`${styles.subTab} ${subTab === 'starlink' ? styles.subTabActive : ''}`}
-            onClick={() => setSubTab('starlink')}
-          >
-            STARLINK
-          </button>
-          <button
-            className={`${styles.subTab} ${subTab === 'orientation' ? styles.subTabActive : ''}`}
-            onClick={() => setSubTab('orientation')}
-          >
-            ORIENTATION
-          </button>
-          <button
-            className={`${styles.subTab} ${subTab === 'ahrs' ? styles.subTabActive : ''}`}
-            onClick={() => setSubTab('ahrs')}
-          >
-            AHRS
-          </button>
-          <button
-            className={`${styles.subTab} ${subTab === 'raw' ? styles.subTabActive : ''}`}
-            onClick={() => setSubTab('raw')}
-          >
-            RAW SENSORS
-          </button>
-          <button
-            className={`${styles.subTab} ${subTab === 'sim' ? styles.subTabActive : ''}`}
-            onClick={() => setSubTab('sim')}
-          >
-            SIMULATION
-          </button>
+      <aside className={styles.nav}>
+        <div className={styles.navHeader}>
+          <span>Systems</span>
+          <strong>Diagnostics</strong>
+        </div>
+        {['Streams', 'Avionics', 'Network', 'Tools'].map((section) => (
+          <div key={section} className={styles.navSection}>
+            <div className={styles.navSectionLabel}>{section}</div>
+            {DEBUG_TABS.filter((item) => item.section === section).map((item) => (
+              <button
+                key={item.id}
+                className={`${styles.navItem} ${subTab === item.id ? styles.navItemActive : ''}`}
+                onClick={() => setSubTab(item.id)}
+              >
+                <span>{item.label}</span>
+                {tabCounts[item.id] != null && <strong>{tabCounts[item.id]}</strong>}
+              </button>
+            ))}
+          </div>
+        ))}
+      </aside>
 
-          {subTab === 'topics' && (
-            <input
-              className={styles.filterInput}
-              placeholder="filter topic…"
-              value={topicFilter}
-              onChange={e => setTopicFilter(e.target.value)}
-            />
-          )}
-
-          <span className={styles.spacer} />
-          <label className={styles.scrollToggle}>
-            <input type="checkbox" checked={autoScroll} onChange={e => setAutoScroll(e.target.checked)} />
-            &nbsp;auto-scroll
-          </label>
-          <button className={styles.clearBtn} onClick={clearDebug}>CLEAR</button>
+      <main className={styles.left}>
+        <div className={styles.workspaceHeader}>
+          <div>
+            <span className={styles.workspaceEyebrow}>{activeTab.section}</span>
+            <h2>{activeTab.label}</h2>
+          </div>
+          <div className={styles.workspaceTools}>
+            {subTab === 'topics' && (
+              <div className={styles.topicPicker}>
+                <input
+                  className={styles.filterInput}
+                  list="mqtt-topic-options"
+                  placeholder="All topics"
+                  value={topicFilter}
+                  onChange={e => setTopicFilter(e.target.value)}
+                />
+                <datalist id="mqtt-topic-options">
+                  {topicOptions.map((topic) => (
+                    <option key={topic} value={topic} />
+                  ))}
+                </datalist>
+                {topicFilter && (
+                  <button
+                    className={styles.topicClearBtn}
+                    onClick={() => setTopicFilter('')}
+                    title="Show all topics"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+            {(subTab === 'log' || subTab === 'topics') && (
+              <label className={styles.scrollToggle}>
+                <input type="checkbox" checked={autoScroll} onChange={e => setAutoScroll(e.target.checked)} />
+                auto-scroll
+              </label>
+            )}
+            <button className={styles.clearBtn} onClick={clearDebug}>Clear</button>
+          </div>
         </div>
 
-        {subTab === 'log' && (
-          <div className={styles.console}>
-            {logLines.map(line => (
-              <div key={line.id} className={styles.logLine}>
-                <span className={styles.logTs}>{formatTs(line.ts)}</span>
-                <span className={styles.logText}>{line.text.replace(/\n$/, '')}</span>
-              </div>
-            ))}
-            <div ref={logEndRef} />
-          </div>
-        )}
+        <div className={styles.workspaceBody}>
+          {subTab === 'log' && (
+            <div className={styles.console}>
+              {logLines.map(line => (
+                <div key={line.id} className={styles.logLine}>
+                  <span className={styles.logTs}>{formatTs(line.ts)}</span>
+                  <span className={styles.logText}>{line.text.replace(/\n$/, '')}</span>
+                </div>
+              ))}
+              <div ref={logEndRef} />
+            </div>
+          )}
 
-        {subTab === 'topics' && (
-          <div className={styles.console}>
-            {filteredMessages.map(msg => (
-              <div key={msg.id} className={styles.rawLine}>
-                <span className={styles.logTs}>{formatTs(msg.ts)}</span>
-                <span className={styles.rawTopic}>{msg.topic}</span>
-                <span className={styles.rawPayload}>{msg.payload}</span>
-              </div>
-            ))}
-            <div ref={topicEndRef} />
-          </div>
-        )}
+          {subTab === 'topics' && (
+            <div className={styles.console}>
+              {filteredMessages.map(msg => (
+                <div key={msg.id} className={styles.rawLine}>
+                  <span className={styles.logTs}>{formatTs(msg.ts)}</span>
+                  <span className={styles.rawTopic}>{msg.topic}</span>
+                  <span className={styles.rawPayload}>{msg.payload}</span>
+                </div>
+              ))}
+              <div ref={topicEndRef} />
+            </div>
+          )}
 
-        {subTab === 'starlink' && <StarlinkTab />}
-        {subTab === 'orientation' && (
-          <OrientationTab
-            antenna={orientationAntenna}
-            imu={orientationImu}
-            connected={connected}
-            imuSeen={imuSeen}
-            antennaSeen={antennaSeen}
-          />
-        )}
-        {subTab === 'ahrs' && (
-          <AhrsTab
-            ahrsHistory={displayAhrsHistory}
-            latest={orientationImu}
-            status={ahrsStatus}
-            seenCount={ahrsSeenCount}
-            parsedCount={fallbackAhrsHistory.length}
-            clearAhrsHistory={clearAhrsHistory}
-          />
-        )}
-        {subTab === 'raw' && (
-          <RawSensorsTab
-            mqtt={mqtt}
-            rawImu={rawImu}
-            rawMag={rawMag}
-            clearRawSensors={clearRawSensors}
-          />
-        )}
-        {subTab === 'sim'      && <SimTab />}
-      </div>
+          {subTab === 'starlink' && <StarlinkTab />}
+          {subTab === 'orientation' && (
+            <OrientationTab
+              antenna={orientationAntenna}
+              imu={orientationImu}
+              connected={connected}
+              imuSeen={imuSeen}
+              antennaSeen={antennaSeen}
+            />
+          )}
+          {subTab === 'ahrs' && (
+            <AhrsTab
+              ahrsHistory={displayAhrsHistory}
+              latest={orientationImu}
+              status={ahrsStatus}
+              seenCount={ahrsSeenCount}
+              parsedCount={fallbackAhrsHistory.length}
+              clearAhrsHistory={clearAhrsHistory}
+            />
+          )}
+          {subTab === 'raw' && (
+            <RawSensorsTab
+              mqtt={mqtt}
+              rawImu={rawImu}
+              rawMag={rawMag}
+              clearRawSensors={clearRawSensors}
+            />
+          )}
+          {subTab === 'sim' && <SimTab />}
+        </div>
+      </main>
 
       {/* ---- Right: antenna command panel ---- */}
       <div className={styles.right}>
@@ -859,7 +920,7 @@ export function DebugPanel({ mqtt }: Props) {
               <strong>{antenna?.mode ?? '--'}</strong>
               <span>AZ ZERO</span>
               <strong>{antenna?.az_calibrated ? 'SET' : 'OPEN'}</strong>
-              <span>ZEN ZERO</span>
+              <span>EL ZERO</span>
               <strong>{antenna?.zen_calibrated ? 'SET' : 'OPEN'}</strong>
               <span>TRACKING</span>
               <strong>{antenna?.tracking_enabled ? 'ON' : 'OFF'}</strong>
@@ -890,8 +951,8 @@ export function DebugPanel({ mqtt }: Props) {
             <div className={styles.jogGrid}>
               <button className={styles.axisBtn} onClick={() => handleJog('az', -1)}>AZ −</button>
               <button className={styles.axisBtn} onClick={() => handleJog('az',  1)}>AZ +</button>
-              <button className={styles.axisBtn} onClick={() => handleJog('zen', -1)}>ZEN −</button>
-              <button className={styles.axisBtn} onClick={() => handleJog('zen',  1)}>ZEN +</button>
+              <button className={styles.axisBtn} onClick={() => handleJog('el', -1)}>EL −</button>
+              <button className={styles.axisBtn} onClick={() => handleJog('el',  1)}>EL +</button>
             </div>
           </div>
 
@@ -899,12 +960,12 @@ export function DebugPanel({ mqtt }: Props) {
           <div className={styles.ctrlCard}>
             <div className={styles.ctrlCardTitle}>CALIBRATION</div>
             <button className={styles.sendBtn} onClick={() => publishCalibration('set_az_zero')}>SET AZ ZERO</button>
-            <button className={styles.sendBtn} onClick={() => publishCalibration('set_zen_zero')}>SET ZEN ZERO</button>
+            <button className={styles.sendBtn} onClick={() => publishCalibration('set_zen_zero')}>SET EL ZERO</button>
             <button className={styles.sendBtn} onClick={() => publishCalibration('enable_tracking')}>ENABLE TRACKING</button>
             <button className={styles.stopBtn} onClick={handleStopMotion}>STOP / DISABLE</button>
             <button className={styles.stopBtn} onClick={() => publishCalibration('clear_calibration')}>CLEAR CAL</button>
             <div className={styles.cmdNote}>
-              Jog to cable-center, set az zero, jog to horizontal reference, set zen zero, then enable tracking.
+              Jog to cable-center, set az zero, jog to horizontal reference, set elevation zero, then enable tracking.
             </div>
           </div>
 
@@ -918,12 +979,12 @@ export function DebugPanel({ mqtt }: Props) {
               value={az}
               onChange={e => setAz(e.target.value)}
             />
-            <label className={styles.cmdLabel}>Zenith (deg)</label>
+            <label className={styles.cmdLabel}>Elevation (deg)</label>
             <input
               className={styles.cmdInput}
-              type="number" step="0.1" min="0" max="90"
-              value={zen}
-              onChange={e => setZen(e.target.value)}
+              type="number" step="0.1" min="-10" max="90"
+              value={el}
+              onChange={e => setEl(e.target.value)}
             />
             <label className={styles.cmdLabel}>Speed (deg/s)</label>
             <input
@@ -932,11 +993,12 @@ export function DebugPanel({ mqtt }: Props) {
               value={speed}
               onChange={e => setSpeed(e.target.value)}
             />
-            <button className={styles.sendBtn} onClick={() => setShowConfirm(true)}>SEND →</button>
+            <button className={styles.sendBtn} onClick={() => setPendingDirectAxis('az')}>SEND AZ</button>
+            <button className={styles.sendBtn} onClick={() => setPendingDirectAxis('el')}>SEND EL</button>
             <div className={styles.cmdNote}>
-              Publishes to<br />
+              Each button publishes one axis only.<br />
               <code>{TOPICS.STEPPER_AZ_CMD}</code><br />
-              <code>{TOPICS.STEPPER_ZEN_CMD}</code>
+              <code>{TOPICS.STEPPER_EL_CMD}</code>
             </div>
           </div>
 
@@ -953,9 +1015,9 @@ export function DebugPanel({ mqtt }: Props) {
                   onClick={() => setOscAxis('az')}
                 >AZ</button>
                 <button
-                  className={`${styles.axisBtn} ${oscAxis === 'zen' ? styles.axisBtnActive : ''}`}
-                  onClick={() => setOscAxis('zen')}
-                >ZEN</button>
+                  className={`${styles.axisBtn} ${oscAxis === 'el' ? styles.axisBtnActive : ''}`}
+                  onClick={() => setOscAxis('el')}
+                >EL</button>
               </div>
               <span className={styles.cmdLabel}>TARGET</span>
               <input

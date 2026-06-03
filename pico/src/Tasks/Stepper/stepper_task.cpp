@@ -25,7 +25,7 @@ namespace StepCfg {
 
     // Per-axis gear ratios  (10:1 planetary gearbox × belt ratio)
     static constexpr float    AZ_GEAR_RATIO         = 30.0f;   // 10:1 × 3:1 belt  (azimuth)
-    static constexpr float    ZEN_GEAR_RATIO        = 50.0f;   // 10:1 × 5:1 belt  (zenith)
+    static constexpr float    EL_GEAR_RATIO         = 50.0f;   // 10:1 × 5:1 belt  (elevation)
 
     static constexpr float    MAX_SPEED_DPS         = 90.0f;
     static constexpr float    DEFAULT_SPEED_DPS     = 30.0f;
@@ -34,9 +34,12 @@ namespace StepCfg {
     static constexpr float    AZ_MIN_DEG            = 270.0f;
     static constexpr float    AZ_MAX_DEG            =  90.0f;
 
-    // Zenith: 0° is horizontal/up. Allow slight down travel and larger up travel.
-    static constexpr float    ZEN_MIN_DEG           = 345.0f;
-    static constexpr float    ZEN_MAX_DEG           =  80.0f;
+    // Elevation command convention: 0° = horizon, 90° = straight up.
+    // The motor's old mechanical frame is kept internal: motor_deg = 90 - elevation_deg.
+    static constexpr float    EL_MIN_DEG            = -10.0f;
+    static constexpr float    EL_MAX_DEG            =  90.0f;
+    static constexpr float    EL_MOTOR_AT_HORIZON_DEG = 90.0f;
+    static constexpr float    EL_MOTOR_SCALE        = -1.0f;
 
     static constexpr uint32_t STATE_PUBLISH_MS      = 1000;
 }
@@ -103,6 +106,8 @@ struct AxisCfg {
     float max_deg;              // soft travel limit (upper)
     bool  wrapped_limits;       // true when allowed range crosses 0°
     bool  shortest_path;        // true for modulo-360 axes such as azimuth
+    float motor_zero_cmd_deg;    // motor angle when public command angle is 0°
+    float motor_deg_per_cmd_deg; // +1 for same frame, -1 for inverted elevation
     const char*    tag;
 };
 
@@ -110,6 +115,16 @@ struct AxisContext {
     Cl57te   drv;
     AxisCfg  cfg;
 };
+
+static float cmd_to_motor_angle( const AxisCfg& ax, float cmd_angle_deg )
+{
+    return ax.motor_zero_cmd_deg + ax.motor_deg_per_cmd_deg * cmd_angle_deg;
+}
+
+static float motor_to_cmd_angle( const AxisCfg& ax, float motor_angle_deg )
+{
+    return ( motor_angle_deg - ax.motor_zero_cmd_deg ) / ax.motor_deg_per_cmd_deg;
+}
 
 static void axis_task_body( void* arg )
 {
@@ -170,9 +185,10 @@ static void axis_task_body( void* arg )
             if ( move_pending_completion ) {
                 int32_t pos_steps = drv.pos_steps();
                 move_pending_completion = false;
-                log_print( "[%s] move complete pos_steps=%ld angle=%.2f\n",
+                log_print( "[%s] move complete pos_steps=%ld angle=%.2f motor_angle=%.2f\n",
                            ax.tag,
                            (long)pos_steps,
+                           (double)motor_to_cmd_angle( ax, drv.angle_deg() ),
                            (double)drv.angle_deg() );
             }
 
@@ -180,15 +196,18 @@ static void axis_task_body( void* arg )
                 StepperCmd c = {};
                 xQueuePeek( *ax.cmd_q, &c, 0 );
 
-                const float before_angle = drv.angle_deg();
-                if ( drv.set_angle( target_angle_deg, c.speed_dps, ax.shortest_path ) ) {
+                const float before_angle = motor_to_cmd_angle( ax, drv.angle_deg() );
+                const float target_motor_angle_deg =
+                    cmd_to_motor_angle( ax, target_angle_deg );
+                if ( drv.set_angle( target_motor_angle_deg, c.speed_dps, ax.shortest_path ) ) {
                     target_dirty = false;
                     if ( drv.is_moving() ) {
                         move_pending_completion = true;
-                        log_print( "[%s] move target=%.2f from=%.2f speed_dps=%.2f dir_gpio=%u dir_readback=%u\n",
+                        log_print( "[%s] move target=%.2f from=%.2f motor_target=%.2f speed_dps=%.2f dir_gpio=%u dir_readback=%u\n",
                                    ax.tag,
                                    (double)target_angle_deg,
                                    (double)before_angle,
+                                   (double)target_motor_angle_deg,
                                    (double)c.speed_dps,
                                    (unsigned)drv.dir_pin(),
                                    drv.dir_gpio_level() ? 1u : 0u );
@@ -199,7 +218,7 @@ static void axis_task_body( void* arg )
 
         // -- Publish status ---------------------------------------------------
         StepperStatus st = {};
-        st.angle_deg    = drv.angle_deg();
+        st.angle_deg    = motor_to_cmd_angle( ax, drv.angle_deg() );
         st.moving       = drv.is_moving();
         st.faulted      = false;
         st.enabled      = true;
@@ -212,7 +231,7 @@ static void axis_task_body( void* arg )
 
 // -----------------------------------------------------------------------------
 // Stepper controller task
-// Reads ground-station and rocket location queues, computes az/zenith, posts cmds.
+// Reads ground-station and rocket location queues, computes az/elevation, posts cmds.
 // -----------------------------------------------------------------------------
 
 static void stepper_ctrl_task( void* )
@@ -233,10 +252,10 @@ static void stepper_ctrl_task( void* )
             rocket_math::Location rocket { rkt.lat, rkt.lon, rkt.alt_m };
 
             double az  = rocket_math::GroundStationMath::calculateAzimuth(  station, rocket );
-            double zen = rocket_math::GroundStationMath::calculateElevation( station, rocket );
+            double el = rocket_math::GroundStationMath::calculateElevation( station, rocket );
 
             StepperCmd az_cmd  { wrap_360( static_cast<float>( az ) ), 0.0f, false };
-            StepperCmd zen_cmd { static_cast<float>( zen ), 0.0f, false };
+            StepperCmd zen_cmd { static_cast<float>( el ), 0.0f, false };
 
             if ( g_stepper_az_cmd_q  ) xQueueOverwrite( g_stepper_az_cmd_q,  &az_cmd  );
             if ( g_stepper_zen_cmd_q ) xQueueOverwrite( g_stepper_zen_cmd_q, &zen_cmd );
@@ -290,6 +309,8 @@ void stepper_az_task_init()
         .max_deg  = StepCfg::AZ_MAX_DEG,
         .wrapped_limits = true,
         .shortest_path = true,
+        .motor_zero_cmd_deg = 0.0f,
+        .motor_deg_per_cmd_deg = 1.0f,
         .tag      = "az",
     };
 
@@ -298,8 +319,9 @@ void stepper_az_task_init()
 }
 
 // -----------------------------------------------------------------------------
-// Zenith axis  (STEP2 – PUL- GPIO 6, DIR- GPIO 7)
-// 10:1 planetary gearbox × 5:1 belt = 50:1 total, travel 345°..0°..80°
+// Elevation axis  (STEP2 – PUL- GPIO 6, DIR- GPIO 7)
+// Public command: 0° = horizon, 90° = straight up.
+// Internal motor frame: 0° = straight up, 90° = horizon, 180° = straight down.
 // -----------------------------------------------------------------------------
 
 static AxisContext s_zen_ctx;
@@ -319,17 +341,19 @@ void stepper_zen_task_init()
             .pul_n           = Pins::STEP2_PUL_N,
             .dir_n           = Pins::STEP2_DIR_N,
             .pulses_per_rev  = StepCfg::PULSES_PER_REV,
-            .gear_ratio      = StepCfg::ZEN_GEAR_RATIO,
+            .gear_ratio      = StepCfg::EL_GEAR_RATIO,
             .max_speed_dps   = StepCfg::MAX_SPEED_DPS,
             .default_speed_dps = StepCfg::DEFAULT_SPEED_DPS,
         },
         .cmd_q    = &g_stepper_zen_cmd_q,
         .status_q = &g_stepper_zen_status_q,
-        .min_deg  = StepCfg::ZEN_MIN_DEG,
-        .max_deg  = StepCfg::ZEN_MAX_DEG,
-        .wrapped_limits = true,
-        .shortest_path = true,
-        .tag      = "zen",
+        .min_deg  = StepCfg::EL_MIN_DEG,
+        .max_deg  = StepCfg::EL_MAX_DEG,
+        .wrapped_limits = false,
+        .shortest_path = false,
+        .motor_zero_cmd_deg = StepCfg::EL_MOTOR_AT_HORIZON_DEG,
+        .motor_deg_per_cmd_deg = StepCfg::EL_MOTOR_SCALE,
+        .tag      = "el",
     };
 
     task_create( axis_task_body, "step_zen", 512, &s_zen_ctx,
@@ -380,9 +404,9 @@ static void stepper_state_task( void* )
                       "}",
                       (unsigned long long)( time_us_64() / 1000u ),
                       (double)wrap_360( az_st.angle_deg ),
-                      (double)wrap_360( zen_st.angle_deg ),
+                      (double)zen_st.angle_deg,
                       (double)wrap_360( az_cmd.target_angle_deg ),
-                      (double)wrap_360( zen_cmd.target_angle_deg ),
+                      (double)zen_cmd.target_angle_deg,
                       (double)az_st.angle_deg,
                       (double)az_cmd.target_angle_deg,
                       az_st.moving ? "true" : "false",
