@@ -1,10 +1,10 @@
 lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/LR2021/LR2021_cmds_flrc.cpp.o: \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/LR2021_cmds_flrc.cpp \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/LR2021.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../BuildOptUser.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../BuildOpt.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/LR2021_cmds_flrc.cpp \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/LR2021.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../BuildOptUser.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../TypeDef.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdio.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/_ansi.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/newlib.h \
@@ -26,9 +26,11 @@ lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/LR2021/LR2021_cmds_flrc.cpp.o:
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdint.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_intsup.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_stdint.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../Hal.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../utils/Utils.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../Hal.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../utils/Cryptography.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../utils/../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../utils/Utils.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cstdlib \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/arm-none-eabi/thumb/v8-m.main+fp/softfp/bits/c++config.h \
@@ -39,15 +41,15 @@ lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/LR2021/LR2021_cmds_flrc.cpp.o:
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/machine/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/alloca.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/std_abs.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../utils/../BuildOpt.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../protocols/PhysicalLayer/PhysicalLayer.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../protocols/PhysicalLayer/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../../protocols/PhysicalLayer/../../Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../LR11x0/LR_common.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../LR11x0/../../Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/../LR11x0/../../protocols/PhysicalLayer/PhysicalLayer.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/LR2021_commands.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LR2021/LR2021_types.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../utils/../BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../protocols/PhysicalLayer/PhysicalLayer.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../protocols/PhysicalLayer/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../../protocols/PhysicalLayer/../../Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../LR11x0/LR_common.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../LR11x0/../../Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/../LR11x0/../../protocols/PhysicalLayer/PhysicalLayer.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/LR2021_commands.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LR2021/LR2021_types.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/string.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_locale.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/strings.h \

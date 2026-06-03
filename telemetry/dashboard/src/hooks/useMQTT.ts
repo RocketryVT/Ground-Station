@@ -2,13 +2,14 @@ import { useEffect, useRef } from 'react';
 import mqtt, { type MqttClient } from 'mqtt';
 import { useTelemetryStore } from '../store/telemetryStore';
 import { MQTT_BROKER_URL, TOPICS } from '../config';
+import { decodeTopicPayload, encodeCommandPayload } from '../proto/groundStationCodec';
 import type {
   RocketTelemetry, AntennaState, MobileNode, GroundImuState,
-  RawImuSample, RawMagSample,
+  RawImuSample, RawMagSample, RawYawImuSample,
 } from '../types/telemetry';
 
 export interface MQTTHandle {
-  publish: (topic: string, payload: string) => void;
+  publish: (topic: string, payload: string | Uint8Array) => void;
 }
 
 function firstNumber(data: Record<string, unknown>, keys: string[]): number | undefined {
@@ -56,6 +57,7 @@ export function useMQTT(enabled = true): MQTTHandle {
       setGroundImu,
       addRawImu,
       addRawMag,
+      addRawYawImu,
       updateNode,
       setConnected,
       addLogLine,
@@ -81,11 +83,26 @@ export function useMQTT(enabled = true): MQTTHandle {
     client.on('error',      () => setConnected(false));
 
     client.on('message', (topic: string, payload: Buffer) => {
-      const raw = payload.toString();
+      let raw = '';
+      let decoded: Record<string, unknown> | string | null = null;
+
+      try {
+        decoded = decodeTopicPayload(topic, payload);
+      } catch {
+        decoded = null;
+      }
+
+      if (decoded != null) {
+        raw = typeof decoded === 'string' ? decoded : JSON.stringify(decoded);
+      } else {
+        raw = payload.toString();
+      }
       addRawMessage(topic, raw);
 
       try {
-        const data = JSON.parse(raw);
+        const data = typeof decoded === 'object' && decoded !== null
+          ? decoded
+          : JSON.parse(raw);
         if (topic === TOPICS.ROCKET_TELEMETRY) {
           addTelemetry(data as RocketTelemetry);
           const activeDrag = activeDragFromPayload(data as Record<string, unknown>);
@@ -98,6 +115,8 @@ export function useMQTT(enabled = true): MQTTHandle {
           addRawImu(data as RawImuSample);
         } else if (topic === TOPICS.RAW_MAG) {
           addRawMag(data as RawMagSample);
+        } else if (topic === TOPICS.RAW_YAW_IMU) {
+          addRawYawImu(data as RawYawImuSample);
         } else if (topic.startsWith('nodes/')) {
           const id = topic.split('/')[1];
           updateNode({ ...(data as Omit<MobileNode, 'id'>), id });
@@ -122,6 +141,9 @@ export function useMQTT(enabled = true): MQTTHandle {
   }, [enabled]);
 
   return {
-    publish: (topic, payload) => clientRef.current?.publish(topic, payload),
+    publish: (topic, payload) => {
+      const encoded = encodeCommandPayload(topic, payload);
+      clientRef.current?.publish(topic, encoded as Buffer | string);
+    },
   };
 }

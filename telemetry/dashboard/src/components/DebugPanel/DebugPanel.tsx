@@ -5,7 +5,8 @@ import {
 import { useTelemetryStore } from '../../store/telemetryStore';
 import { TOPICS, KNOWN_MQTT_TOPICS, STARLINK_PROXY_URL } from '../../config';
 import type { MQTTHandle } from '../../hooks/useMQTT';
-import type { AntennaState, GroundImuState, RawImuSample, RawMagSample } from '../../types/telemetry';
+import { decodeStarlinkProxyStatus } from '../../proto/groundStationCodec';
+import type { AntennaState, GroundImuState, RawImuSample, RawMagSample, RawYawImuSample } from '../../types/telemetry';
 import { SimTab } from './SimTab';
 import styles from './DebugPanel.module.css';
 
@@ -70,8 +71,11 @@ function StarlinkTab() {
     try {
       const res = await fetch(STARLINK_PROXY_URL);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      setData(json);
+      const contentType = res.headers.get('content-type') ?? '';
+      const data = contentType.includes('json')
+        ? await res.json()
+        : decodeStarlinkProxyStatus(new Uint8Array(await res.arrayBuffer()));
+      setData(data as unknown as StarlinkData);
       setFetchErr(null);
     } catch (e: unknown) {
       setFetchErr(e instanceof Error ? e.message : String(e));
@@ -276,16 +280,61 @@ function OrientationTab({
   connected,
   imuSeen,
   antennaSeen,
+  mqtt,
 }: {
   antenna: AntennaState | null;
   imu: GroundImuState | null;
   connected: boolean;
   imuSeen: number | null;
   antennaSeen: number | null;
+  mqtt: MQTTHandle;
 }) {
   const baseAz = antenna?.actual_az ?? 0;
-  const elevation = antenna?.actual_el ?? 0;
-  const imuYaw = imu?.yaw360 ?? norm360(imu?.yaw) ?? 0;
+  // Use IMU pitch (physical bar tilt) for the side view when available,
+  // falling back to the stepper's reported elevation.
+  const elevation = imu?.pitch ?? antenna?.actual_el ?? 0;
+
+  // Declination state
+  const [declInput,     setDeclInput]     = useState('-8.53');
+  const [noaaLat,       setNoaaLat]       = useState('');
+  const [noaaLon,       setNoaaLon]       = useState('');
+  const [noaaFetching,  setNoaaFetching]  = useState(false);
+  const [noaaMsg,       setNoaaMsg]       = useState<string | null>(null);
+
+  function sendDeclination(deg: number) {
+    mqtt.publish(TOPICS.DECLINATION_CMD, JSON.stringify({ declination_deg: deg }));
+  }
+
+  async function fetchNoaa() {
+    const lat = parseFloat(noaaLat);
+    const lon = parseFloat(noaaLon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      setNoaaMsg('Enter valid lat / lon first');
+      return;
+    }
+    setNoaaFetching(true);
+    setNoaaMsg(null);
+    try {
+      const url = `https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination` +
+        `?lat1=${lat}&lon1=${lon}&key=zNEw7&resultFormat=json`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const deg: number = json?.result?.[0]?.declination;
+      if (!Number.isFinite(deg)) throw new Error('No declination in response');
+      const rounded = Math.round(deg * 100) / 100;
+      setDeclInput(String(rounded));
+      sendDeclination(rounded);
+      setNoaaMsg(`Fetched ${rounded.toFixed(2)}° — sent to Pico`);
+    } catch (e: unknown) {
+      setNoaaMsg(`Fetch failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setNoaaFetching(false);
+    }
+  }
+  // Use yaw-platform heading (tilt-compensated, stable across bar elevation).
+  // Fall back to bar-frame yaw360 only when yaw_frame data is absent.
+  const imuYaw = imu?.yaw_frame_yaw360 ?? imu?.yaw360 ?? norm360(imu?.yaw) ?? 0;
   const yawDelta = imu && antenna
     ? ((((imuYaw - antenna.actual_az + 540) % 360) - 180))
     : null;
@@ -311,7 +360,7 @@ function OrientationTab({
             <div className={styles.compassHub} />
           </div>
           <div className={styles.legendRow}><span className={styles.swatchBase} />Base azimuth {fmtDeg(antenna?.actual_az)}</div>
-          <div className={styles.legendRow}><span className={styles.swatchImu} />IMU yaw {fmtDeg(imu?.yaw360 ?? norm360(imu?.yaw))}</div>
+          <div className={styles.legendRow}><span className={styles.swatchImu} />Yaw platform heading {fmtDeg(imu?.yaw_frame_yaw360 ?? imu?.yaw360 ?? norm360(imu?.yaw))}</div>
         </div>
 
         <div className={styles.orientationCard}>
@@ -324,25 +373,40 @@ function OrientationTab({
             />
             <div className={styles.sideHub} />
           </div>
-          <div className={styles.legendRow}>Elevation {fmtDeg(antenna?.actual_el)}</div>
+          <div className={styles.legendRow}>IMU pitch {fmtDeg(imu?.pitch)}</div>
+          <div className={styles.legendRow}>Stepper el {fmtDeg(antenna?.actual_el)}</div>
           <div className={styles.legendRow}>Target {fmtDeg(antenna?.target_el)}</div>
         </div>
 
         <div className={styles.orientationCard}>
-          <div className={styles.cardTitle}>SENSOR ON ELEVATION BAR</div>
+          <div className={styles.cardTitle}>SENSOR STATUS</div>
           <div className={styles.kvGrid}>
             <span>MQTT</span><strong>{connected ? 'CONNECTED' : 'OFFLINE'}</strong>
             <span>IMU seen</span><strong>{fmtSeen(imuSeen)}</strong>
             <span>State seen</span><strong>{fmtSeen(antennaSeen)}</strong>
+          </div>
+          <div className={styles.rawGroupHeader} style={{marginTop:8}}>YAW PLATFORM — LSM6DSOX+LIS3MDL</div>
+          <div className={styles.kvGrid}>
+            <span>Heading</span><strong>{fmtDeg(imu?.yaw_frame_yaw360)}</strong>
+            <span>Heading signed</span><strong>{fmtDeg(imu?.yaw_frame_yaw)}</strong>
+            <span>Hdg − base</span><strong>{fmtDeg(yawDelta)}</strong>
+            <span>Yaw AHRS</span><strong>{imu ? (imu.yaw_startup ? 'STARTUP' : 'VALID') : '--'}</strong>
+          </div>
+          <div className={styles.rawGroupHeader} style={{marginTop:8}}>ZENITH BAR — ISM330DLC+LIS3MDL</div>
+          <div className={styles.kvGrid}>
             <span>Roll</span><strong>{fmtDeg(imu?.roll)}</strong>
-            <span>Pitch</span><strong>{fmtDeg(imu?.pitch)}</strong>
-            <span>Yaw 0-360</span><strong>{fmtDeg(imu?.yaw360 ?? norm360(imu?.yaw))}</strong>
-            <span>Yaw signed</span><strong>{fmtDeg(imu?.yaw)}</strong>
-            <span>Yaw - base</span><strong>{fmtDeg(yawDelta)}</strong>
+            <span>Pitch (elev)</span><strong>{fmtDeg(imu?.pitch)}</strong>
+            <span>Bar yaw</span><strong>{fmtDeg(imu?.yaw360 ?? norm360(imu?.yaw))}</strong>
             <span>Mag valid</span><strong>{imu ? (imu.have_mag ? 'YES' : 'NO') : '--'}</strong>
             <span>AHRS</span><strong>{imu ? (imu.valid ? 'VALID' : 'STARTUP') : '--'}</strong>
             <span>Mag rec</span><strong>{imu ? (imu.mag_rec ? 'ON' : 'OFF') : '--'}</strong>
             <span>Acc rec</span><strong>{imu ? (imu.acc_rec ? 'ON' : 'OFF') : '--'}</strong>
+          </div>
+          <div className={styles.rawGroupHeader} style={{marginTop:8}}>RELATIVE (YAW→BAR)</div>
+          <div className={styles.kvGrid}>
+            <span>Rel roll</span><strong>{fmtDeg(imu?.bar_rel_roll)}</strong>
+            <span>Rel pitch</span><strong>{fmtDeg(imu?.bar_rel_pitch)}</strong>
+            <span>Rel yaw</span><strong>{fmtDeg(imu?.bar_rel_yaw)}</strong>
           </div>
         </div>
 
@@ -357,9 +421,60 @@ function OrientationTab({
             <code>{imu?.q ? imu.q.map(v => v.toFixed(4)).join(', ') : '--'}</code>
           </div>
         </div>
+
+        <div className={styles.orientationCard}>
+          <div className={styles.cardTitle}>MAGNETIC DECLINATION</div>
+          <div className={styles.kvGrid}>
+            <span>Pico default</span><strong>−8.53° (Blacksburg VA)</strong>
+          </div>
+          <div className={styles.rawGroupHeader} style={{marginTop:8}}>MANUAL OVERRIDE</div>
+          <div className={styles.declinationRow}>
+            <input
+              className={styles.declinationInput}
+              type="number"
+              step="0.01"
+              value={declInput}
+              onChange={e => setDeclInput(e.target.value)}
+              placeholder="deg (neg=west)"
+            />
+            <span className={styles.declinationUnit}>°</span>
+            <button
+              className={styles.declinationSendBtn}
+              onClick={() => {
+                const v = parseFloat(declInput);
+                if (Number.isFinite(v)) { sendDeclination(v); setNoaaMsg(`Sent ${v.toFixed(2)}°`); }
+              }}
+            >SEND</button>
+          </div>
+          <div className={styles.rawGroupHeader} style={{marginTop:8}}>NOAA AUTO-FETCH</div>
+          <div className={styles.declinationRow}>
+            <input
+              className={styles.declinationInput}
+              type="number" step="0.0001" placeholder="lat"
+              value={noaaLat} onChange={e => setNoaaLat(e.target.value)}
+            />
+            <input
+              className={styles.declinationInput}
+              type="number" step="0.0001" placeholder="lon"
+              value={noaaLon} onChange={e => setNoaaLon(e.target.value)}
+            />
+          </div>
+          <button
+            className={styles.declinationFetchBtn}
+            onClick={fetchNoaa}
+            disabled={noaaFetching}
+          >
+            {noaaFetching ? 'FETCHING…' : 'FETCH FROM NOAA & SEND'}
+          </button>
+          {noaaMsg && <div className={styles.declinationMsg}>{noaaMsg}</div>}
+          <div className={styles.declinationNote}>
+            Future: auto-populate lat/lon from ground station GPS.
+          </div>
+        </div>
+
       </div>
       <div className={styles.orientationNote}>
-        The base azimuth is the true tracker yaw reference. The IMU is mounted after the azimuth joint on the elevation bar, so its quaternion includes base rotation, elevation tilt, and the fixed sensor mount offset.
+        Side view uses IMU pitch (physical bar tilt). True heading = magnetic + declination.
       </div>
     </div>
   );
@@ -410,114 +525,294 @@ function RawChart({
   );
 }
 
+function SensorGroupHeader({ label }: { label: string }) {
+  return <div className={styles.rawGroupHeader}>{label}</div>;
+}
+
+// ---------------------------------------------------------------------------
+// CSV recording types
+// ---------------------------------------------------------------------------
+type RecAz      = RawYawImuSample & { rec_ms: number };
+type RecZenImu  = RawImuSample    & { rec_ms: number };
+type RecZenMag  = RawMagSample    & { rec_ms: number };
+
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildCsv(az: RecAz[], zenImu: RecZenImu[], zenMag: RecZenMag[]): string {
+  const header = 'rec_ms,sensor,fw_ts_ms,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,mx,my,mz,mag_unit,temp_c,mag_valid';
+  const rows: string[] = [header];
+
+  for (const s of az) {
+    rows.push([
+      s.rec_ms, 'az', s.timestamp,
+      s.ax, s.ay, s.az,
+      s.gx, s.gy, s.gz,
+      s.mx_ut, s.my_ut, s.mz_ut, 'uT',
+      s.temp ?? '', s.mag_valid ?? '',
+    ].join(','));
+  }
+  for (const s of zenImu) {
+    rows.push([
+      s.rec_ms, 'zen_imu', s.timestamp,
+      s.ax, s.ay, s.az,
+      s.gx, s.gy, s.gz,
+      '', '', '', '',
+      s.temp ?? '', '',
+    ].join(','));
+  }
+  for (const s of zenMag) {
+    rows.push([
+      s.rec_ms, 'zen_mag', s.timestamp,
+      '', '', '', '', '', '',
+      s.mx, s.my, s.mz, 'gauss',
+      '', '',
+    ].join(','));
+  }
+
+  // Sort all data rows (skip header) by rec_ms
+  const sorted = rows.slice(1).sort((a, b) => {
+    const ta = parseFloat(a.split(',')[0]);
+    const tb = parseFloat(b.split(',')[0]);
+    return ta - tb;
+  });
+  return [header, ...sorted].join('\n');
+}
+
 function RawSensorsTab({
   mqtt,
   rawImu,
   rawMag,
+  rawYawImu,
   clearRawSensors,
 }: {
   mqtt: MQTTHandle;
   rawImu: RawImuSample[];
   rawMag: RawMagSample[];
+  rawYawImu: RawYawImuSample[];
   clearRawSensors: () => void;
 }) {
-  const [imuEnabled, setImuEnabled] = useState(false);
-  const [magEnabled, setMagEnabled] = useState(false);
+  const [zenithImuEnabled, setZenithImuEnabled] = useState(false);
+  const [zenithMagEnabled, setZenithMagEnabled] = useState(false);
+  const [azEnabled,        setAzEnabled]        = useState(false);
 
-  function publish(nextImu = imuEnabled, nextMag = magEnabled) {
-    mqtt.publish(TOPICS.RAW_SENSORS_CMD, JSON.stringify({ imu: nextImu, mag: nextMag }));
+  // Recording state
+  const [isRecording,   setIsRecording]   = useState(false);
+  const [elapsedSec,    setElapsedSec]    = useState(0);
+  const [hasRecording,  setHasRecording]  = useState(false);
+  const recStartRef   = useRef<number>(0);
+  const recAzRef      = useRef<RecAz[]>([]);
+  const recZenImuRef  = useRef<RecZenImu[]>([]);
+  const recZenMagRef  = useRef<RecZenMag[]>([]);
+  const seenAzTs      = useRef(new Set<number>());
+  const seenZenImuTs  = useRef(new Set<number>());
+  const seenZenMagTs  = useRef(new Set<number>());
+
+  // Elapsed timer
+  useEffect(() => {
+    if (!isRecording) return;
+    const id = setInterval(() => setElapsedSec(Math.floor((Date.now() - recStartRef.current) / 1000)), 250);
+    return () => clearInterval(id);
+  }, [isRecording]);
+
+  // Accumulate new samples while recording
+  useEffect(() => {
+    if (!isRecording) return;
+    const now = Date.now();
+    const rec_ms = now - recStartRef.current;
+    for (const s of rawYawImu) {
+      if (!seenAzTs.current.has(s.timestamp)) {
+        seenAzTs.current.add(s.timestamp);
+        recAzRef.current.push({ ...s, rec_ms });
+      }
+    }
+  }, [rawYawImu, isRecording]);
+
+  useEffect(() => {
+    if (!isRecording) return;
+    const now = Date.now();
+    const rec_ms = now - recStartRef.current;
+    for (const s of rawImu) {
+      if (!seenZenImuTs.current.has(s.timestamp)) {
+        seenZenImuTs.current.add(s.timestamp);
+        recZenImuRef.current.push({ ...s, rec_ms });
+      }
+    }
+  }, [rawImu, isRecording]);
+
+  useEffect(() => {
+    if (!isRecording) return;
+    const now = Date.now();
+    const rec_ms = now - recStartRef.current;
+    for (const s of rawMag) {
+      if (!seenZenMagTs.current.has(s.timestamp)) {
+        seenZenMagTs.current.add(s.timestamp);
+        recZenMagRef.current.push({ ...s, rec_ms });
+      }
+    }
+  }, [rawMag, isRecording]);
+
+  function startRecording() {
+    recAzRef.current     = [];
+    recZenImuRef.current = [];
+    recZenMagRef.current = [];
+    seenAzTs.current     = new Set();
+    seenZenImuTs.current = new Set();
+    seenZenMagTs.current = new Set();
+    recStartRef.current  = Date.now();
+    setElapsedSec(0);
+    setHasRecording(false);
+    setIsRecording(true);
   }
 
-  function toggleImu() {
-    const next = !imuEnabled;
-    setImuEnabled(next);
-    publish(next, magEnabled);
+  function stopRecording() {
+    setIsRecording(false);
+    setHasRecording(
+      recAzRef.current.length > 0 ||
+      recZenImuRef.current.length > 0 ||
+      recZenMagRef.current.length > 0,
+    );
   }
 
-  function toggleMag() {
-    const next = !magEnabled;
-    setMagEnabled(next);
-    publish(imuEnabled, next);
+  function exportCsv() {
+    const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const csv  = buildCsv(recAzRef.current, recZenImuRef.current, recZenMagRef.current);
+    downloadCsv(`raw_sensors_${ts}.csv`, csv);
   }
 
-  function stopBoth() {
-    setImuEnabled(false);
-    setMagEnabled(false);
-    publish(false, false);
+  function publish(nextZenImu = zenithImuEnabled, nextZenMag = zenithMagEnabled, nextAz = azEnabled) {
+    mqtt.publish(TOPICS.RAW_SENSORS_CMD, JSON.stringify({
+      imu: nextZenImu, mag: nextZenMag, yaw_imu: nextAz,
+    }));
   }
 
-  const imuData = useMemo(
-    () => rawImu.map((s, i) => ({
-      i,
-      ax: s.ax, ay: s.ay, az: s.az,
-      gx: s.gx, gy: s.gy, gz: s.gz,
-    })),
+  function toggleZenithImu() { const n = !zenithImuEnabled; setZenithImuEnabled(n); publish(n, zenithMagEnabled, azEnabled); }
+  function toggleZenithMag() { const n = !zenithMagEnabled; setZenithMagEnabled(n); publish(zenithImuEnabled, n, azEnabled); }
+  function toggleAz()        { const n = !azEnabled;        setAzEnabled(n);        publish(zenithImuEnabled, zenithMagEnabled, n); }
+
+  function stopAll() {
+    setZenithImuEnabled(false);
+    setZenithMagEnabled(false);
+    setAzEnabled(false);
+    publish(false, false, false);
+  }
+
+  const recAzCount     = isRecording ? recAzRef.current.length     : (hasRecording ? recAzRef.current.length     : 0);
+  const recZenImuCount = isRecording ? recZenImuRef.current.length  : (hasRecording ? recZenImuRef.current.length  : 0);
+  const recZenMagCount = isRecording ? recZenMagRef.current.length  : (hasRecording ? recZenMagRef.current.length  : 0);
+
+  const zenithImuData = useMemo(
+    () => rawImu.map((s, i) => ({ i, ax: s.ax, ay: s.ay, az: s.az, gx: s.gx, gy: s.gy, gz: s.gz })),
     [rawImu],
   );
-  const magData = useMemo(
+  const zenithMagData = useMemo(
     () => rawMag.map((s, i) => ({ i, mx: s.mx, my: s.my, mz: s.mz })),
     [rawMag],
   );
+  const azData = useMemo(
+    () => rawYawImu.map((s, i) => ({
+      i,
+      ax: s.ax, ay: s.ay, az: s.az,
+      gx: s.gx, gy: s.gy, gz: s.gz,
+      mx: s.mx_ut, my: s.my_ut, mz: s.mz_ut,
+    })),
+    [rawYawImu],
+  );
+
+  const accelLines = [
+    { key: 'ax', label: 'ax', color: '#00ccff' },
+    { key: 'ay', label: 'ay', color: '#CA4F00' },
+    { key: 'az', label: 'az', color: '#b0ffb0' },
+  ];
+  const gyroLines = [
+    { key: 'gx', label: 'gx', color: '#00ccff' },
+    { key: 'gy', label: 'gy', color: '#CA4F00' },
+    { key: 'gz', label: 'gz', color: '#b0ffb0' },
+  ];
+  const magLines = [
+    { key: 'mx', label: 'mx', color: '#00ccff' },
+    { key: 'my', label: 'my', color: '#CA4F00' },
+    { key: 'mz', label: 'mz', color: '#b0ffb0' },
+  ];
 
   return (
     <div className={styles.rawSensorsRoot}>
+      {/* ---- Stream toggles ---- */}
       <div className={styles.rawSensorToolbar}>
         <button
-          className={`${styles.rawToggleBtn} ${imuEnabled ? styles.rawToggleBtnActive : ''}`}
-          onClick={toggleImu}
-          aria-pressed={imuEnabled}
+          className={`${styles.rawToggleBtn} ${azEnabled ? styles.rawToggleBtnActive : ''}`}
+          onClick={toggleAz}
+          aria-pressed={azEnabled}
         >
-          {imuEnabled ? 'IMU RAW ON' : 'START IMU RAW'}
+          {azEnabled ? 'AZ IMU ON' : 'START AZ IMU'}
         </button>
         <button
-          className={`${styles.rawToggleBtn} ${magEnabled ? styles.rawToggleBtnActive : ''}`}
-          onClick={toggleMag}
-          aria-pressed={magEnabled}
+          className={`${styles.rawToggleBtn} ${zenithImuEnabled ? styles.rawToggleBtnActive : ''}`}
+          onClick={toggleZenithImu}
+          aria-pressed={zenithImuEnabled}
         >
-          {magEnabled ? 'MAG RAW ON' : 'START MAG RAW'}
+          {zenithImuEnabled ? 'ZEN IMU ON' : 'START ZEN IMU'}
         </button>
-        <button className={styles.rawStopBtn} onClick={stopBoth}>STOP STREAMS</button>
+        <button
+          className={`${styles.rawToggleBtn} ${zenithMagEnabled ? styles.rawToggleBtnActive : ''}`}
+          onClick={toggleZenithMag}
+          aria-pressed={zenithMagEnabled}
+        >
+          {zenithMagEnabled ? 'ZEN MAG ON' : 'START ZEN MAG'}
+        </button>
+        <button className={styles.rawStopBtn} onClick={stopAll}>STOP ALL</button>
         <button className={styles.rawClearDataBtn} onClick={clearRawSensors}>CLEAR DATA</button>
         <span className={styles.rawSensorCount}>
-          IMU {rawImu.length} samples / MAG {rawMag.length} samples
+          AZ {rawYawImu.length} / ZEN IMU {rawImu.length} / ZEN MAG {rawMag.length}
         </span>
       </div>
 
+      {/* ---- CSV recording ---- */}
+      <div className={styles.recToolbar}>
+        {!isRecording ? (
+          <button className={styles.recStartBtn} onClick={startRecording}>
+            ⏺ START RECORDING
+          </button>
+        ) : (
+          <button className={styles.recStopBtn} onClick={stopRecording}>
+            ⏹ STOP  {elapsedSec}s
+          </button>
+        )}
+        {hasRecording && !isRecording && (
+          <button className={styles.recExportBtn} onClick={exportCsv}>
+            ↓ EXPORT CSV
+          </button>
+        )}
+        {(isRecording || hasRecording) && (
+          <span className={styles.recCount}>
+            AZ {recAzCount} / ZEN IMU {recZenImuCount} / ZEN MAG {recZenMagCount} rows
+          </span>
+        )}
+      </div>
+
+      <SensorGroupHeader label="AZIMUTH BAR  —  LSM6DSOX (IMU) + LIS3MDL (MAG)" />
       <div className={styles.rawChartGrid}>
-        <RawChart
-          title="ACCELEROMETER"
-          data={imuData}
-          unit="g"
-          lines={[
-            { key: 'ax', label: 'ax', color: '#00ccff' },
-            { key: 'ay', label: 'ay', color: '#CA4F00' },
-            { key: 'az', label: 'az', color: '#b0ffb0' },
-          ]}
-        />
-        <RawChart
-          title="GYROSCOPE"
-          data={imuData}
-          unit="dps"
-          lines={[
-            { key: 'gx', label: 'gx', color: '#00ccff' },
-            { key: 'gy', label: 'gy', color: '#CA4F00' },
-            { key: 'gz', label: 'gz', color: '#b0ffb0' },
-          ]}
-        />
-        <RawChart
-          title="MAGNETOMETER"
-          data={magData}
-          unit="gauss"
-          lines={[
-            { key: 'mx', label: 'mx', color: '#00ccff' },
-            { key: 'my', label: 'my', color: '#CA4F00' },
-            { key: 'mz', label: 'mz', color: '#b0ffb0' },
-          ]}
-        />
+        <RawChart title="AZ ACCELEROMETER" data={azData} unit="g"    lines={accelLines} />
+        <RawChart title="AZ GYROSCOPE"     data={azData} unit="dps"  lines={gyroLines} />
+        <RawChart title="AZ MAGNETOMETER"  data={azData} unit="µT"   lines={magLines} />
+      </div>
+
+      <SensorGroupHeader label="ZENITH  —  ISM330DLC (IMU) + LIS3MDL (MAG)" />
+      <div className={styles.rawChartGrid}>
+        <RawChart title="ZEN ACCELEROMETER" data={zenithImuData} unit="g"     lines={accelLines} />
+        <RawChart title="ZEN GYROSCOPE"     data={zenithImuData} unit="dps"   lines={gyroLines} />
+        <RawChart title="ZEN MAGNETOMETER"  data={zenithMagData} unit="gauss" lines={magLines} />
       </div>
 
       <div className={styles.orientationNote}>
-        Toggles publish to <code>{TOPICS.RAW_SENSORS_CMD}</code>. The Pico streams raw samples on <code>{TOPICS.RAW_IMU}</code> and <code>{TOPICS.RAW_MAG}</code> while enabled.
+        CSV columns: <code>rec_ms, sensor, fw_ts_ms, ax_g…gz_dps, mx…mz, mag_unit, temp_c, mag_valid</code>
       </div>
     </div>
   );
@@ -619,8 +914,9 @@ function AhrsTab({
             <span>Mag input</span><strong>{status ? (status.have_mag ? 'YES' : 'NO') : '--'}</strong>
             <span>Roll</span><strong>{fmtDeg(latest?.roll)}</strong>
             <span>Pitch</span><strong>{fmtDeg(latest?.pitch)}</strong>
-            <span>Yaw 0-360</span><strong>{fmtDeg(latest?.yaw360 ?? norm360(latest?.yaw))}</strong>
-            <span>Yaw signed</span><strong>{fmtDeg(latest?.yaw)}</strong>
+            <span>Heading 0-360</span><strong>{fmtDeg(latest?.yaw_frame_yaw360 ?? latest?.yaw360 ?? norm360(latest?.yaw))}</strong>
+            <span>Heading signed</span><strong>{fmtDeg(latest?.yaw_frame_yaw ?? latest?.yaw)}</strong>
+            <span>Bar yaw 0-360</span><strong>{fmtDeg(latest?.yaw360 ?? norm360(latest?.yaw))}</strong>
             <span>Valid</span><strong>{latest ? (latest.valid ? 'YES' : 'NO') : '--'}</strong>
             <span>Mag rec</span><strong>{latest ? (latest.mag_rec ? 'ON' : 'OFF') : '--'}</strong>
             <span>Acc rec</span><strong>{latest ? (latest.acc_rec ? 'ON' : 'OFF') : '--'}</strong>
@@ -642,7 +938,7 @@ function AhrsTab({
 export function DebugPanel({ mqtt }: Props) {
   const {
     logLines, rawMessages, clearDebug, antenna, groundImu, connected,
-    rawImu, rawMag, clearRawSensors, ahrsHistory, clearAhrsHistory,
+    rawImu, rawMag, rawYawImu, clearRawSensors, ahrsHistory, clearAhrsHistory,
   } = useTelemetryStore();
 
   const [subTab, setSubTab] = useState<DebugTab>('log');
@@ -766,7 +1062,7 @@ export function DebugPanel({ mqtt }: Props) {
   const tabCounts: Partial<Record<DebugTab, number>> = {
     log: logLines.length,
     topics: rawMessages.length,
-    raw: rawImu.length + rawMag.length,
+    raw: rawImu.length + rawMag.length + rawYawImu.length,
     ahrs: displayAhrsHistory.length,
   };
 
@@ -884,6 +1180,7 @@ export function DebugPanel({ mqtt }: Props) {
               connected={connected}
               imuSeen={imuSeen}
               antennaSeen={antennaSeen}
+              mqtt={mqtt}
             />
           )}
           {subTab === 'ahrs' && (
@@ -901,6 +1198,7 @@ export function DebugPanel({ mqtt }: Props) {
               mqtt={mqtt}
               rawImu={rawImu}
               rawMag={rawMag}
+              rawYawImu={rawYawImu}
               clearRawSensors={clearRawSensors}
             />
           )}

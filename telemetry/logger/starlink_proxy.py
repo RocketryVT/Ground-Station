@@ -1,6 +1,6 @@
 """
 Starlink dish proxy — polls 192.168.100.1:9200 via gRPC and serves the
-decoded data as JSON on http://localhost:8001/starlink.
+decoded data as protobuf on http://localhost:8001/starlink.
 
 The generated protobuf stubs are compiled from the Starlink spacex_api proto
 tree on first run if they don't exist yet.  No pre-compilation step needed.
@@ -31,6 +31,10 @@ logging.basicConfig(level=logging.INFO,
 HERE       = Path(__file__).parent
 PROTO_DIR  = HERE / "proto"
 STUB_FILE  = HERE / "spacex_api" / "device" / "device_pb2.py"
+
+if str(PROTO_DIR) not in sys.path:
+    sys.path.insert(0, str(PROTO_DIR))
+import ground_station_pb2  # noqa: E402
 
 DISH_HOST  = "192.168.100.1"
 DISH_PORT  = 9200
@@ -89,6 +93,48 @@ def _short_error(exc: Exception) -> str:
     if isinstance(exc, grpc.RpcError):
         return exc.details() or exc.code().name
     return str(exc)
+
+
+def _snapshot() -> dict:
+    with _lock:
+        return {
+            **_state["data"],
+            "error":          _state["error"],
+            "location_error": _state["location_error"],
+            "last_ok":        _state["last_ok"],
+        }
+
+
+def _set_optional(msg, field: str, value) -> None:
+    if value is not None:
+        setattr(msg, field, value)
+
+
+def _status_proto(snapshot: dict) -> ground_station_pb2.StarlinkProxyStatus:
+    msg = ground_station_pb2.StarlinkProxyStatus()
+    for field in (
+        "lat",
+        "lon",
+        "alt",
+        "horizontal_speed_mps",
+        "vertical_speed_mps",
+        "pop_ping_latency_ms",
+        "pop_ping_drop_rate",
+        "downlink_throughput_bps",
+        "uplink_throughput_bps",
+        "boresight_azimuth_deg",
+        "boresight_elevation_deg",
+        "gps_valid",
+        "gps_sats",
+        "hardware_version",
+        "software_version",
+        "uptime_s",
+        "error",
+        "location_error",
+        "last_ok",
+    ):
+        _set_optional(msg, field, snapshot.get(field))
+    return msg
 
 
 def _poll_loop(pb2, pb2_grpc) -> None:
@@ -183,22 +229,23 @@ class _Handler(BaseHTTPRequestHandler):
         pass   # silence default access log
 
     def do_GET(self):
-        if self.path not in ("/starlink", "/starlink/"):
+        if self.path not in ("/starlink", "/starlink/", "/starlink.json", "/starlink.json/"):
             self.send_response(404)
             self.end_headers()
             return
 
-        with _lock:
-            payload = json.dumps({
-                **_state["data"],
-                "error":          _state["error"],
-                "location_error": _state["location_error"],
-                "last_ok":        _state["last_ok"],
-            })
+        snapshot = _snapshot()
+        wants_json = self.path in ("/starlink.json", "/starlink.json/")
 
-        body = payload.encode()
+        if wants_json:
+            body = json.dumps(snapshot).encode()
+            content_type = "application/json"
+        else:
+            body = _status_proto(snapshot).SerializeToString()
+            content_type = "application/x-protobuf"
+
         self.send_response(200)
-        self.send_header("Content-Type",                "application/json")
+        self.send_header("Content-Type",                content_type)
         self.send_header("Content-Length",              str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()

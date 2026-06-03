@@ -1,36 +1,38 @@
 // lora2_task.cpp — RFM69HCW / 433 MHz receive, forward to primary Pico via UDP.
 //
-// Mirrors lora1_task.cpp but uses the RF69Radio driver on SPI1.
+// Mirrors lora1_task.cpp but uses the RF69 driver on SPI1.
 // Each received SIGMA LoRa frame is decoded and immediately re-encoded as a
 // SIGMA INTER_PICO frame and enqueued to g_udp_queue.
 
 #include "lora2_task.hpp"
 #include "shared.hpp"
 
-#include "radio/RF69Radio.hpp"
+#include "rf69/RF69.hpp"
 #include "SIGMA.hpp"
 
 #include "hardware/spi.h"
 #include "hardware/gpio.h"
 
 // -- Radio instance ------------------------------------------------------------
-static const RF69Config s_cfg {
-    LoRa2Cfg::FREQ_MHZ,
-    LoRa2Cfg::BR_KBPS,
-    LoRa2Cfg::FREQ_DEV_KHZ,
-    LoRa2Cfg::RX_BW_KHZ,
-    LoRa2Cfg::TX_POWER,
-    LoRa2Cfg::PREAMBLE,
-};
+static const radio::rf69::Config s_cfg = [] {
+    radio::rf69::Config cfg;
+    cfg.freq_mhz  = LoRa2Cfg::FREQ_MHZ;
+    cfg.br_kbps   = LoRa2Cfg::BR_KBPS;
+    cfg.fdev_khz  = LoRa2Cfg::FREQ_DEV_KHZ;
+    cfg.rx_bw_khz = LoRa2Cfg::RX_BW_KHZ;
+    cfg.tx_dbm    = LoRa2Cfg::TX_POWER;
+    cfg.preamble  = LoRa2Cfg::PREAMBLE;
+    return cfg;
+}();
 
-static RF69Radio s_radio( spi1,
-                            Pins::LORA2_SCK,
-                            Pins::LORA2_MOSI,
-                            Pins::LORA2_MISO,
-                            Pins::LORA2_NSS,
-                            Pins::LORA2_DIO0,
-                            Pins::LORA2_RST,
-                            s_cfg );
+static radio::rf69::RF69 s_radio( spi1,
+                                  Pins::LORA2_SCK,
+                                  Pins::LORA2_MOSI,
+                                  Pins::LORA2_MISO,
+                                  Pins::LORA2_NSS,
+                                  Pins::LORA2_DIO0,
+                                  Pins::LORA2_RST,
+                                  s_cfg );
 
 // -- Task ----------------------------------------------------------------------
 static void lora2_task( void* )
@@ -43,25 +45,25 @@ static void lora2_task( void* )
     vTaskDelay( pdMS_TO_TICKS( 500 ) );
 
     int state = s_radio.begin();
-    if ( state != RADIO_OK ) {
+    if ( state != RADIOLIB_ERR_NONE ) {
         log_print( "[lora2] init failed %d — task halting\n", state );
         for ( ;; ) vTaskDelay( portMAX_DELAY );
     }
     log_print( "[lora2] RFM69 ready — %.1f MHz  %.1f kbps\n",
                LoRa2Cfg::FREQ_MHZ, LoRa2Cfg::BR_KBPS );
 
-    s_radio.startReceive();
+    s_radio.start_receive();
 
     for ( ;; ) {
-        if ( !s_radio.packetAvailable() ) {
+        if ( !s_radio.packet_available() ) {
             vTaskDelay( pdMS_TO_TICKS( 5 ) );
             continue;
         }
 
-        RadioPacket pkt;
-        if ( s_radio.readPacket( pkt ) != RADIO_OK ) {
+        radio::Packet pkt;
+        if ( s_radio.read_packet( pkt ) != RADIOLIB_ERR_NONE ) {
             log_print( "[lora2] readPacket error\n" );
-            s_radio.startReceive();
+            s_radio.start_receive();
             continue;
         }
 
@@ -70,7 +72,7 @@ static void lora2_task( void* )
         if ( !SIGMA::LoRaData::deserialize( pkt.data, pkt.len, d ) ) {
             log_print( "[lora2] rx %u B  RSSI %.0f dBm — bad frame\n",
                        (unsigned)pkt.len, (double)pkt.rssi );
-            s_radio.startReceive();
+            s_radio.start_receive();
             continue;
         }
 
@@ -91,7 +93,7 @@ static void lora2_task( void* )
             }
         }
 
-        s_radio.startReceive();
+        s_radio.start_receive();
     }
 }
 

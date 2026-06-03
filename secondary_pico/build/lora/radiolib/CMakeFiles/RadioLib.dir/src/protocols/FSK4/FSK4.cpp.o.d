@@ -1,10 +1,10 @@
 lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/FSK4/FSK4.cpp.o: \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/FSK4.cpp \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/FSK4.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../../BuildOptUser.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../../BuildOpt.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/FSK4.cpp \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/FSK4.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../../BuildOptUser.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../../BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../../TypeDef.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdio.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/_ansi.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/newlib.h \
@@ -26,13 +26,15 @@ lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/FSK4/FSK4.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdint.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_intsup.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_stdint.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../PhysicalLayer/PhysicalLayer.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../PhysicalLayer/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../PhysicalLayer/../../Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../PhysicalLayer/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../PhysicalLayer/../../Hal.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../PhysicalLayer/../../BuildOpt.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../PhysicalLayer/../../utils/Utils.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../PhysicalLayer/PhysicalLayer.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../PhysicalLayer/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../PhysicalLayer/../../Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../PhysicalLayer/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../PhysicalLayer/../../Hal.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../PhysicalLayer/../../BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../PhysicalLayer/../../utils/Cryptography.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../PhysicalLayer/../../utils/../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../PhysicalLayer/../../utils/Utils.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cstdlib \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/arm-none-eabi/thumb/v8-m.main+fp/softfp/bits/c++config.h \
@@ -43,11 +45,11 @@ lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/FSK4/FSK4.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/machine/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/alloca.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/std_abs.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../PhysicalLayer/../../utils/../BuildOpt.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../AFSK/AFSK.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../AFSK/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../AFSK/../../Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/protocols/FSK4/../AFSK/../PhysicalLayer/PhysicalLayer.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../PhysicalLayer/../../utils/../BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../AFSK/AFSK.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../AFSK/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../AFSK/../../Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/FSK4/../AFSK/../PhysicalLayer/PhysicalLayer.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/math.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cmath \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/requires_hosted.h \

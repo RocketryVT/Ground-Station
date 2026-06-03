@@ -4,7 +4,7 @@
 # compile CXX with /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/bin/arm-none-eabi-g++
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I/Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src
+CXX_INCLUDES = -I/Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src
 
 CXX_FLAGS = -mcpu=cortex-m33 -mthumb -march=armv8-m.main+fp+dsp -mfloat-abi=softfp -mcmse -g -O3 -DNDEBUG -std=gnu++20 -Wall -Wextra -Wpedantic -Wdouble-promotion
 

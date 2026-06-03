@@ -1,6 +1,8 @@
 file(REMOVE_RECURSE
   "CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora1_task.cpp.o"
   "CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora1_task.cpp.o.d"
+  "CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora2_task.cpp.o"
+  "CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora2_task.cpp.o.d"
   "CMakeFiles/gs_secondary_pico.dir/Tasks/UDP/udp_send_task.cpp.o"
   "CMakeFiles/gs_secondary_pico.dir/Tasks/UDP/udp_send_task.cpp.o.d"
   "CMakeFiles/gs_secondary_pico.dir/Tasks/USB/usb_task.cpp.o"

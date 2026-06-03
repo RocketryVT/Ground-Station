@@ -40,10 +40,11 @@ export interface AntennaState {
 
 export interface GroundImuState {
   timestamp: number;
+  // Bar-frame Euler angles (q_EB — includes elevation tilt, not suitable for azimuth display)
   roll: number;
   pitch: number;
-  yaw: number;       // signed Fusion Euler yaw, -180..180
-  yaw360?: number;   // normalized yaw, 0..360
+  yaw: number;       // signed, -180..180
+  yaw360?: number;   // normalized 0..360
   q?: [number, number, number, number];
   a?: [number, number, number];
   m?: [number, number, number];
@@ -54,6 +55,15 @@ export interface GroundImuState {
   alt_baro?: number;
   temp?: number;
   valid: boolean;
+  // Yaw-platform heading (q_EY from LSM6DSOX+LIS3MDL — tilt-compensated, stable across bar elevation)
+  have_yaw_frame?: boolean;
+  yaw_frame_yaw?: number;      // signed, -180..180
+  yaw_frame_yaw360?: number;   // normalized 0..360 — USE THIS for azimuth display
+  yaw_startup?: boolean;
+  // Bar orientation relative to yaw platform
+  bar_rel_roll?: number;
+  bar_rel_pitch?: number;
+  bar_rel_yaw?: number;
 }
 
 export interface RawImuSample {
@@ -72,6 +82,17 @@ export interface RawMagSample {
   mx: number;
   my: number;
   mz: number;
+}
+
+// Azimuth bar sensor: LSM6DSOX (IMU) + LIS3MDL (mag) combined publish.
+// mag is in µT (sensor native gauss × 100).
+export interface RawYawImuSample {
+  timestamp: number;
+  ax: number; ay: number; az: number;
+  gx: number; gy: number; gz: number;
+  mx_ut: number; my_ut: number; mz_ut: number;
+  temp?: number;
+  mag_valid?: boolean;
 }
 
 export interface MobileNode {

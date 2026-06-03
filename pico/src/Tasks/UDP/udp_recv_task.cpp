@@ -11,6 +11,7 @@
 #include "udp_recv_task.hpp"
 #include "shared.hpp"
 #include "Tasks/MQTT/mqtt_task.hpp"
+#include "Proto/mqtt_proto.hpp"
 
 #include "SIGMA.hpp"
 
@@ -125,27 +126,27 @@ static void udp_recv_task( void* )
 
         // MQTT publish (best-effort — silently dropped if queue full or disconnected)
         if ( mqtt_is_connected() ) {
-            MqttMessage m;
-            strncpy( m.topic, "rocket/inter_pico", sizeof(m.topic) );
-            snprintf( m.payload, sizeof(m.payload),
-                      "{\"boot_ms\":%lu,\"state\":\"%s\","
-                      "\"sats\":%u,\"flags\":%u,"
-                      "\"lat\":%.7f,\"lon\":%.7f,"
-                      "\"alt_gps_m\":%.1f,\"alt_baro_m\":%.1f,"
-                      "\"speed_ms\":%.2f,"
-                      "\"q\":[%.5f,%.5f,%.5f,%.5f],"
-                      "\"rssi\":%d,\"snr\":%.2f}",
-                      (unsigned long)d.boot_ms,
-                      flight_state_str(d.state),
-                      (unsigned)d.satellites,
-                      (unsigned)d.flags,
-                      d.lat, d.lon,
-                      (double)d.alt_gps_m, (double)d.alt_baro_m,
-                      (double)d.speed_ms,
-                      (double)d.q[0], (double)d.q[1],
-                      (double)d.q[2], (double)d.q[3],
-                      d.rssi, (double)d.snr_dB );
-            xQueueSend( g_mqtt_queue, &m, 0 );
+            MqttMessage m = {};
+            groundstation_RocketLoRaSample pb =
+                groundstation_RocketLoRaSample_init_zero;
+            pb.has_boot_ms = true;    pb.boot_ms = d.boot_ms;
+            pb.has_state = true;      pb.state = (groundstation_FlightState)d.state;
+            pb.has_sats = true;       pb.sats = d.satellites;
+            pb.has_flags = true;      pb.flags = d.flags;
+            pb.has_lat = true;        pb.lat = d.lat;
+            pb.has_lon = true;        pb.lon = d.lon;
+            pb.has_alt_gps_m = true;  pb.alt_gps_m = d.alt_gps_m;
+            pb.has_alt_baro_m = true; pb.alt_baro_m = d.alt_baro_m;
+            pb.has_speed_ms = true;   pb.speed_ms = d.speed_ms;
+            pb.q_count = 4;
+            pb.q[0] = d.q[0]; pb.q[1] = d.q[1];
+            pb.q[2] = d.q[2]; pb.q[3] = d.q[3];
+            pb.has_rssi = true;       pb.rssi = (float)d.rssi;
+            pb.has_snr = true;        pb.snr = d.snr_dB;
+
+            if ( mqtt_encode_proto( m, "rocket/inter_pico",
+                                    groundstation_RocketLoRaSample_fields, &pb ) )
+                xQueueSend( g_mqtt_queue, &m, 0 );
         }
     }
 }

@@ -381,6 +381,9 @@ LORA_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/lora
 //Path to LSM6DSO32 driver
 LSM6DSO32_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/imus/lsm6dso32
 
+//Path to LSM6DSOX driver
+LSM6DSOX_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/imus/lsm6dsox
+
 //Path to MadgwickAHRS
 MADGWICK_AHRS_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/MadgwickAHRS
 
@@ -398,6 +401,9 @@ MS5611_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/baros/
 
 //Path to nanopb
 NANOPB_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/nanopb
+
+//Path to ICM-20948 9-axis IMU driver
+NINE_AXIS_IMU_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/9axisIMU
 
 //Path to shared protobuf packet definitions
 PACKETS_PROTOBUF_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/packets/protobufs
@@ -478,8 +484,8 @@ RADIOLIB_BUILD_EXAMPLES:BOOL=OFF
 
 RADIOLIB_BUILD_TESTS:BOOL=OFF
 
-//Path to local RadioLib 7.x source
-RADIOLIB_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0
+//No help, variable specified on the command line.
+RADIOLIB_PATH:UNINITIALIZED=/Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1
 
 //Path to ubxlib
 UBXLIB_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/ubxlib
@@ -512,7 +518,7 @@ radiolib_BINARY_DIR:STATIC=/Users/gregory/Downloads/Rocketry/Avionics/projects/g
 radiolib_IS_TOP_LEVEL:STATIC=OFF
 
 //Value Computed by CMake
-radiolib_SOURCE_DIR:STATIC=/Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0
+radiolib_SOURCE_DIR:STATIC=/Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1
 
 
 ########################
@@ -549,7 +555,7 @@ CMAKE_CACHE_MAJOR_VERSION:INTERNAL=4
 //Minor version of cmake used to create the current loaded cache
 CMAKE_CACHE_MINOR_VERSION:INTERNAL=3
 //Patch version of cmake used to create the current loaded cache
-CMAKE_CACHE_PATCH_VERSION:INTERNAL=1
+CMAKE_CACHE_PATCH_VERSION:INTERNAL=3
 //ADVANCED property for variable: CMAKE_COLOR_MAKEFILE
 CMAKE_COLOR_MAKEFILE-ADVANCED:INTERNAL=1
 //Path to CMake executable.

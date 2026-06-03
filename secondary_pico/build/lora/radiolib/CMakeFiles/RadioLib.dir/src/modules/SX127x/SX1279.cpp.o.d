@@ -1,10 +1,10 @@
 lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/SX127x/SX1279.cpp.o: \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/SX1279.cpp \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/SX1279.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../BuildOptUser.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../BuildOpt.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/SX1279.cpp \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/SX1279.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../BuildOptUser.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../TypeDef.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdio.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/_ansi.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/newlib.h \
@@ -26,10 +26,12 @@ lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/SX127x/SX1279.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdint.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_intsup.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_stdint.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/SX1278.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../Hal.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../utils/Utils.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/SX1278.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../Hal.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../utils/Cryptography.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../utils/../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../utils/Utils.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cstdlib \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/arm-none-eabi/thumb/v8-m.main+fp/softfp/bits/c++config.h \
@@ -40,8 +42,8 @@ lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/SX127x/SX1279.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/machine/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/alloca.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/std_abs.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../utils/../BuildOpt.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/SX127x.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../protocols/PhysicalLayer/PhysicalLayer.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../protocols/PhysicalLayer/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/SX127x/../../protocols/PhysicalLayer/../../Module.h
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../utils/../BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/SX127x.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../protocols/PhysicalLayer/PhysicalLayer.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../protocols/PhysicalLayer/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/SX127x/../../protocols/PhysicalLayer/../../Module.h

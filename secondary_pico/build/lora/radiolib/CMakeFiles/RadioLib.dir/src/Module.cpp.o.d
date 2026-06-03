@@ -1,9 +1,9 @@
 lora/radiolib/CMakeFiles/RadioLib.dir/src/Module.cpp.o: \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/Module.cpp \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/BuildOptUser.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/Module.cpp \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/BuildOptUser.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/BuildOpt.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdio.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/_ansi.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/newlib.h \
@@ -25,8 +25,10 @@ lora/radiolib/CMakeFiles/RadioLib.dir/src/Module.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdint.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_intsup.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_stdint.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/Hal.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/utils/Utils.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/Hal.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/utils/Cryptography.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/utils/../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/utils/Utils.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cstdlib \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/arm-none-eabi/thumb/v8-m.main+fp/softfp/bits/c++config.h \
@@ -37,7 +39,7 @@ lora/radiolib/CMakeFiles/RadioLib.dir/src/Module.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/machine/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/alloca.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/std_abs.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/utils/../BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/utils/../BuildOpt.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/string.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_locale.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/strings.h \

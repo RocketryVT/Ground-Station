@@ -1,10 +1,10 @@
 lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/LLCC68/LLCC68.cpp.o: \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/LLCC68.cpp \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/LLCC68.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../../BuildOptUser.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../../BuildOpt.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/LLCC68.cpp \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/LLCC68.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../../BuildOptUser.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../../BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../../TypeDef.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdio.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/_ansi.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/newlib.h \
@@ -26,9 +26,11 @@ lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/LLCC68/LLCC68.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdint.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_intsup.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_stdint.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../../Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../../Hal.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../../utils/Utils.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../../Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../../Hal.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../../utils/Cryptography.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../../utils/../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../../utils/Utils.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cstdlib \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/arm-none-eabi/thumb/v8-m.main+fp/softfp/bits/c++config.h \
@@ -39,19 +41,19 @@ lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/LLCC68/LLCC68.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/machine/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/alloca.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/std_abs.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../../utils/../BuildOpt.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/SX1262.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/../../Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/SX126x.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/../../protocols/PhysicalLayer/PhysicalLayer.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/../../protocols/PhysicalLayer/../../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/../../protocols/PhysicalLayer/../../Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/../../utils/FEC.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/../../utils/../TypeDef.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/../../utils/../Module.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/../../utils/CRC.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/SX126x_commands.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/SX126x_registers.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/SX1261.h \
- /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/modules/LLCC68/../SX126x/SX1262.h
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../../utils/../BuildOpt.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/SX1262.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/../../Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/SX126x.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/../../protocols/PhysicalLayer/PhysicalLayer.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/../../protocols/PhysicalLayer/../../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/../../protocols/PhysicalLayer/../../Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/../../utils/ConvCode.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/../../utils/../TypeDef.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/../../utils/../Module.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/../../utils/CRC.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/SX126x_commands.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/SX126x_registers.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/SX1261.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/LLCC68/../SX126x/SX1262.h

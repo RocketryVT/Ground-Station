@@ -1,0 +1,10 @@
+groundstation.RocketLoRaSample.q max_count:4
+groundstation.Lora1Rf69Packet.data max_size:255
+groundstation.AntennaState.mode max_size:16
+groundstation.GroundImu.q max_count:4
+groundstation.GroundImu.a max_count:3
+groundstation.GroundImu.m max_count:3
+groundstation.StarlinkProxyStatus.hardware_version max_size:64
+groundstation.StarlinkProxyStatus.software_version max_size:64
+groundstation.StarlinkProxyStatus.error max_size:160
+groundstation.StarlinkProxyStatus.location_error max_size:160

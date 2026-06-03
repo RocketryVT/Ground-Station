@@ -847,30 +847,6 @@ src/modules/SX126x/STM32WLx.cpp.s:
 	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/SX126x/STM32WLx.cpp.s
 .PHONY : src/modules/SX126x/STM32WLx.cpp.s
 
-src/modules/SX126x/STM32WLx_Module.o: src/modules/SX126x/STM32WLx_Module.cpp.o
-.PHONY : src/modules/SX126x/STM32WLx_Module.o
-
-# target to build an object file
-src/modules/SX126x/STM32WLx_Module.cpp.o:
-	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/SX126x/STM32WLx_Module.cpp.o
-.PHONY : src/modules/SX126x/STM32WLx_Module.cpp.o
-
-src/modules/SX126x/STM32WLx_Module.i: src/modules/SX126x/STM32WLx_Module.cpp.i
-.PHONY : src/modules/SX126x/STM32WLx_Module.i
-
-# target to preprocess a source file
-src/modules/SX126x/STM32WLx_Module.cpp.i:
-	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/SX126x/STM32WLx_Module.cpp.i
-.PHONY : src/modules/SX126x/STM32WLx_Module.cpp.i
-
-src/modules/SX126x/STM32WLx_Module.s: src/modules/SX126x/STM32WLx_Module.cpp.s
-.PHONY : src/modules/SX126x/STM32WLx_Module.s
-
-# target to generate assembly for a file
-src/modules/SX126x/STM32WLx_Module.cpp.s:
-	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/modules/SX126x/STM32WLx_Module.cpp.s
-.PHONY : src/modules/SX126x/STM32WLx_Module.cpp.s
-
 src/modules/SX126x/SX1261.o: src/modules/SX126x/SX1261.cpp.o
 .PHONY : src/modules/SX126x/SX1261.o
 
@@ -1663,6 +1639,78 @@ src/protocols/LoRaWAN/LoRaWANBands.cpp.s:
 	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/LoRaWAN/LoRaWANBands.cpp.s
 .PHONY : src/protocols/LoRaWAN/LoRaWANBands.cpp.s
 
+src/protocols/LoRaWAN/LoRaWANPacMan.o: src/protocols/LoRaWAN/LoRaWANPacMan.cpp.o
+.PHONY : src/protocols/LoRaWAN/LoRaWANPacMan.o
+
+# target to build an object file
+src/protocols/LoRaWAN/LoRaWANPacMan.cpp.o:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/LoRaWAN/LoRaWANPacMan.cpp.o
+.PHONY : src/protocols/LoRaWAN/LoRaWANPacMan.cpp.o
+
+src/protocols/LoRaWAN/LoRaWANPacMan.i: src/protocols/LoRaWAN/LoRaWANPacMan.cpp.i
+.PHONY : src/protocols/LoRaWAN/LoRaWANPacMan.i
+
+# target to preprocess a source file
+src/protocols/LoRaWAN/LoRaWANPacMan.cpp.i:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/LoRaWAN/LoRaWANPacMan.cpp.i
+.PHONY : src/protocols/LoRaWAN/LoRaWANPacMan.cpp.i
+
+src/protocols/LoRaWAN/LoRaWANPacMan.s: src/protocols/LoRaWAN/LoRaWANPacMan.cpp.s
+.PHONY : src/protocols/LoRaWAN/LoRaWANPacMan.s
+
+# target to generate assembly for a file
+src/protocols/LoRaWAN/LoRaWANPacMan.cpp.s:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/LoRaWAN/LoRaWANPacMan.cpp.s
+.PHONY : src/protocols/LoRaWAN/LoRaWANPacMan.cpp.s
+
+src/protocols/LoRaWAN/LoRaWANPackageTS003.o: src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.o
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS003.o
+
+# target to build an object file
+src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.o:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.o
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.o
+
+src/protocols/LoRaWAN/LoRaWANPackageTS003.i: src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.i
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS003.i
+
+# target to preprocess a source file
+src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.i:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.i
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.i
+
+src/protocols/LoRaWAN/LoRaWANPackageTS003.s: src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.s
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS003.s
+
+# target to generate assembly for a file
+src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.s:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.s
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS003.cpp.s
+
+src/protocols/LoRaWAN/LoRaWANPackageTS009.o: src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.o
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS009.o
+
+# target to build an object file
+src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.o:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.o
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.o
+
+src/protocols/LoRaWAN/LoRaWANPackageTS009.i: src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.i
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS009.i
+
+# target to preprocess a source file
+src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.i:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.i
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.i
+
+src/protocols/LoRaWAN/LoRaWANPackageTS009.s: src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.s
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS009.s
+
+# target to generate assembly for a file
+src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.s:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.s
+.PHONY : src/protocols/LoRaWAN/LoRaWANPackageTS009.cpp.s
+
 src/protocols/Morse/Morse.o: src/protocols/Morse/Morse.cpp.o
 .PHONY : src/protocols/Morse/Morse.o
 
@@ -1831,6 +1879,30 @@ src/protocols/SSTV/SSTV.cpp.s:
 	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/protocols/SSTV/SSTV.cpp.s
 .PHONY : src/protocols/SSTV/SSTV.cpp.s
 
+src/utils/BCH.o: src/utils/BCH.cpp.o
+.PHONY : src/utils/BCH.o
+
+# target to build an object file
+src/utils/BCH.cpp.o:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/BCH.cpp.o
+.PHONY : src/utils/BCH.cpp.o
+
+src/utils/BCH.i: src/utils/BCH.cpp.i
+.PHONY : src/utils/BCH.i
+
+# target to preprocess a source file
+src/utils/BCH.cpp.i:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/BCH.cpp.i
+.PHONY : src/utils/BCH.cpp.i
+
+src/utils/BCH.s: src/utils/BCH.cpp.s
+.PHONY : src/utils/BCH.s
+
+# target to generate assembly for a file
+src/utils/BCH.cpp.s:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/BCH.cpp.s
+.PHONY : src/utils/BCH.cpp.s
+
 src/utils/CRC.o: src/utils/CRC.cpp.o
 .PHONY : src/utils/CRC.o
 
@@ -1855,6 +1927,30 @@ src/utils/CRC.cpp.s:
 	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/CRC.cpp.s
 .PHONY : src/utils/CRC.cpp.s
 
+src/utils/ConvCode.o: src/utils/ConvCode.cpp.o
+.PHONY : src/utils/ConvCode.o
+
+# target to build an object file
+src/utils/ConvCode.cpp.o:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/ConvCode.cpp.o
+.PHONY : src/utils/ConvCode.cpp.o
+
+src/utils/ConvCode.i: src/utils/ConvCode.cpp.i
+.PHONY : src/utils/ConvCode.i
+
+# target to preprocess a source file
+src/utils/ConvCode.cpp.i:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/ConvCode.cpp.i
+.PHONY : src/utils/ConvCode.cpp.i
+
+src/utils/ConvCode.s: src/utils/ConvCode.cpp.s
+.PHONY : src/utils/ConvCode.s
+
+# target to generate assembly for a file
+src/utils/ConvCode.cpp.s:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/ConvCode.cpp.s
+.PHONY : src/utils/ConvCode.cpp.s
+
 src/utils/Cryptography.o: src/utils/Cryptography.cpp.o
 .PHONY : src/utils/Cryptography.o
 
@@ -1878,30 +1974,6 @@ src/utils/Cryptography.s: src/utils/Cryptography.cpp.s
 src/utils/Cryptography.cpp.s:
 	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/Cryptography.cpp.s
 .PHONY : src/utils/Cryptography.cpp.s
-
-src/utils/FEC.o: src/utils/FEC.cpp.o
-.PHONY : src/utils/FEC.o
-
-# target to build an object file
-src/utils/FEC.cpp.o:
-	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/FEC.cpp.o
-.PHONY : src/utils/FEC.cpp.o
-
-src/utils/FEC.i: src/utils/FEC.cpp.i
-.PHONY : src/utils/FEC.i
-
-# target to preprocess a source file
-src/utils/FEC.cpp.i:
-	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/FEC.cpp.i
-.PHONY : src/utils/FEC.cpp.i
-
-src/utils/FEC.s: src/utils/FEC.cpp.s
-.PHONY : src/utils/FEC.s
-
-# target to generate assembly for a file
-src/utils/FEC.cpp.s:
-	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f lora/radiolib/CMakeFiles/RadioLib.dir/build.make lora/radiolib/CMakeFiles/RadioLib.dir/src/utils/FEC.cpp.s
-.PHONY : src/utils/FEC.cpp.s
 
 src/utils/Utils.o: src/utils/Utils.cpp.o
 .PHONY : src/utils/Utils.o
@@ -2024,9 +2096,6 @@ help:
 	@echo "... src/modules/SX126x/STM32WLx.o"
 	@echo "... src/modules/SX126x/STM32WLx.i"
 	@echo "... src/modules/SX126x/STM32WLx.s"
-	@echo "... src/modules/SX126x/STM32WLx_Module.o"
-	@echo "... src/modules/SX126x/STM32WLx_Module.i"
-	@echo "... src/modules/SX126x/STM32WLx_Module.s"
 	@echo "... src/modules/SX126x/SX1261.o"
 	@echo "... src/modules/SX126x/SX1261.i"
 	@echo "... src/modules/SX126x/SX1261.s"
@@ -2126,6 +2195,15 @@ help:
 	@echo "... src/protocols/LoRaWAN/LoRaWANBands.o"
 	@echo "... src/protocols/LoRaWAN/LoRaWANBands.i"
 	@echo "... src/protocols/LoRaWAN/LoRaWANBands.s"
+	@echo "... src/protocols/LoRaWAN/LoRaWANPacMan.o"
+	@echo "... src/protocols/LoRaWAN/LoRaWANPacMan.i"
+	@echo "... src/protocols/LoRaWAN/LoRaWANPacMan.s"
+	@echo "... src/protocols/LoRaWAN/LoRaWANPackageTS003.o"
+	@echo "... src/protocols/LoRaWAN/LoRaWANPackageTS003.i"
+	@echo "... src/protocols/LoRaWAN/LoRaWANPackageTS003.s"
+	@echo "... src/protocols/LoRaWAN/LoRaWANPackageTS009.o"
+	@echo "... src/protocols/LoRaWAN/LoRaWANPackageTS009.i"
+	@echo "... src/protocols/LoRaWAN/LoRaWANPackageTS009.s"
 	@echo "... src/protocols/Morse/Morse.o"
 	@echo "... src/protocols/Morse/Morse.i"
 	@echo "... src/protocols/Morse/Morse.s"
@@ -2147,15 +2225,18 @@ help:
 	@echo "... src/protocols/SSTV/SSTV.o"
 	@echo "... src/protocols/SSTV/SSTV.i"
 	@echo "... src/protocols/SSTV/SSTV.s"
+	@echo "... src/utils/BCH.o"
+	@echo "... src/utils/BCH.i"
+	@echo "... src/utils/BCH.s"
 	@echo "... src/utils/CRC.o"
 	@echo "... src/utils/CRC.i"
 	@echo "... src/utils/CRC.s"
+	@echo "... src/utils/ConvCode.o"
+	@echo "... src/utils/ConvCode.i"
+	@echo "... src/utils/ConvCode.s"
 	@echo "... src/utils/Cryptography.o"
 	@echo "... src/utils/Cryptography.i"
 	@echo "... src/utils/Cryptography.s"
-	@echo "... src/utils/FEC.o"
-	@echo "... src/utils/FEC.i"
-	@echo "... src/utils/FEC.s"
 	@echo "... src/utils/Utils.o"
 	@echo "... src/utils/Utils.i"
 	@echo "... src/utils/Utils.s"

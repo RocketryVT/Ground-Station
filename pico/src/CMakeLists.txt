@@ -18,6 +18,10 @@ add_executable(gs_pico
     Tasks/Stepper/cl57te.cpp
     Tasks/Stepper/stepper_task.cpp
     Tasks/USB/usb_task.cpp
+    Proto/ground_station.pb.c
+    ${AVIONICS_ROOT}/projects/libs/Third_Party/nanopb/pb_common.c
+    ${AVIONICS_ROOT}/projects/libs/Third_Party/nanopb/pb_encode.c
+    ${AVIONICS_ROOT}/projects/libs/Third_Party/nanopb/pb_decode.c
 )
 
 target_include_directories(gs_pico PRIVATE
@@ -27,6 +31,8 @@ target_include_directories(gs_pico PRIVATE
     ${LORA_ROOT}/hal                        # PicoHal.h
     ${LORA_ROOT}/radio                      # Radio.hpp  SpiDevice.hpp  sx1276/  rf69/  sx1231/
     ${FUSION_PATH}/Fusion                   # Fusion.h (AHRS)
+    ${CMAKE_CURRENT_SOURCE_DIR}/Proto       # generated protobuf schema
+    ${AVIONICS_ROOT}/projects/libs/Third_Party/nanopb
 )
 
 target_link_libraries(gs_pico

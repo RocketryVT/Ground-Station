@@ -1,18 +1,22 @@
 #include "mqtt_task.hpp"
 #include "shared.hpp"
 #include "Tasks/Stepper/stepper_task.hpp"
+#include "Tasks/Fusion/fusion_task.hpp"
+#include "Proto/ground_station.pb.h"
 
 #include "pico/cyw43_arch.h"
 #include "lwip/ip_addr.h"
 #include "lwip/apps/mqtt.h"
+#include "pb_decode.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 static mqtt_client_t*  s_mqtt           = nullptr;
 static volatile bool   s_mqtt_connected = false;
-static volatile bool   s_raw_imu_enabled = false;
-static volatile bool   s_raw_mag_enabled = false;
+static volatile bool   s_raw_imu_enabled     = false;
+static volatile bool   s_raw_mag_enabled     = false;
+static volatile bool   s_raw_yaw_imu_enabled = false;
 static char            s_in_topic[64] = {};
 
 struct PendingAxisCmd {
@@ -38,84 +42,43 @@ static volatile PendingAxisCmd s_pending_zen_cmd = {};
 static volatile PendingJogCmd  s_pending_jog_cmd = {};
 
 bool mqtt_is_connected() { return s_mqtt_connected; }
-bool mqtt_raw_imu_enabled() { return s_raw_imu_enabled; }
-bool mqtt_raw_mag_enabled() { return s_raw_mag_enabled; }
+bool mqtt_raw_imu_enabled()     { return s_raw_imu_enabled; }
+bool mqtt_raw_mag_enabled()     { return s_raw_mag_enabled; }
+bool mqtt_raw_yaw_imu_enabled() { return s_raw_yaw_imu_enabled; }
 
-static bool json_bool_field( const char* json, const char* key, bool* out )
+static bool decode_proto( const u8_t* data,
+                          u16_t len,
+                          const pb_msgdesc_t* fields,
+                          void* out )
 {
-    const char* p = strstr( json, key );
-    if ( !p ) return false;
-    const char* colon = strchr( p, ':' );
-    if ( !colon ) return false;
-    colon++;
-    while ( *colon == ' ' || *colon == '\t' ) colon++;
-    if ( strncmp( colon, "true", 4 ) == 0 ) {
-        *out = true;
-        return true;
-    }
-    if ( strncmp( colon, "false", 5 ) == 0 ) {
-        *out = false;
-        return true;
-    }
-    return false;
+    pb_istream_t stream = pb_istream_from_buffer( data, len );
+    return pb_decode( &stream, fields, out );
 }
 
-static bool json_number_field( const char* json, const char* key, float* out )
+static void store_axis_cmd( const groundstation_AxisCommand& cmd,
+                            volatile PendingAxisCmd* pending )
 {
-    const char* p = strstr( json, key );
-    if ( !p ) return false;
-    const char* colon = strchr( p, ':' );
-    if ( !colon ) return false;
-    colon++;
-    while ( *colon == ' ' || *colon == '\t' ) colon++;
-
-    char* end = nullptr;
-    float value = strtof( colon, &end );
-    if ( end == colon ) return false;
-
-    *out = value;
-    return true;
-}
-
-static void store_axis_cmd( const char* payload, volatile PendingAxisCmd* pending )
-{
-    float target = 0.0f;
-    const bool has_target =
-        json_number_field( payload, "\"target_angle_deg\"", &target );
-
-    float speed = 0.0f;
-    const bool has_speed =
-        json_number_field( payload, "\"speed_dps\"", &speed );
-
-    bool stop = false;
-    const bool has_stop = json_bool_field( payload, "\"stop\"", &stop );
-
-    pending->has_target       = has_target;
-    pending->target_angle_deg = target;
-    pending->has_speed        = has_speed;
-    pending->speed_dps        = speed;
-    pending->has_stop         = has_stop;
-    pending->stop             = stop;
+    pending->has_target       = cmd.has_target_angle_deg;
+    pending->target_angle_deg = cmd.target_angle_deg;
+    pending->has_speed        = cmd.has_speed_dps;
+    pending->speed_dps        = cmd.speed_dps;
+    pending->has_stop         = cmd.has_stop;
+    pending->stop             = cmd.stop;
     pending->pending          = true;
 }
 
-static void store_jog_cmd( const char* payload )
+static void store_jog_cmd( const groundstation_JogCommand& cmd )
 {
-    const bool az_axis  = strstr( payload, "\"axis\":\"az\"" ) != nullptr;
-    const bool el_axis = strstr( payload, "\"axis\":\"el\"" ) != nullptr
-                      || strstr( payload, "\"axis\":\"zen\"" ) != nullptr;
+    if ( !cmd.has_axis || !cmd.has_delta_deg ) return;
+
+    const bool az_axis = cmd.axis == groundstation_JogAxis_JOG_AXIS_AZ;
+    const bool el_axis = cmd.axis == groundstation_JogAxis_JOG_AXIS_EL;
     if ( !az_axis && !el_axis ) return;
 
-    float delta = 0.0f;
-    if ( !json_number_field( payload, "\"delta_deg\"", &delta ) ) return;
-
-    float speed = 0.0f;
-    const bool has_speed = json_number_field( payload, "\"speed_dps\"", &speed );
-
     s_pending_jog_cmd.axis_is_az = az_axis;
-    s_pending_jog_cmd.delta_deg  = delta;
-    s_pending_jog_cmd.has_speed  = has_speed;
-    s_pending_jog_cmd.speed_dps  = speed;
+    s_pending_jog_cmd.delta_deg  = cmd.delta_deg;
+    s_pending_jog_cmd.has_speed  = cmd.has_speed_dps;
+    s_pending_jog_cmd.speed_dps  = cmd.speed_dps;
     s_pending_jog_cmd.pending    = true;
 }
 
@@ -227,22 +190,34 @@ static void incoming_data_cb( void* arg, const u8_t* data, u16_t len, u8_t flags
     ( void ) arg;
     if ( !( flags & MQTT_DATA_FLAG_LAST ) ) return;
 
-    char payload[128] = {};
-    const u16_t copy_len = len < sizeof(payload) - 1 ? len : sizeof(payload) - 1;
-    memcpy( payload, data, copy_len );
-
     if ( strcmp( s_in_topic, "gs/cmd/raw_sensors" ) == 0 ) {
-        bool value = false;
-        if ( json_bool_field( payload, "\"imu\"", &value ) )
-            s_raw_imu_enabled = value;
-        if ( json_bool_field( payload, "\"mag\"", &value ) )
-            s_raw_mag_enabled = value;
+        groundstation_RawSensorsCommand cmd = groundstation_RawSensorsCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_RawSensorsCommand_fields, &cmd ) ) {
+            if ( cmd.has_imu ) s_raw_imu_enabled = cmd.imu;
+            if ( cmd.has_mag ) s_raw_mag_enabled = cmd.mag;
+            if ( cmd.has_yaw_imu ) s_raw_yaw_imu_enabled = cmd.yaw_imu;
+        }
+    } else if ( strcmp( s_in_topic, "gs/cmd/declination" ) == 0 ) {
+        groundstation_DeclinationCommand cmd = groundstation_DeclinationCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_DeclinationCommand_fields, &cmd )
+             && cmd.has_declination_deg )
+        {
+            fusion_set_declination( cmd.declination_deg );
+            log_print( "[mqtt] declination set to %.2f deg\n",
+                       (double)cmd.declination_deg );
+        }
     } else if ( strcmp( s_in_topic, "gs/cmd/az" ) == 0 ) {
-        store_axis_cmd( payload, &s_pending_az_cmd );
+        groundstation_AxisCommand cmd = groundstation_AxisCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_AxisCommand_fields, &cmd ) )
+            store_axis_cmd( cmd, &s_pending_az_cmd );
     } else if ( strcmp( s_in_topic, "gs/cmd/zen" ) == 0 ) {
-        store_axis_cmd( payload, &s_pending_zen_cmd );
+        groundstation_AxisCommand cmd = groundstation_AxisCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_AxisCommand_fields, &cmd ) )
+            store_axis_cmd( cmd, &s_pending_zen_cmd );
     } else if ( strcmp( s_in_topic, "gs/cmd/jog" ) == 0 ) {
-        store_jog_cmd( payload );
+        groundstation_JogCommand cmd = groundstation_JogCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_JogCommand_fields, &cmd ) )
+            store_jog_cmd( cmd );
     }
 }
 
@@ -264,12 +239,30 @@ static bool broker_connect()
         return false;
     }
 
+    // Always tear down the previous client so its PCB is fully closed before
+    // we attempt a new TCP connection.  Reusing a stale client causes
+    // mqtt_client_connect() to return ERR_CLSD (-10) on every retry.
+    cyw43_arch_lwip_begin();
+    if ( s_mqtt ) {
+        mqtt_disconnect( s_mqtt );
+        mqtt_client_free( s_mqtt );
+        s_mqtt = nullptr;
+    }
+    s_mqtt = mqtt_client_new();
+    cyw43_arch_lwip_end();
+
+    if ( !s_mqtt ) {
+        log_print( "[mqtt] client alloc failed\n" );
+        return false;
+    }
+
+    s_mqtt_connected = false;
+
     struct mqtt_connect_client_info_t ci = {};
     ci.client_id  = MQTT_CLIENT_ID;
     ci.keep_alive = 60;
 
     cyw43_arch_lwip_begin();
-    if ( !s_mqtt ) s_mqtt = mqtt_client_new();
     err_t err = mqtt_client_connect( s_mqtt, &broker, MQTT_BROKER_PORT,
                                       connection_cb, nullptr, &ci );
     cyw43_arch_lwip_end();
@@ -314,10 +307,11 @@ static void mqtt_task( void* param )
 
         cyw43_arch_lwip_begin();
         mqtt_set_inpub_callback( s_mqtt, incoming_publish_cb, incoming_data_cb, nullptr );
-        mqtt_subscribe( s_mqtt, "gs/cmd/raw_sensors", 0, nullptr, nullptr );
-        mqtt_subscribe( s_mqtt, "gs/cmd/az", 0, nullptr, nullptr );
-        mqtt_subscribe( s_mqtt, "gs/cmd/zen", 0, nullptr, nullptr );
-        mqtt_subscribe( s_mqtt, "gs/cmd/jog", 0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/cmd/raw_sensors",  0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/cmd/az",           0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/cmd/zen",          0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/cmd/jog",          0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/cmd/declination",  0, nullptr, nullptr );
         cyw43_arch_lwip_end();
 
         // Drain the publish queue while broker is alive
@@ -329,7 +323,7 @@ static void mqtt_task( void* param )
                 err_t pub_err = mqtt_publish( s_mqtt,
                                                msg.topic,
                                                msg.payload,
-                                               ( u16_t ) strlen( msg.payload ),
+                                               msg.payload_len,
                                                0,        // QoS 0
                                                0,        // not retained
                                                nullptr, nullptr );
@@ -337,7 +331,7 @@ static void mqtt_task( void* param )
                 if ( pub_err != ERR_OK ) {
                     log_print( "[mqtt] publish failed topic=%s len=%u err=%d\n",
                                msg.topic,
-                               (unsigned)strlen( msg.payload ),
+                               (unsigned)msg.payload_len,
                                (int)pub_err );
                 }
             }

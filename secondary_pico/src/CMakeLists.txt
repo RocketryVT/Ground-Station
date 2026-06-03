@@ -12,7 +12,7 @@ target_include_directories(gs_secondary_pico PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}             # shared.hpp
     ${LIBS_ROOT}/packets                    # SIGMA.hpp
     ${LORA_ROOT}/hal                        # PicoHal.h
-    ${LORA_ROOT}/radio                      # SX1276Radio.hpp  RF69Radio.hpp
+    ${LORA_ROOT}/radio                      # Radio.hpp, sx1276/, rf69/
 )
 
 target_link_libraries(gs_secondary_pico

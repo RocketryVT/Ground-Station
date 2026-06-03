@@ -2,6 +2,7 @@
 #include "cl57te.hpp"
 #include "shared.hpp"
 #include "Tasks/MQTT/mqtt_task.hpp"
+#include "Proto/mqtt_proto.hpp"
 
 #include "math_utils/GroundStationMath.h"
 
@@ -12,6 +13,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 // -----------------------------------------------------------------------------
 // Motor / drive configuration
@@ -389,31 +391,27 @@ static void stepper_state_task( void* )
                 xQueuePeek( g_stepper_zen_cmd_q, &zen_cmd, 0 );
 
             MqttMessage m = {};
-            snprintf( m.topic, sizeof(m.topic), "antenna/state" );
-            snprintf( m.payload, sizeof(m.payload),
-                      "{"
-                      "\"timestamp\":%llu,"
-                      "\"actual_az\":%.2f,\"actual_el\":%.2f,"
-                      "\"target_az\":%.2f,\"target_el\":%.2f,"
-                      "\"actual_az_mech\":%.2f,\"target_az_mech\":%.2f,"
-                      "\"az_calibrated\":false,\"zen_calibrated\":false,"
-                      "\"tracking_enabled\":false,"
-                      "\"mode\":\"manual\","
-                      "\"az_moving\":%s,\"zen_moving\":%s,"
-                      "\"az_faulted\":%s,\"zen_faulted\":%s"
-                      "}",
-                      (unsigned long long)( time_us_64() / 1000u ),
-                      (double)wrap_360( az_st.angle_deg ),
-                      (double)zen_st.angle_deg,
-                      (double)wrap_360( az_cmd.target_angle_deg ),
-                      (double)zen_cmd.target_angle_deg,
-                      (double)az_st.angle_deg,
-                      (double)az_cmd.target_angle_deg,
-                      az_st.moving ? "true" : "false",
-                      zen_st.moving ? "true" : "false",
-                      az_st.faulted ? "true" : "false",
-                      zen_st.faulted ? "true" : "false" );
-            xQueueSend( g_mqtt_queue, &m, 0 );
+            groundstation_AntennaState pb = groundstation_AntennaState_init_zero;
+            pb.has_timestamp = true;        pb.timestamp = time_us_64() / 1000u;
+            pb.has_actual_az = true;        pb.actual_az = wrap_360( az_st.angle_deg );
+            pb.has_actual_el = true;        pb.actual_el = zen_st.angle_deg;
+            pb.has_target_az = true;        pb.target_az = wrap_360( az_cmd.target_angle_deg );
+            pb.has_target_el = true;        pb.target_el = zen_cmd.target_angle_deg;
+            pb.has_actual_az_mech = true;   pb.actual_az_mech = az_st.angle_deg;
+            pb.has_target_az_mech = true;   pb.target_az_mech = az_cmd.target_angle_deg;
+            pb.has_az_calibrated = true;    pb.az_calibrated = false;
+            pb.has_zen_calibrated = true;   pb.zen_calibrated = false;
+            pb.has_tracking_enabled = true; pb.tracking_enabled = false;
+            pb.has_az_moving = true;        pb.az_moving = az_st.moving;
+            pb.has_zen_moving = true;       pb.zen_moving = zen_st.moving;
+            pb.has_az_faulted = true;       pb.az_faulted = az_st.faulted;
+            pb.has_zen_faulted = true;      pb.zen_faulted = zen_st.faulted;
+            pb.has_mode = true;
+            strncpy( pb.mode, "manual", sizeof(pb.mode) - 1 );
+
+            if ( mqtt_encode_proto( m, "antenna/state",
+                                    groundstation_AntennaState_fields, &pb ) )
+                xQueueSend( g_mqtt_queue, &m, 0 );
         }
 
         vTaskDelayUntil( &last_tick, pdMS_TO_TICKS( StepCfg::STATE_PUBLISH_MS ) );

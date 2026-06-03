@@ -594,6 +594,64 @@
   line-height: 1.5;
 }
 
+/* -- Declination card -------------------------------------------------------- */
+.declinationRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.declinationInput {
+  width: 80px;
+  padding: 4px 6px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+}
+
+.declinationUnit {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+
+.declinationSendBtn,
+.declinationFetchBtn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.07);
+  color: #e0e0e0;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.declinationSendBtn:hover,
+.declinationFetchBtn:hover  { background: rgba(255,255,255,0.12); }
+.declinationFetchBtn:disabled { opacity: 0.5; cursor: default; }
+.declinationFetchBtn { margin-top: 6px; width: 100%; }
+
+.declinationMsg {
+  margin-top: 5px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  color: #6ddb6d;
+}
+
+.declinationNote {
+  margin-top: 6px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  font-style: italic;
+}
+
 /* -- Raw sensor tab ---------------------------------------------------------- */
 .rawSensorsRoot {
   flex: 1 1 0;
@@ -609,6 +667,81 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.recToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.recStartBtn,
+.recStopBtn,
+.recExportBtn {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.recStartBtn {
+  background: #1a3a1a;
+  border-color: #3a6b3a;
+  color: #6ddb6d;
+}
+.recStartBtn:hover { opacity: 0.85; }
+
+.recStopBtn {
+  background: #3a1a1a;
+  border-color: #8b2020;
+  color: #ff6b6b;
+  animation: recPulse 1s ease-in-out infinite alternate;
+}
+.recStopBtn:hover { opacity: 0.85; }
+
+@keyframes recPulse {
+  from { border-color: #8b2020; }
+  to   { border-color: #ff4444; }
+}
+
+.recExportBtn {
+  background: #1a2a3a;
+  border-color: #2a5a8b;
+  color: #6bbfff;
+}
+.recExportBtn:hover { opacity: 0.85; }
+
+.recCount {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-left: 4px;
+}
+
+.rawGroupHeader {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+  margin-top: 4px;
   flex-shrink: 0;
 }
 

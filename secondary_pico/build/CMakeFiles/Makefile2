@@ -2526,12 +2526,12 @@ src/clean: src/CMakeFiles/gs_secondary_pico.dir/clean
 pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/all:
 	$(MAKE) $(MAKESILENT) -f pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/build.make pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/depend
 	$(MAKE) $(MAKESILENT) -f pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/build.make pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num= "Built target bs2_default"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=16 "Built target bs2_default"
 .PHONY : pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/all
 
 # Build rule for subdir invocation for target.
 pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 0
 .PHONY : pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/rule
@@ -2543,7 +2543,7 @@ bs2_default: pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/rule
 # codegen rule for target.
 pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/build.make pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num= "Finished codegen for target bs2_default"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=16 "Finished codegen for target bs2_default"
 .PHONY : pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/codegen
 
 # clean rule for target.
@@ -2558,7 +2558,7 @@ pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/clean:
 pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/all: pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/all
 	$(MAKE) $(MAKESILENT) -f pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/build.make pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/depend
 	$(MAKE) $(MAKESILENT) -f pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/build.make pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=16 "Built target bs2_default_bin"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num= "Built target bs2_default_bin"
 .PHONY : pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/all
 
 # Build rule for subdir invocation for target.
@@ -2575,7 +2575,7 @@ bs2_default_bin: pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/
 # codegen rule for target.
 pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/codegen: pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/all
 	$(MAKE) $(MAKESILENT) -f pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/build.make pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=16 "Finished codegen for target bs2_default_bin"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num= "Finished codegen for target bs2_default_bin"
 .PHONY : pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/codegen
 
 # clean rule for target.
@@ -2590,12 +2590,12 @@ pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_bin.dir/clean:
 pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/all: pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/all
 	$(MAKE) $(MAKESILENT) -f pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/build.make pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/depend
 	$(MAKE) $(MAKESILENT) -f pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/build.make pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num= "Built target bs2_default_library"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=17 "Built target bs2_default_library"
 .PHONY : pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/all
 
 # Build rule for subdir invocation for target.
 pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 2
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 0
 .PHONY : pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/rule
@@ -2607,7 +2607,7 @@ bs2_default_library: pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_libr
 # codegen rule for target.
 pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/codegen: pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default.dir/all
 	$(MAKE) $(MAKESILENT) -f pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/build.make pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num= "Finished codegen for target bs2_default_library"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=17 "Finished codegen for target bs2_default_library"
 .PHONY : pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_default_library.dir/codegen
 
 # clean rule for target.
@@ -2691,7 +2691,7 @@ lora/CMakeFiles/sx1231.dir/all: pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_d
 
 # Build rule for subdir invocation for target.
 lora/CMakeFiles/sx1231.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 13
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 15
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 lora/CMakeFiles/sx1231.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 0
 .PHONY : lora/CMakeFiles/sx1231.dir/rule
@@ -2719,12 +2719,12 @@ lora/CMakeFiles/lr11xx.dir/all: pico-sdk/src/rp2350/boot_stage2/CMakeFiles/bs2_d
 lora/CMakeFiles/lr11xx.dir/all: lora/lr11xx_driver/CMakeFiles/lr11xx_driver.dir/all
 	$(MAKE) $(MAKESILENT) -f lora/CMakeFiles/lr11xx.dir/build.make lora/CMakeFiles/lr11xx.dir/depend
 	$(MAKE) $(MAKESILENT) -f lora/CMakeFiles/lr11xx.dir/build.make lora/CMakeFiles/lr11xx.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=59,60,61,62,63,64,65,66,67,68,69,70,71,72,73 "Built target lr11xx"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=60,61,62,63,64,65,66,67,68,69,70,71,72,73 "Built target lr11xx"
 .PHONY : lora/CMakeFiles/lr11xx.dir/all
 
 # Build rule for subdir invocation for target.
 lora/CMakeFiles/lr11xx.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 29
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 30
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 lora/CMakeFiles/lr11xx.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 0
 .PHONY : lora/CMakeFiles/lr11xx.dir/rule
@@ -2736,7 +2736,7 @@ lr11xx: lora/CMakeFiles/lr11xx.dir/rule
 # codegen rule for target.
 lora/CMakeFiles/lr11xx.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f lora/CMakeFiles/lr11xx.dir/build.make lora/CMakeFiles/lr11xx.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=59,60,61,62,63,64,65,66,67,68,69,70,71,72,73 "Finished codegen for target lr11xx"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=60,61,62,63,64,65,66,67,68,69,70,71,72,73 "Finished codegen for target lr11xx"
 .PHONY : lora/CMakeFiles/lr11xx.dir/codegen
 
 # clean rule for target.
@@ -2788,7 +2788,7 @@ lora/lr11xx_driver/CMakeFiles/lr11xx_driver.dir/all: pico-sdk/src/rp2350/boot_st
 
 # Build rule for subdir invocation for target.
 lora/lr11xx_driver/CMakeFiles/lr11xx_driver.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 14
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 16
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 lora/lr11xx_driver/CMakeFiles/lr11xx_driver.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 0
 .PHONY : lora/lr11xx_driver/CMakeFiles/lr11xx_driver.dir/rule
@@ -2817,12 +2817,12 @@ src/CMakeFiles/gs_secondary_pico.dir/all: pico-sdk/src/rp2_common/pico_cyw43_dri
 src/CMakeFiles/gs_secondary_pico.dir/all: lora/radiolib/CMakeFiles/RadioLib.dir/all
 	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/gs_secondary_pico.dir/build.make src/CMakeFiles/gs_secondary_pico.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/gs_secondary_pico.dir/build.make src/CMakeFiles/gs_secondary_pico.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58 "Built target gs_secondary_pico"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59 "Built target gs_secondary_pico"
 .PHONY : src/CMakeFiles/gs_secondary_pico.dir/all
 
 # Build rule for subdir invocation for target.
 src/CMakeFiles/gs_secondary_pico.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 57
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 59
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/gs_secondary_pico.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles 0
 .PHONY : src/CMakeFiles/gs_secondary_pico.dir/rule
@@ -2834,7 +2834,7 @@ gs_secondary_pico: src/CMakeFiles/gs_secondary_pico.dir/rule
 # codegen rule for target.
 src/CMakeFiles/gs_secondary_pico.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/gs_secondary_pico.dir/build.make src/CMakeFiles/gs_secondary_pico.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58 "Finished codegen for target gs_secondary_pico"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/CMakeFiles --progress-num=18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59 "Finished codegen for target gs_secondary_pico"
 .PHONY : src/CMakeFiles/gs_secondary_pico.dir/codegen
 
 # clean rule for target.

@@ -1,0 +1,174 @@
+syntax = "proto2";
+
+package groundstation;
+
+enum FlightState {
+  FLIGHT_STATE_GROUND_IDLE = 0;
+  FLIGHT_STATE_ARMED = 1;
+  FLIGHT_STATE_POWERED_ASCENT = 2;
+  FLIGHT_STATE_COAST_ASCENT = 3;
+  FLIGHT_STATE_APOGEE = 4;
+  FLIGHT_STATE_DESCENT_DROGUE = 5;
+  FLIGHT_STATE_DESCENT_MAIN = 6;
+  FLIGHT_STATE_LANDED = 7;
+  FLIGHT_STATE_FAULT = 255;
+}
+
+enum JogAxis {
+  JOG_AXIS_UNSPECIFIED = 0;
+  JOG_AXIS_AZ = 1;
+  JOG_AXIS_EL = 2;
+}
+
+message RocketLoRaSample {
+  optional uint32 boot_ms = 1;
+  optional FlightState state = 2;
+  optional uint32 sats = 3;
+  optional uint32 flags = 4;
+  optional double lat = 5;
+  optional double lon = 6;
+  optional float alt_gps_m = 7;
+  optional float alt_baro_m = 8;
+  optional float speed_ms = 9;
+  repeated float q = 10;
+  optional float rssi = 11;
+  optional float snr = 12;
+}
+
+message Lora1Rf69Packet {
+  optional bytes data = 1;
+  optional float rssi = 2;
+  optional float snr = 3;
+}
+
+message AntennaState {
+  optional uint64 timestamp = 1;
+  optional float actual_az = 2;
+  optional float actual_el = 3;
+  optional float target_az = 4;
+  optional float target_el = 5;
+  optional float actual_az_mech = 6;
+  optional float target_az_mech = 7;
+  optional bool az_calibrated = 8;
+  optional bool zen_calibrated = 9;
+  optional bool tracking_enabled = 10;
+  optional bool az_moving = 11;
+  optional bool zen_moving = 12;
+  optional bool az_faulted = 13;
+  optional bool zen_faulted = 14;
+  optional string mode = 15;
+}
+
+message GroundImu {
+  optional uint64 timestamp = 1;
+  optional float roll = 2;
+  optional float pitch = 3;
+  optional float yaw = 4;
+  optional float yaw360 = 5;
+  repeated float q = 6;
+  repeated float a = 7;
+  repeated float m = 8;
+  optional bool have_mag = 9;
+  optional bool startup = 10;
+  optional bool mag_rec = 11;
+  optional bool acc_rec = 12;
+  optional float alt_baro = 13;
+  optional float temp = 14;
+  optional bool valid = 15;
+  optional bool have_yaw_frame = 16;
+  optional float yaw_frame_yaw = 17;
+  optional float yaw_frame_yaw360 = 18;
+  optional bool yaw_startup = 19;
+  optional float bar_rel_roll = 20;
+  optional float bar_rel_pitch = 21;
+  optional float bar_rel_yaw = 22;
+}
+
+message AhrsStatus {
+  optional uint64 timestamp = 1;
+  optional bool running = 2;
+  optional bool have_bar_imu = 3;
+  optional bool have_bar_mag = 4;
+  optional bool have_yaw_imu = 5;
+  optional bool have_yaw_mag = 6;
+  optional uint32 bar_updates = 7;
+  optional uint32 yaw_updates = 8;
+}
+
+message RawImuSample {
+  optional uint64 timestamp = 1;
+  optional float ax = 2;
+  optional float ay = 3;
+  optional float az = 4;
+  optional float gx = 5;
+  optional float gy = 6;
+  optional float gz = 7;
+  optional float temp = 8;
+}
+
+message RawMagSample {
+  optional uint64 timestamp = 1;
+  optional float mx = 2;
+  optional float my = 3;
+  optional float mz = 4;
+}
+
+message RawYawImuSample {
+  optional uint64 timestamp = 1;
+  optional float ax = 2;
+  optional float ay = 3;
+  optional float az = 4;
+  optional float gx = 5;
+  optional float gy = 6;
+  optional float gz = 7;
+  optional float mx_ut = 8;
+  optional float my_ut = 9;
+  optional float mz_ut = 10;
+  optional bool mag_valid = 11;
+  optional bool mag_overflow = 12;
+  optional float temp = 13;
+}
+
+message RawSensorsCommand {
+  optional bool imu = 1;
+  optional bool mag = 2;
+  optional bool yaw_imu = 3;
+}
+
+message AxisCommand {
+  optional float target_angle_deg = 1;
+  optional float speed_dps = 2;
+  optional bool stop = 3;
+}
+
+message JogCommand {
+  optional JogAxis axis = 1;
+  optional float delta_deg = 2;
+  optional float speed_dps = 3;
+}
+
+message DeclinationCommand {
+  optional float declination_deg = 1;
+}
+
+message StarlinkProxyStatus {
+  optional double lat = 1;
+  optional double lon = 2;
+  optional double alt = 3;
+  optional float horizontal_speed_mps = 4;
+  optional float vertical_speed_mps = 5;
+  optional float pop_ping_latency_ms = 6;
+  optional float pop_ping_drop_rate = 7;
+  optional float downlink_throughput_bps = 8;
+  optional float uplink_throughput_bps = 9;
+  optional float boresight_azimuth_deg = 10;
+  optional float boresight_elevation_deg = 11;
+  optional bool gps_valid = 12;
+  optional uint32 gps_sats = 13;
+  optional string hardware_version = 14;
+  optional string software_version = 15;
+  optional uint32 uptime_s = 16;
+  optional string error = 17;
+  optional string location_error = 18;
+  optional double last_ok = 19;
+}

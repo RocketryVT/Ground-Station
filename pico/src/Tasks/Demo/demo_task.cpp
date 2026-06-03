@@ -14,14 +14,17 @@ static void demo_task( void* param )
     uint32_t count = 0;
 
     for ( ;; ) {
-        MqttMessage msg;
+        MqttMessage msg = {};
         uint32_t uptime_ms = ( uint32_t ) ( xTaskGetTickCount() * portTICK_PERIOD_MS );
 
         snprintf( msg.topic,   sizeof( msg.topic ),   "gs/demo" );
-        snprintf( msg.payload, sizeof( msg.payload ),
-                  "{\"count\":%lu,\"uptime_ms\":%lu}",
-                  ( unsigned long ) count,
-                  ( unsigned long ) uptime_ms );
+        int n = snprintf( (char*)msg.payload, sizeof( msg.payload ),
+                          "{\"count\":%lu,\"uptime_ms\":%lu}",
+                          ( unsigned long ) count,
+                          ( unsigned long ) uptime_ms );
+        if ( n < 0 ) n = 0;
+        if ( n >= (int)sizeof(msg.payload) ) n = sizeof(msg.payload) - 1;
+        msg.payload_len = (uint16_t)n;
 
         xQueueSend( g_mqtt_queue, &msg, 0 );
         ++count;

@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "Tasks/I2C/i2c_task.hpp"
 #include "Tasks/MQTT/mqtt_task.hpp"
+#include "Proto/mqtt_proto.hpp"
 
 #include "lis3mdl/LIS3MDL.hpp"
 
@@ -155,15 +156,15 @@ static void mag_task( void* )
             {
                 last_raw_mqtt = now_ticks;
                 MqttMessage msg = {};
-                snprintf( msg.topic, sizeof(msg.topic), "gs/pico/primary/raw/mag" );
-                snprintf( msg.payload, sizeof(msg.payload),
-                          "{"
-                          "\"timestamp\":%llu,"
-                          "\"mx\":%.6f,\"my\":%.6f,\"mz\":%.6f"
-                          "}",
-                          (unsigned long long)( m.timestamp_us / 1000u ),
-                          (double)m.mag[0], (double)m.mag[1], (double)m.mag[2] );
-                xQueueSend( g_mqtt_queue, &msg, 0 );
+                groundstation_RawMagSample pb = groundstation_RawMagSample_init_zero;
+                pb.has_timestamp = true; pb.timestamp = m.timestamp_us / 1000u;
+                pb.has_mx = true; pb.mx = m.mag[0];
+                pb.has_my = true; pb.my = m.mag[1];
+                pb.has_mz = true; pb.mz = m.mag[2];
+
+                if ( mqtt_encode_proto( msg, "gs/pico/primary/raw/mag",
+                                        groundstation_RawMagSample_fields, &pb ) )
+                    xQueueSend( g_mqtt_queue, &msg, 0 );
             }
         } else {
             log_print( "[mag] read fail\n" );

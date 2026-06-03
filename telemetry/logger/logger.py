@@ -14,6 +14,10 @@ from pathlib import Path
 
 import paho.mqtt.client as mqtt
 
+PROTO_DIR = Path(__file__).parent / "proto"
+sys.path.insert(0, str(PROTO_DIR))
+import ground_station_pb2  # noqa: E402
+
 # -- Config ---------------------------------------------------------------------
 BROKER_HOST = "localhost"
 BROKER_PORT  = 1883
@@ -61,11 +65,26 @@ def init_db(path: Path) -> sqlite3.Connection:
     conn.commit()
     return conn
 
+
+def decode_payload(topic: str, payload: bytes) -> dict:
+    if topic == "antenna/state":
+        msg = ground_station_pb2.AntennaState()
+        msg.ParseFromString(payload)
+        return {
+            "timestamp": msg.timestamp,
+            "zenith_deg": msg.actual_el,
+            "azimuth_deg": msg.actual_az,
+            "target_az": msg.target_az,
+            "target_el": msg.target_el,
+        }
+
+    return json.loads(payload.decode())
+
 # -- Message handler -------------------------------------------------------------
 def make_on_message(conn: sqlite3.Connection):
     def on_message(client, userdata, msg):
         try:
-            data = json.loads(msg.payload.decode())
+            data = decode_payload(msg.topic, msg.payload)
         except Exception as e:
             print(f"[WARN] bad payload on {msg.topic}: {e}")
             return

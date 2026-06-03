@@ -2,8 +2,9 @@
 #include "shared.hpp"
 #include "Tasks/I2C/i2c_task.hpp"
 #include "Tasks/MQTT/mqtt_task.hpp"
+#include "Proto/mqtt_proto.hpp"
 
-#include "nine_axis_imu/ICM20948.hpp"
+#include "nine_axis_imu/LSM6DSOX_LIS3MDL/LSM6DSOX_LIS3MDL.hpp"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -70,70 +71,40 @@ static bool i2c_read_regs( void* context, uint8_t dev, uint8_t reg, uint8_t* out
     return true;
 }
 
-static void delay_ms_task( uint32_t ms )
-{
-    vTaskDelay( pdMS_TO_TICKS(ms) );
-}
-
 } // namespace
 
-static bool yaw_imu_init( nine_axis_imu::ICM20948& device )
+using Device = nine_axis_imu::lsm6dsox_lis3mdl::Device;
+
+static bool yaw_imu_init( Device& device )
 {
-    uint8_t who = 0;
-    if ( !device.read_who_am_i( who ) ) {
-        log_print( "[yaw_imu] WHO_AM_I read failed\n" );
+    if ( !device.initialize() ) {
+        log_print( "[yaw_imu] LSM6DSOX+LIS3MDL init failed\n" );
         return false;
     }
-    if ( who != nine_axis_imu::ICM20948::kWhoAmIExpected ) {
-        log_print( "[yaw_imu] WHO_AM_I mismatch: got 0x%02X expected 0x%02X\n",
-                   who, nine_axis_imu::ICM20948::kWhoAmIExpected );
-        return false;
-    }
-
-    const nine_axis_imu::Config cfg = {
-        .accel_range = nine_axis_imu::AccelRange::g16,
-        .gyro_range = nine_axis_imu::GyroRange::dps_2000,
-        .accel_rate_hz = YAW_IMU_SAMPLE_RATE_HZ,
-        .gyro_rate_hz = YAW_IMU_SAMPLE_RATE_HZ,
-        .accel_dlpf_enable = true,
-        .gyro_dlpf_enable = true,
-        .accel_dlpf = nine_axis_imu::DlpfBandwidth::hz_23_9,
-        .gyro_dlpf = nine_axis_imu::DlpfBandwidth::hz_23_9,
-        .mag_mode = nine_axis_imu::MagMode::hz_100,
-        .delay_ms = delay_ms_task,
-    };
-
-    if ( !device.initialize( cfg ) ) {
-        log_print( "[yaw_imu] ICM-20948 init failed\n" );
-        return false;
-    }
-
-    uint16_t mag_id = 0;
-    device.read_mag_who_am_i( mag_id );
-    log_print( "[yaw_imu] ICM-20948 OK on I2C1 (WHO_AM_I=0x%02X AK09916=0x%04X)\n",
-               who, mag_id );
+    log_print( "[yaw_imu] LSM6DSOX+LIS3MDL OK on I2C1\n" );
     return true;
 }
 
-static bool yaw_imu_read( const nine_axis_imu::ICM20948& device, YawImuMsg& m )
+static bool yaw_imu_read( Device const& device, YawImuMsg& m )
 {
-    nine_axis_imu::Sample sample = {};
+    nine_axis_imu::lsm6dsox_lis3mdl::Sample sample = {};
     if ( !device.read_sample( sample ) ) {
         return false;
     }
 
-    m.accel[0] = sample.accel_x;
-    m.accel[1] = sample.accel_y;
-    m.accel[2] = sample.accel_z;
-    m.gyro[0] = sample.gyro_x;
-    m.gyro[1] = sample.gyro_y;
-    m.gyro[2] = sample.gyro_z;
-    m.mag_ut[0] = sample.mag_x_ut;
-    m.mag_ut[1] = sample.mag_y_ut;
-    m.mag_ut[2] = sample.mag_z_ut;
+    m.accel[0] = sample.accel[0];
+    m.accel[1] = sample.accel[1];
+    m.accel[2] = sample.accel[2];
+    m.gyro[0] = sample.gyro[0];
+    m.gyro[1] = sample.gyro[1];
+    m.gyro[2] = sample.gyro[2];
+    // LIS3MDL reports in gauss; YawImuMsg expects µT (1 gauss = 100 µT)
+    m.mag_ut[0] = sample.mag_gauss[0] * 100.0f;
+    m.mag_ut[1] = sample.mag_gauss[1] * 100.0f;
+    m.mag_ut[2] = sample.mag_gauss[2] * 100.0f;
     m.temp_c = sample.temp_c;
     m.mag_valid = sample.mag_valid;
-    m.mag_overflow = sample.mag_overflow;
+    m.mag_overflow = false;
     return true;
 }
 
@@ -148,24 +119,17 @@ static void yaw_imu_task( void* )
     s_bus_ctx.request_q = g_i2c1_req_q;
     s_bus_ctx.reply_q = s_reply_q;
 
-    const nine_axis_imu::Transport transport = {
+    const nine_axis_imu::lsm6dsox_lis3mdl::Transport transport = {
         .ctx = &s_bus_ctx,
         .write_reg = i2c_write_reg,
         .read_regs = i2c_read_regs,
     };
-    nine_axis_imu::ICM20948 default_addr_device( transport, nine_axis_imu::ICM20948::kDefaultAddress );
-    nine_axis_imu::ICM20948 alt_addr_device( transport, nine_axis_imu::ICM20948::kAltAddress );
-    nine_axis_imu::ICM20948* device = &default_addr_device;
+    Device device( transport );
 
     vTaskDelay( pdMS_TO_TICKS(200) );
 
     while ( true ) {
-        if ( yaw_imu_init( default_addr_device ) ) {
-            device = &default_addr_device;
-            break;
-        }
-        if ( yaw_imu_init( alt_addr_device ) ) {
-            device = &alt_addr_device;
+        if ( yaw_imu_init( device ) ) {
             break;
         }
         log_print( "[yaw_imu] init retry in 2 s\n" );
@@ -179,36 +143,37 @@ static void yaw_imu_task( void* )
         YawImuMsg m = {};
         m.timestamp_us = time_us_64();
 
-        if ( yaw_imu_read( *device, m ) ) {
+        if ( yaw_imu_read( device, m ) ) {
             m.valid = true;
             xQueueOverwrite( g_yaw_imu_q, &m );
 
             TickType_t now_ticks = xTaskGetTickCount();
-            if ( mqtt_raw_imu_enabled()
+            if ( mqtt_raw_yaw_imu_enabled()
                  && mqtt_is_connected()
                  && ( now_ticks - last_mqtt ) >= pdMS_TO_TICKS(YAW_IMU_MQTT_INTERVAL_MS) )
             {
                 last_mqtt = now_ticks;
 
                 MqttMessage msg = {};
-                snprintf( msg.topic, sizeof(msg.topic), "gs/pico/primary/raw/yaw_imu" );
-                snprintf( msg.payload, sizeof(msg.payload),
-                          "{"
-                          "\"timestamp\":%llu,"
-                          "\"ax\":%.5f,\"ay\":%.5f,\"az\":%.5f,"
-                          "\"gx\":%.5f,\"gy\":%.5f,\"gz\":%.5f,"
-                          "\"mx_ut\":%.3f,\"my_ut\":%.3f,\"mz_ut\":%.3f,"
-                          "\"mag_valid\":%s,\"mag_overflow\":%s,"
-                          "\"temp\":%.2f"
-                          "}",
-                          (unsigned long long)( m.timestamp_us / 1000u ),
-                          (double)m.accel[0], (double)m.accel[1], (double)m.accel[2],
-                          (double)m.gyro[0], (double)m.gyro[1], (double)m.gyro[2],
-                          (double)m.mag_ut[0], (double)m.mag_ut[1], (double)m.mag_ut[2],
-                          m.mag_valid ? "true" : "false",
-                          m.mag_overflow ? "true" : "false",
-                          (double)m.temp_c );
-                xQueueSend( g_mqtt_queue, &msg, 0 );
+                groundstation_RawYawImuSample pb =
+                    groundstation_RawYawImuSample_init_zero;
+                pb.has_timestamp = true; pb.timestamp = m.timestamp_us / 1000u;
+                pb.has_ax = true; pb.ax = m.accel[0];
+                pb.has_ay = true; pb.ay = m.accel[1];
+                pb.has_az = true; pb.az = m.accel[2];
+                pb.has_gx = true; pb.gx = m.gyro[0];
+                pb.has_gy = true; pb.gy = m.gyro[1];
+                pb.has_gz = true; pb.gz = m.gyro[2];
+                pb.has_mx_ut = true; pb.mx_ut = m.mag_ut[0];
+                pb.has_my_ut = true; pb.my_ut = m.mag_ut[1];
+                pb.has_mz_ut = true; pb.mz_ut = m.mag_ut[2];
+                pb.has_mag_valid = true; pb.mag_valid = m.mag_valid;
+                pb.has_mag_overflow = true; pb.mag_overflow = m.mag_overflow;
+                pb.has_temp = true; pb.temp = m.temp_c;
+
+                if ( mqtt_encode_proto( msg, "gs/pico/primary/raw/yaw_imu",
+                                        groundstation_RawYawImuSample_fields, &pb ) )
+                    xQueueSend( g_mqtt_queue, &msg, 0 );
             }
         } else {
             log_print( "[yaw_imu] read fail\n" );

@@ -18,6 +18,7 @@ export const TOPICS = {
   AHRS_STATUS:       'gs/pico/primary/ahrs/status',
   RAW_IMU:           'gs/pico/primary/raw/imu',
   RAW_MAG:           'gs/pico/primary/raw/mag',
+  RAW_YAW_IMU:       'gs/pico/primary/raw/yaw_imu',
   NODES_WILDCARD:    'nodes/+/position',
   GS_DEMO:           'gs/demo',
   GS_LOG:            'gs/log',
@@ -27,6 +28,7 @@ export const TOPICS = {
   STEPPER_JOG_CMD:   'gs/cmd/jog',
   CALIBRATION_CMD:   'gs/cmd/calibration',
   RAW_SENSORS_CMD:   'gs/cmd/raw_sensors',
+  DECLINATION_CMD:   'gs/cmd/declination',
   DEBUG_AZ_OSC:      'gs/cmd/debug/az',
   DEBUG_EL_OSC:      'gs/cmd/debug/zen',
 } as const;
@@ -36,7 +38,7 @@ export const KNOWN_MQTT_TOPICS = Object.values(TOPICS);
 // -- History API (Python logger) -----------------------------------------------
 export const API_BASE_URL = 'http://localhost:8000';
 
-// -- Starlink proxy (starlink_proxy.py, polls dish at 192.168.100.1:9200) -----
+// -- Starlink proxy (starlink_proxy.py, protobuf response, polls dish at 192.168.100.1:9200)
 export const STARLINK_PROXY_URL = 'http://localhost:8001/starlink';
 
 // How many live telemetry samples to keep in memory per streamed MQTT history.

@@ -1,4 +1,4 @@
-# Install script for directory: /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0
+# Install script for directory: /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -42,7 +42,7 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/RadioLib" TYPE DIRECTORY FILES "/Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.6.0/src/" FILES_MATCHING REGEX "/[^/]*\\.h$")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/RadioLib" TYPE DIRECTORY FILES "/Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/" FILES_MATCHING REGEX "/[^/]*\\.h$")
 endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT

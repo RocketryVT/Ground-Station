@@ -8,31 +8,33 @@
 #include "lora1_task.hpp"
 #include "shared.hpp"
 
-#include "radio/SX1276Radio.hpp"
+#include "sx1276/SX1276.hpp"
 #include "SIGMA.hpp"
 
 #include "hardware/spi.h"
 #include "hardware/gpio.h"
 
 // -- Radio instance ------------------------------------------------------------
-static const SX1276Config s_cfg {
-    LoRa1Cfg::FREQ_MHZ,
-    LoRa1Cfg::BW_KHZ,
-    LoRa1Cfg::SF,
-    LoRa1Cfg::CR,
-    LoRa1Cfg::SYNC_WORD,
-    LoRa1Cfg::TX_POWER,
-    LoRa1Cfg::PREAMBLE,
-};
+static const radio::sx1276::Config s_cfg = [] {
+    radio::sx1276::Config cfg;
+    cfg.freq_mhz  = LoRa1Cfg::FREQ_MHZ;
+    cfg.bw_khz    = LoRa1Cfg::BW_KHZ;
+    cfg.sf        = LoRa1Cfg::SF;
+    cfg.cr        = LoRa1Cfg::CR;
+    cfg.sync_word = LoRa1Cfg::SYNC_WORD;
+    cfg.tx_dbm    = LoRa1Cfg::TX_POWER;
+    cfg.preamble  = LoRa1Cfg::PREAMBLE;
+    return cfg;
+}();
 
-static SX1276Radio s_radio( spi0,
-                              Pins::LORA1_SCK,
-                              Pins::LORA1_MOSI,
-                              Pins::LORA1_MISO,
-                              Pins::LORA1_NSS,
-                              Pins::LORA1_DIO0,
-                              Pins::LORA1_RST,
-                              s_cfg );
+static radio::sx1276::SX1276 s_radio( spi0,
+                                       Pins::LORA1_SCK,
+                                       Pins::LORA1_MOSI,
+                                       Pins::LORA1_MISO,
+                                       Pins::LORA1_NSS,
+                                       Pins::LORA1_DIO0,
+                                       Pins::LORA1_RST,
+                                       s_cfg );
 
 // -- Task ----------------------------------------------------------------------
 static void lora1_task( void* )
@@ -45,25 +47,25 @@ static void lora1_task( void* )
     vTaskDelay( pdMS_TO_TICKS( 500 ) );
 
     int state = s_radio.begin();
-    if ( state != RADIO_OK ) {
+    if ( state != RADIOLIB_ERR_NONE ) {
         log_print( "[lora1] init failed %d — task halting\n", state );
         for ( ;; ) vTaskDelay( portMAX_DELAY );
     }
     log_print( "[lora1] SX1276 ready — %.1f MHz  SF%u  BW%.0f kHz\n",
                LoRa1Cfg::FREQ_MHZ, (unsigned)LoRa1Cfg::SF, LoRa1Cfg::BW_KHZ );
 
-    s_radio.startReceive();
+    s_radio.start_receive();
 
     for ( ;; ) {
-        if ( !s_radio.packetAvailable() ) {
+        if ( !s_radio.packet_available() ) {
             vTaskDelay( pdMS_TO_TICKS( 5 ) );
             continue;
         }
 
-        RadioPacket pkt;
-        if ( s_radio.readPacket( pkt ) != RADIO_OK ) {
+        radio::Packet pkt;
+        if ( s_radio.read_packet( pkt ) != RADIOLIB_ERR_NONE ) {
             log_print( "[lora1] readPacket error\n" );
-            s_radio.startReceive();
+            s_radio.start_receive();
             continue;
         }
 
@@ -72,7 +74,7 @@ static void lora1_task( void* )
         if ( !SIGMA::LoRaData::deserialize( pkt.data, pkt.len, d ) ) {
             log_print( "[lora1] rx %u B  RSSI %.0f dBm  SNR %.1f dB — bad frame\n",
                        (unsigned)pkt.len, (double)pkt.rssi, (double)pkt.snr );
-            s_radio.startReceive();
+            s_radio.start_receive();
             continue;
         }
 
@@ -97,7 +99,7 @@ static void lora1_task( void* )
             }
         }
 
-        s_radio.startReceive();
+        s_radio.start_receive();
     }
 }
 

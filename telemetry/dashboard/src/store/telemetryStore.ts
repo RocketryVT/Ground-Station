@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type {
   RocketTelemetry, AntennaState, MobileNode, GroundImuState,
-  RawImuSample, RawMagSample,
+  RawImuSample, RawMagSample, RawYawImuSample,
 } from '../types/telemetry';
 import { MAX_HISTORY } from '../config';
 
@@ -54,6 +54,7 @@ interface TelemetryState {
   rawMessages: RawMessage[];
   rawImu:      RawImuSample[];
   rawMag:      RawMagSample[];
+  rawYawImu:   RawYawImuSample[];
   ahrsHistory: GroundImuState[];
 
   addTelemetry: (t: RocketTelemetry) => void;
@@ -67,6 +68,7 @@ interface TelemetryState {
   addRawMessage:(topic: string, payload: string) => void;
   addRawImu:    (s: RawImuSample) => void;
   addRawMag:    (s: RawMagSample) => void;
+  addRawYawImu: (s: RawYawImuSample) => void;
   clearRawSensors: () => void;
   clearAhrsHistory: () => void;
   clearDebug:   () => void;
@@ -87,6 +89,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   rawMessages: [],
   rawImu:      [],
   rawMag:      [],
+  rawYawImu:   [],
   ahrsHistory: [],
 
   addTelemetry: (t) =>
@@ -138,7 +141,10 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   addRawMag: (sample) =>
     set((s) => ({ rawMag: appendCapped(s.rawMag, sample, MAX_SENSOR_RAW) })),
 
-  clearRawSensors: () => set({ rawImu: [], rawMag: [] }),
+  addRawYawImu: (sample) =>
+    set((s) => ({ rawYawImu: appendCapped(s.rawYawImu, sample, MAX_SENSOR_RAW) })),
+
+  clearRawSensors: () => set({ rawImu: [], rawMag: [], rawYawImu: [] }),
 
   clearAhrsHistory: () => set({ ahrsHistory: [] }),
 

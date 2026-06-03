@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "Tasks/I2C/i2c_task.hpp"
 #include "Tasks/MQTT/mqtt_task.hpp"
+#include "Proto/mqtt_proto.hpp"
 
 #include "ism330dlc/ISM330DLC.hpp"
 
@@ -169,19 +170,19 @@ static void imu_task( void* )
             {
                 last_raw_mqtt = now_ticks;
                 MqttMessage msg = {};
-                snprintf( msg.topic, sizeof(msg.topic), "gs/pico/primary/raw/imu" );
-                snprintf( msg.payload, sizeof(msg.payload),
-                          "{"
-                          "\"timestamp\":%llu,"
-                          "\"ax\":%.5f,\"ay\":%.5f,\"az\":%.5f,"
-                          "\"gx\":%.5f,\"gy\":%.5f,\"gz\":%.5f,"
-                          "\"temp\":%.2f"
-                          "}",
-                          (unsigned long long)( m.timestamp_us / 1000u ),
-                          (double)m.accel[0], (double)m.accel[1], (double)m.accel[2],
-                          (double)m.gyro[0],  (double)m.gyro[1],  (double)m.gyro[2],
-                          (double)m.temp_c );
-                xQueueSend( g_mqtt_queue, &msg, 0 );
+                groundstation_RawImuSample pb = groundstation_RawImuSample_init_zero;
+                pb.has_timestamp = true; pb.timestamp = m.timestamp_us / 1000u;
+                pb.has_ax = true; pb.ax = m.accel[0];
+                pb.has_ay = true; pb.ay = m.accel[1];
+                pb.has_az = true; pb.az = m.accel[2];
+                pb.has_gx = true; pb.gx = m.gyro[0];
+                pb.has_gy = true; pb.gy = m.gyro[1];
+                pb.has_gz = true; pb.gz = m.gyro[2];
+                pb.has_temp = true; pb.temp = m.temp_c;
+
+                if ( mqtt_encode_proto( msg, "gs/pico/primary/raw/imu",
+                                        groundstation_RawImuSample_fields, &pb ) )
+                    xQueueSend( g_mqtt_queue, &msg, 0 );
             }
         } else {
             log_print( "[imu] read fail\n" );

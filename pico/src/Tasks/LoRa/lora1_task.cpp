@@ -1,6 +1,7 @@
 #include "lora1_task.hpp"
 #include "shared.hpp"
 #include "Tasks/MQTT/mqtt_task.hpp"
+#include "Proto/mqtt_proto.hpp"
 
 #include "rf69/RF69.hpp"
 
@@ -32,20 +33,78 @@ static radio::rf69::RF69 s_radio(
     Pins::LORA1_RST,
     s_lora1_cfg );
 
+static uint8_t diag_spi_read_reg( bool miso_pullup )
+{
+    spi_init( spi1, 1'000'000u );
+    spi_set_format( spi1, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST );
+    gpio_set_function( Pins::LORA1_SCK,  GPIO_FUNC_SPI );
+    gpio_set_function( Pins::LORA1_MOSI, GPIO_FUNC_SPI );
+    gpio_set_function( Pins::LORA1_MISO, GPIO_FUNC_SPI );
+
+    if ( miso_pullup ) gpio_pull_up( Pins::LORA1_MISO );
+    else               gpio_disable_pulls( Pins::LORA1_MISO );
+
+    gpio_init( Pins::LORA1_NSS );
+    gpio_set_dir( Pins::LORA1_NSS, GPIO_OUT );
+    gpio_put( Pins::LORA1_NSS, 1 );
+
+    gpio_init( Pins::LORA1_RST );
+    gpio_set_dir( Pins::LORA1_RST, GPIO_OUT );
+    gpio_put( Pins::LORA1_RST, 1 );
+    sleep_ms( 1 );
+    gpio_put( Pins::LORA1_RST, 0 );
+    sleep_ms( 10 );
+
+    gpio_put( Pins::LORA1_NSS, 0 );
+    const uint8_t addr = 0x10u;
+    uint8_t val = 0xAAu;
+    spi_write_blocking( spi1, &addr, 1 );
+    spi_read_blocking( spi1, 0x00u, &val, 1 );
+    gpio_put( Pins::LORA1_NSS, 1 );
+
+    gpio_disable_pulls( Pins::LORA1_MISO );
+    return val;
+}
+
+static void diag_spi()
+{
+    const uint8_t no_pull = diag_spi_read_reg( false );
+    const uint8_t pullup  = diag_spi_read_reg( true );
+
+    log_print( "[lora1] RF69 SPI diag: RegVersion=0x%02X (pulled-up=0x%02X)\n",
+               no_pull, pullup );
+
+    if ( no_pull == 0x24 ) {
+        log_print( "[lora1] diag: RFM69HCW/RF69 OK\n" );
+    } else if ( no_pull == 0x00 && pullup == 0xFF ) {
+        log_print( "[lora1] diag: MISO not connected - check GPIO%u\n", Pins::LORA1_MISO );
+    } else if ( no_pull == 0x00 && pullup == 0x00 ) {
+        log_print( "[lora1] diag: MISO shorted to GND\n" );
+    } else if ( no_pull == 0xFF && pullup == 0xFF ) {
+        log_print( "[lora1] diag: chip in reset / no power - check GPIO%u and 3.3V\n",
+                   Pins::LORA1_RST );
+    } else {
+        log_print( "[lora1] diag: unexpected - NSS=%u SCK=%u MOSI=%u MISO=%u RST=%u\n",
+                   Pins::LORA1_NSS, Pins::LORA1_SCK,
+                   Pins::LORA1_MOSI, Pins::LORA1_MISO, Pins::LORA1_RST );
+    }
+}
+
 static void publish_hex_packet( const radio::Packet& pkt )
 {
     if ( !mqtt_is_connected() ) return;
 
     MqttMessage m = {};
-    strncpy( m.topic, "rocket/lora1/rf69", sizeof(m.topic) - 1 );
+    groundstation_Lora1Rf69Packet pb = groundstation_Lora1Rf69Packet_init_zero;
+    pb.has_data = true;
+    pb.data.size = pkt.len < sizeof(pb.data.bytes) ? pkt.len : sizeof(pb.data.bytes);
+    memcpy( pb.data.bytes, pkt.data, pb.data.size );
+    pb.has_rssi = true; pb.rssi = pkt.rssi;
+    pb.has_snr = true;  pb.snr = pkt.snr;
 
-    int off = 0;
-    for ( uint8_t i = 0; i < pkt.len && off < (int)sizeof(m.payload) - 3; i++ ) {
-        off += snprintf( m.payload + off, sizeof(m.payload) - off,
-                         "%02X", (unsigned)pkt.data[i] );
-    }
-
-    xQueueSend( g_mqtt_queue, &m, 0 );
+    if ( mqtt_encode_proto( m, "rocket/lora1/rf69",
+                            groundstation_Lora1Rf69Packet_fields, &pb ) )
+        xQueueSend( g_mqtt_queue, &m, 0 );
 }
 
 static void lora1_task( void* )
@@ -58,6 +117,8 @@ static void lora1_task( void* )
         log_print( "[lora1] RFM69HCW init in %d s...\n", i );
         vTaskDelay( pdMS_TO_TICKS( 1000 ) );
     }
+
+    diag_spi();
 
     int state = s_radio.begin();
     if ( state != 0 ) {

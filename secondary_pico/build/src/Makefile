@@ -199,6 +199,30 @@ Tasks/LoRa/lora1_task.cpp.s:
 	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/gs_secondary_pico.dir/build.make src/CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora1_task.cpp.s
 .PHONY : Tasks/LoRa/lora1_task.cpp.s
 
+Tasks/LoRa/lora2_task.o: Tasks/LoRa/lora2_task.cpp.o
+.PHONY : Tasks/LoRa/lora2_task.o
+
+# target to build an object file
+Tasks/LoRa/lora2_task.cpp.o:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/gs_secondary_pico.dir/build.make src/CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora2_task.cpp.o
+.PHONY : Tasks/LoRa/lora2_task.cpp.o
+
+Tasks/LoRa/lora2_task.i: Tasks/LoRa/lora2_task.cpp.i
+.PHONY : Tasks/LoRa/lora2_task.i
+
+# target to preprocess a source file
+Tasks/LoRa/lora2_task.cpp.i:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/gs_secondary_pico.dir/build.make src/CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora2_task.cpp.i
+.PHONY : Tasks/LoRa/lora2_task.cpp.i
+
+Tasks/LoRa/lora2_task.s: Tasks/LoRa/lora2_task.cpp.s
+.PHONY : Tasks/LoRa/lora2_task.s
+
+# target to generate assembly for a file
+Tasks/LoRa/lora2_task.cpp.s:
+	cd /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/gs_secondary_pico.dir/build.make src/CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora2_task.cpp.s
+.PHONY : Tasks/LoRa/lora2_task.cpp.s
+
 Tasks/UDP/udp_send_task.o: Tasks/UDP/udp_send_task.cpp.o
 .PHONY : Tasks/UDP/udp_send_task.o
 
@@ -4855,6 +4879,9 @@ help:
 	@echo "... Tasks/LoRa/lora1_task.o"
 	@echo "... Tasks/LoRa/lora1_task.i"
 	@echo "... Tasks/LoRa/lora1_task.s"
+	@echo "... Tasks/LoRa/lora2_task.o"
+	@echo "... Tasks/LoRa/lora2_task.i"
+	@echo "... Tasks/LoRa/lora2_task.s"
 	@echo "... Tasks/UDP/udp_send_task.o"
 	@echo "... Tasks/UDP/udp_send_task.i"
 	@echo "... Tasks/UDP/udp_send_task.s"

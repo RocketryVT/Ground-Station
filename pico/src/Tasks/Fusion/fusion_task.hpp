@@ -6,4 +6,6 @@
 // Writes ImuMsg to g_imu_q (depth-1 overwrite).
 // Publishes orientation to MQTT at 1 Hz.
 
-void fusion_task_init();
+void  fusion_task_init();
+void  fusion_set_declination( float deg );
+float fusion_get_declination();

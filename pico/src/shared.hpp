@@ -51,8 +51,9 @@ extern EventGroupHandle_t g_net_events;
 // -- MQTT publish queue --------------------------------------------------------
 // All tasks publish by enqueuing an MqttMessage.  The MQTT task drains it.
 struct MqttMessage {
-    char topic  [ 64 ];
-    char payload[ 1024 ];
+    char     topic[ 64 ];
+    uint16_t payload_len;
+    uint8_t  payload[ 320 ];
 };
 
 #define MQTT_QUEUE_DEPTH  64
