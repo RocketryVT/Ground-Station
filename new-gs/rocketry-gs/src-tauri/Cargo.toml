@@ -22,4 +22,10 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+prost = "0.13"
+reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "rustls"] }
+rumqttc = "0.24"
+rumqttd = { version = "0.20", default-features = false }
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1", features = ["macros", "rt", "time", "sync"] }

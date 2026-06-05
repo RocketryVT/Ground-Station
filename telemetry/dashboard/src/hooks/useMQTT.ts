@@ -12,6 +12,17 @@ export interface MQTTHandle {
   publish: (topic: string, payload: string | Uint8Array) => void;
 }
 
+const MQTT_ERROR_LOG_INTERVAL_MS = 5000;
+
+interface MQTTRefState {
+  client: MqttClient | null;
+  lastErrorLog: { text: string; ts: number } | null;
+}
+
+function mqttErrorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function firstNumber(data: Record<string, unknown>, keys: string[]): number | undefined {
   for (const key of keys) {
     const value = data[key];
@@ -47,10 +58,11 @@ function activeDragFromPayload(data: Record<string, unknown>): Partial<RocketTel
 }
 
 export function useMQTT(enabled = true): MQTTHandle {
-  const clientRef = useRef<MqttClient | null>(null);
+  const mqttRef = useRef<MQTTRefState>({ client: null, lastErrorLog: null });
 
   useEffect(() => {
     if (!enabled) return;
+    const mqttState = mqttRef.current;
     const {
       addTelemetry,
       setAntenna,
@@ -65,24 +77,47 @@ export function useMQTT(enabled = true): MQTTHandle {
       setActiveDrag,
     } = useTelemetryStore.getState();
 
+    const logMqttError = (error: unknown) => {
+      const text = mqttErrorText(error);
+      const now = Date.now();
+      const last = mqttState.lastErrorLog;
+      if (!last || last.text !== text || now - last.ts > MQTT_ERROR_LOG_INTERVAL_MS) {
+        addLogLine(`[mqtt] ${text} (${MQTT_BROKER_URL})`);
+        mqttState.lastErrorLog = { text, ts: now };
+      }
+    };
+
     const client = mqtt.connect(MQTT_BROKER_URL, {
+      manualConnect:   true,
       reconnectPeriod: 2000,
       connectTimeout:  5000,
       keepalive:       30,
     });
-    clientRef.current = client;
+    client.on('error', () => {});
+    mqttState.client = client;
 
-    client.on('connect', () => {
+    const handleConnect = () => {
       setConnected(true);
       // Subscribe to all topics — raw inspector needs everything
-      client.subscribe('#');
-    });
+      client.subscribe('#', (error) => {
+        if (error) logMqttError(error);
+      });
+    };
 
-    client.on('disconnect', () => setConnected(false));
-    client.on('offline',    () => setConnected(false));
-    client.on('error',      () => setConnected(false));
+    const handleDisconnected = () => setConnected(false);
 
-    client.on('message', (topic: string, payload: Buffer) => {
+    const handleError = (error: Error) => {
+      setConnected(false);
+      logMqttError(error);
+    };
+
+    client.on('connect', handleConnect);
+    client.on('disconnect', handleDisconnected);
+    client.on('offline', handleDisconnected);
+    client.on('close', handleDisconnected);
+    client.on('error', handleError);
+
+    const handleMessage = (topic: string, payload: Buffer) => {
       let raw = '';
       let decoded: Record<string, unknown> | string | null = null;
 
@@ -130,20 +165,40 @@ export function useMQTT(enabled = true): MQTTHandle {
         // Non-JSON topics (e.g. gs/log plain text)
         if (topic === TOPICS.GS_LOG) addLogLine(raw);
       }
-    });
+    };
+
+    client.on('message', handleMessage);
+
+    try {
+      client.connect();
+    } catch (error) {
+      handleError(error instanceof Error ? error : new Error(String(error)));
+      client.end(true);
+    }
 
     return () => {
-      client.removeAllListeners();
+      client.off('connect', handleConnect);
+      client.off('disconnect', handleDisconnected);
+      client.off('offline', handleDisconnected);
+      client.off('close', handleDisconnected);
+      client.off('message', handleMessage);
+      client.off('error', handleError);
+      client.on('error', () => {});
       client.end(true);
-      if (clientRef.current === client) clientRef.current = null;
+      if (mqttState.client === client) mqttState.client = null;
       setConnected(false);
     };
   }, [enabled]);
 
   return {
     publish: (topic, payload) => {
+      if (!mqttRef.current.client?.connected) {
+        const { addLogLine } = useTelemetryStore.getState();
+        addLogLine(`[mqtt] publish skipped while disconnected: ${topic}`);
+        return;
+      }
       const encoded = encodeCommandPayload(topic, payload);
-      clientRef.current?.publish(topic, encoded as Buffer | string);
+      mqttRef.current.client?.publish(topic, encoded as Buffer | string);
     },
   };
 }

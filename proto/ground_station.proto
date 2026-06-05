@@ -82,6 +82,9 @@ message GroundImu {
   optional float bar_rel_roll = 20;
   optional float bar_rel_pitch = 21;
   optional float bar_rel_yaw = 22;
+  repeated float bar_q = 23;      // Raw bar/zenith AHRS quaternion q_EB [w,x,y,z]
+  repeated float yaw_q = 24;      // Raw yaw-platform AHRS quaternion q_EY [w,x,y,z]
+  repeated float bar_rel_q = 25;  // Relative quaternion q_YB = inverse(q_EY) * q_EB [w,x,y,z]
 }
 
 message AhrsStatus {

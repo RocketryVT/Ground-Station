@@ -927,6 +927,12 @@ function AhrsTab({
           <div className={styles.vectorBlock}>
             <span>q[w,x,y,z]</span>
             <code>{latest?.q ? latest.q.map(v => v.toFixed(5)).join(', ') : '--'}</code>
+            <span>bar q[w,x,y,z]</span>
+            <code>{latest?.bar_q ? latest.bar_q.map(v => v.toFixed(5)).join(', ') : '--'}</code>
+            <span>yaw q[w,x,y,z]</span>
+            <code>{latest?.yaw_q ? latest.yaw_q.map(v => v.toFixed(5)).join(', ') : '--'}</code>
+            <span>rel q[w,x,y,z]</span>
+            <code>{latest?.bar_rel_q ? latest.bar_rel_q.map(v => v.toFixed(5)).join(', ') : '--'}</code>
           </div>
         </div>
       </div>

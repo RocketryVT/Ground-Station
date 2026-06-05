@@ -46,6 +46,9 @@ export interface GroundImuState {
   yaw: number;       // signed, -180..180
   yaw360?: number;   // normalized 0..360
   q?: [number, number, number, number];
+  bar_q?: [number, number, number, number];
+  yaw_q?: [number, number, number, number];
+  bar_rel_q?: [number, number, number, number];
   a?: [number, number, number];
   m?: [number, number, number];
   have_mag?: boolean;

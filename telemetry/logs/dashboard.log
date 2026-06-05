@@ -1,9 +1,6 @@
-=== dashboard started 2026-06-03 00:49:10 ===
-00:49:11  > dashboard@0.0.0 dev
-00:49:11  > vite
-00:49:11    VITE v8.0.0  ready in 155 ms
-00:49:11    ➜  Local:   http://localhost:3000/
-00:49:11    ➜  Network: http://192.168.1.170:3000/
-01:01:16  1:01:16 AM [vite] (client) hmr update /src/components/Map/TrajectoryMap.tsx, /src/App.tsx, /src/components/AntennaScene/AntennaScene.tsx, /src/components/DebugPanel/DebugPanel.tsx, /src/components/StatusBar/StatusBar.tsx, /src/components/Scene3D/RocketScene.tsx, /src/components/Charts/TelemetryCharts.tsx, /src/components/DebugPanel/SimTab.tsx
-01:01:31  1:01:31 AM [vite] (client) hmr update /src/components/DebugPanel/DebugPanel.tsx
-01:01:39  1:01:39 AM [vite] (client) hmr update /src/components/DebugPanel/DebugPanel.tsx
+=== dashboard started 2026-06-04 19:47:25 ===
+19:47:25  > dashboard@0.0.0 dev
+19:47:25  > vite
+19:47:25    VITE v8.0.0  ready in 111 ms
+19:47:25    ➜  Local:   http://localhost:3000/
+19:47:25    ➜  Network: http://192.168.1.170:3000/

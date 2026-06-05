@@ -144,6 +144,12 @@ typedef struct _groundstation_GroundImu {
     float bar_rel_pitch;
     bool has_bar_rel_yaw;
     float bar_rel_yaw;
+    pb_size_t bar_q_count;
+    float bar_q[4];
+    pb_size_t yaw_q_count;
+    float yaw_q[4];
+    pb_size_t bar_rel_q_count;
+    float bar_rel_q[4];
 } groundstation_GroundImu;
 
 typedef struct _groundstation_AhrsStatus {
@@ -331,7 +337,7 @@ extern "C" {
 #define groundstation_RocketLoRaSample_init_default {false, 0, false, _groundstation_FlightState_MIN, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, false, 0, false, 0}
 #define groundstation_Lora1Rf69Packet_init_default {false, {0, {0}}, false, 0, false, 0}
 #define groundstation_AntennaState_init_default  {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, ""}
-#define groundstation_GroundImu_init_default     {false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, 0, {0, 0, 0}, 0, {0, 0, 0}, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
+#define groundstation_GroundImu_init_default     {false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, 0, {0, 0, 0}, 0, {0, 0, 0}, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, 0, {0, 0, 0, 0}, 0, {0, 0, 0, 0}}
 #define groundstation_AhrsStatus_init_default    {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define groundstation_RawImuSample_init_default  {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define groundstation_RawMagSample_init_default  {false, 0, false, 0, false, 0, false, 0}
@@ -344,7 +350,7 @@ extern "C" {
 #define groundstation_RocketLoRaSample_init_zero {false, 0, false, _groundstation_FlightState_MIN, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, false, 0, false, 0}
 #define groundstation_Lora1Rf69Packet_init_zero  {false, {0, {0}}, false, 0, false, 0}
 #define groundstation_AntennaState_init_zero     {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, ""}
-#define groundstation_GroundImu_init_zero        {false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, 0, {0, 0, 0}, 0, {0, 0, 0}, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
+#define groundstation_GroundImu_init_zero        {false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, 0, {0, 0, 0}, 0, {0, 0, 0}, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, 0, {0, 0, 0, 0}, 0, {0, 0, 0, 0}}
 #define groundstation_AhrsStatus_init_zero       {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define groundstation_RawImuSample_init_zero     {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define groundstation_RawMagSample_init_zero     {false, 0, false, 0, false, 0, false, 0}
@@ -408,6 +414,9 @@ extern "C" {
 #define groundstation_GroundImu_bar_rel_roll_tag 20
 #define groundstation_GroundImu_bar_rel_pitch_tag 21
 #define groundstation_GroundImu_bar_rel_yaw_tag  22
+#define groundstation_GroundImu_bar_q_tag        23
+#define groundstation_GroundImu_yaw_q_tag        24
+#define groundstation_GroundImu_bar_rel_q_tag    25
 #define groundstation_AhrsStatus_timestamp_tag   1
 #define groundstation_AhrsStatus_running_tag     2
 #define groundstation_AhrsStatus_have_bar_imu_tag 3
@@ -536,7 +545,10 @@ X(a_, STATIC,   OPTIONAL, FLOAT,    yaw_frame_yaw360,  18) \
 X(a_, STATIC,   OPTIONAL, BOOL,     yaw_startup,      19) \
 X(a_, STATIC,   OPTIONAL, FLOAT,    bar_rel_roll,     20) \
 X(a_, STATIC,   OPTIONAL, FLOAT,    bar_rel_pitch,    21) \
-X(a_, STATIC,   OPTIONAL, FLOAT,    bar_rel_yaw,      22)
+X(a_, STATIC,   OPTIONAL, FLOAT,    bar_rel_yaw,      22) \
+X(a_, STATIC,   REPEATED, FLOAT,    bar_q,            23) \
+X(a_, STATIC,   REPEATED, FLOAT,    yaw_q,            24) \
+X(a_, STATIC,   REPEATED, FLOAT,    bar_rel_q,        25)
 #define groundstation_GroundImu_CALLBACK NULL
 #define groundstation_GroundImu_DEFAULT NULL
 
@@ -673,7 +685,7 @@ extern const pb_msgdesc_t groundstation_StarlinkProxyStatus_msg;
 #define groundstation_AntennaState_size          72
 #define groundstation_AxisCommand_size           12
 #define groundstation_DeclinationCommand_size    5
-#define groundstation_GroundImu_size             137
+#define groundstation_GroundImu_size             197
 #define groundstation_JogCommand_size            12
 #define groundstation_Lora1Rf69Packet_size       268
 #define groundstation_RawImuSample_size          46

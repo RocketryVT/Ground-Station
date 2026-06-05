@@ -2,11 +2,9 @@
 export const CESIUM_ION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MDc5ZTc3My03NTBjLTRhNDAtODFhNy0wMmY2MmI5NmJhYmQiLCJpZCI6MjYwMTU5LCJpYXQiOjE3Mzg4NzQ0NjN9.OKY5cXo8TzgE6H_tMB84ggCprbZD91TEuBaebhl08wA';
 
 // -- MQTT ----------------------------------------------------------------------
-// Mosquitto must have a WebSocket listener enabled (port 9001).
-// Add to /etc/mosquitto/mosquitto.conf:
-//   listener 9001
-//   protocol websockets
-export const MQTT_BROKER_URL = 'ws://localhost:9001';
+// The Rust backend connects to a plain-TCP MQTT broker.
+// Override via env vars: ROCKETRY_GS_MQTT_HOST (default: localhost)
+//                        ROCKETRY_GS_MQTT_PORT (default: 1883)
 
 export const TOPICS = {
   ROCKET_TELEMETRY:  'rocket/telemetry',

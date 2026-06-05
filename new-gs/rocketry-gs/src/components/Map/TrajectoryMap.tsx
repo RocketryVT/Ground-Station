@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 
@@ -14,6 +15,56 @@ const ORANGE = Cesium.Color.fromCssColorString('#CA4F00');
 const PANEL  = Cesium.Color.fromCssColorString('#861F41').withAlpha(0.85);
 
 const N_CONE_EDGES = 16;
+
+type TileCacheInfo = {
+  proxy_url: string;
+  cache_dir: string;
+};
+
+// Esri World Imagery — satellite tiles via a plain URL template.
+// No Ion endpoint resolution needed: goes straight through the proxy and caches
+// to disk exactly like any other tile, so offline works for pre-loaded areas.
+function satelliteImageryProvider(proxy?: Cesium.DefaultProxy): Cesium.UrlTemplateImageryProvider {
+  const url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  return new Cesium.UrlTemplateImageryProvider({
+    url: proxy ? new Cesium.Resource({ url, proxy }) : url,
+    credit: 'Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    maximumLevel: 19,
+  });
+}
+
+async function createCachedGlobeProviders() {
+  const cacheInfo = await invoke<TileCacheInfo>('get_tile_cache_info');
+  console.info('[cesium-cache] file cache', cacheInfo.cache_dir);
+
+  const proxy = new Cesium.DefaultProxy(cacheInfo.proxy_url);
+
+  // Satellite imagery — no Ion required, all traffic goes through the proxy.
+  const imageryProvider = satelliteImageryProvider(proxy);
+
+  // Cesium World Terrain — the endpoint resolution request (api.cesium.com) also
+  // goes through the proxy because we set proxy on the server Resource, so it gets
+  // cached to disk on the first online session. Subsequent offline sessions serve
+  // the cached endpoint JSON, then cached tile data. Falls back to flat ellipsoid
+  // on the very first offline run (cache not yet warm).
+  let terrainProvider: Cesium.TerrainProvider;
+  try {
+    const terrainResource = await Cesium.IonResource.fromAssetId(1, {
+      accessToken: CESIUM_ION_TOKEN,
+      server: new Cesium.Resource({ url: 'https://api.cesium.com/', proxy }),
+    });
+    terrainResource.proxy = proxy;
+    terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(terrainResource, {
+      requestVertexNormals: false,
+      requestWaterMask: false,
+    });
+  } catch {
+    console.warn('[cesium-cache] terrain unavailable (offline?), using flat ellipsoid');
+    terrainProvider = new Cesium.EllipsoidTerrainProvider();
+  }
+
+  return { imageryProvider, terrainProvider };
+}
 
 // -- Build cone edge positions in ECEF ----------------------------------------
 function coneRingPositions(
@@ -94,19 +145,16 @@ export function TrajectoryMap() {
   const lastHistoryRef   = useRef<RocketTelemetry[]>([]);
 
   // Pad location + MSL altitude: captured from first GPS fix.
-  // Used every frame to compute the MSL->ellipsoidal offset via globe.getHeight().
   const padAltRef        = useRef<number | null>(null);
   const padLatRef        = useRef<number | null>(null);
   const padLonRef        = useRef<number | null>(null);
 
-  // Last offset used to build the trajectory — triggers a rebuild when it changes
-  // (offset refines as terrain tiles load at higher LOD).
+  // Last offset used to build the trajectory
   const lastOffsetRef    = useRef<number | null>(null);
 
   // Scratch Cartesian3 reused each preRender — setValue() clones it internally
   const posScratch       = useRef(new Cesium.Cartesian3());
 
-  // These subscriptions drive only the DOM coords readout (cheap, outside Canvas)
   const nodes  = useTelemetryStore((s) => s.nodes);
   const latest = useTelemetryStore((s) => s.latest);
 
@@ -114,199 +162,223 @@ export function TrajectoryMap() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const viewer = new Cesium.Viewer(containerRef.current, {
-      timeline:             false,
-      animation:            false,
-      homeButton:           false,
-      sceneModePicker:      false,
-      baseLayerPicker:      false,
-      navigationHelpButton: false,
-      geocoder:             false,
-      fullscreenButton:     false,
-      infoBox:              false,
-      selectionIndicator:   false,
-    });
+    let cancelled = false;
+    let removePreRender: (() => void) | undefined;
 
-    // -- Performance: fewer terrain tiles, capped frame rate --------------
-    viewer.scene.globe.tileCacheSize          = 25;  // default 100
-    viewer.scene.globe.maximumScreenSpaceError = 4;  // default 2 — fewer/coarser tiles
-    viewer.targetFrameRate                    = 60;  // cap render loop at 30 fps
-    viewer.scene.debugShowFramesPerSecond     = true;
+    // Shared setup that runs after the viewer is created (success or fallback)
+    function setupViewerPrimitives(viewer: Cesium.Viewer) {
+      viewer.scene.globe.tileCacheSize          = 25;
+      viewer.scene.globe.maximumScreenSpaceError = 4;
+      viewer.targetFrameRate                    = 60;
+      viewer.scene.debugShowFramesPerSecond     = true;
 
-    // -- Trajectory (PolylineCollection — positions mutated in-place) ------
-    const trackColl = new Cesium.PolylineCollection();
-    viewer.scene.primitives.add(trackColl);
-    trackPolyRef.current = trackColl.add({
-      show:      false,
-      positions: [],
-      width:     4,
-      material:  Cesium.Material.fromType('Color', { color: Cesium.Color.WHITE }),
-    });
+      // -- Trajectory -------------------------------------------------------
+      const trackColl = new Cesium.PolylineCollection();
+      viewer.scene.primitives.add(trackColl);
+      trackPolyRef.current = trackColl.add({
+        show:      false,
+        positions: [],
+        width:     4,
+        material:  Cesium.Material.fromType('Color', { color: Cesium.Color.WHITE }),
+      });
 
-    // -- Rocket entity — HeightReference.NONE; altitude corrected via offset --
-    // offset = globe.getHeight(pad) - padAltMSL is recomputed every frame so
-    // the rocket always matches the rendered tile mesh, just like CLAMP_TO_GROUND.
-    const rocketPosProp  = new Cesium.ConstantPositionProperty(Cesium.Cartesian3.ZERO);
-    const rocketTextProp = new Cesium.ConstantProperty('');
-    rocketPosPropRef.current  = rocketPosProp;
-    rocketTextPropRef.current = rocketTextProp;
+      // -- Rocket entity ----------------------------------------------------
+      const rocketPosProp  = new Cesium.ConstantPositionProperty(Cesium.Cartesian3.ZERO);
+      const rocketTextProp = new Cesium.ConstantProperty('');
+      rocketPosPropRef.current  = rocketPosProp;
+      rocketTextPropRef.current = rocketTextProp;
 
-    rocketRef.current = viewer.entities.add({
-      show:     false,
-      position: rocketPosProp,
-      point: {
-        pixelSize:                10,
-        color:                    MAROON,
-        outlineColor:             Cesium.Color.WHITE,
-        outlineWidth:             1,
-        heightReference:          Cesium.HeightReference.NONE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-      label: {
-        text:                     rocketTextProp,
-        font:                     '12px "Courier New", monospace',
-        fillColor:                Cesium.Color.WHITE,
-        showBackground:           true,
-        backgroundColor:          PANEL,
-        backgroundPadding:        new Cesium.Cartesian2(6, 3),
-        pixelOffset:              new Cesium.Cartesian2(0, -22),
-        heightReference:          Cesium.HeightReference.NONE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-    });
+      rocketRef.current = viewer.entities.add({
+        show:     false,
+        position: rocketPosProp,
+        point: {
+          pixelSize:                10,
+          color:                    MAROON,
+          outlineColor:             Cesium.Color.WHITE,
+          outlineWidth:             1,
+          heightReference:          Cesium.HeightReference.NONE,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        label: {
+          text:                     rocketTextProp,
+          font:                     '12px "Courier New", monospace',
+          fillColor:                Cesium.Color.WHITE,
+          showBackground:           true,
+          backgroundColor:          PANEL,
+          backgroundPadding:        new Cesium.Cartesian2(6, 3),
+          pixelOffset:              new Cesium.Cartesian2(0, -22),
+          heightReference:          Cesium.HeightReference.NONE,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
 
-    // -- Beam polylines (pre-allocated) ------------------------------------
-    const beamLines = new Cesium.PolylineCollection();
-    viewer.scene.primitives.add(beamLines);
-    beamLinesRef.current = beamLines;
+      // -- Beam polylines ---------------------------------------------------
+      const beamLines = new Cesium.PolylineCollection();
+      viewer.scene.primitives.add(beamLines);
+      beamLinesRef.current = beamLines;
 
-    const zero    = [Cesium.Cartesian3.ZERO, Cesium.Cartesian3.ZERO];
-    const mkColor = (a: number) =>
-      Cesium.Material.fromType('Color', { color: ORANGE.withAlpha(a) });
-    const mkDash = () =>
-      Cesium.Material.fromType('PolylineDash', { color: MAROON.withAlpha(0.8), dashLength: 16 });
+      const zero    = [Cesium.Cartesian3.ZERO, Cesium.Cartesian3.ZERO];
+      const mkColor = (a: number) =>
+        Cesium.Material.fromType('Color', { color: ORANGE.withAlpha(a) });
+      const mkDash = () =>
+        Cesium.Material.fromType('PolylineDash', { color: MAROON.withAlpha(0.8), dashLength: 16 });
 
-    const pls: Cesium.Polyline[] = [];
-    pls.push(beamLines.add({ show: false, positions: zero, width: 2, material: mkColor(0.9) })); // central
-    for (let i = 0; i < N_CONE_EDGES; i++)
-      pls.push(beamLines.add({ show: false, positions: zero, width: 1, material: mkColor(0.4) })); // edges
-    for (let i = 0; i < N_CONE_EDGES; i++)
-      pls.push(beamLines.add({ show: false, positions: zero, width: 1, material: mkColor(0.4) })); // ring
-    pls.push(beamLines.add({ show: false, positions: zero, width: 2, material: mkDash() })); // target
-    beamPolylinesRef.current = pls;
+      const pls: Cesium.Polyline[] = [];
+      pls.push(beamLines.add({ show: false, positions: zero, width: 2, material: mkColor(0.9) }));
+      for (let i = 0; i < N_CONE_EDGES; i++)
+        pls.push(beamLines.add({ show: false, positions: zero, width: 1, material: mkColor(0.4) }));
+      for (let i = 0; i < N_CONE_EDGES; i++)
+        pls.push(beamLines.add({ show: false, positions: zero, width: 1, material: mkColor(0.4) }));
+      pls.push(beamLines.add({ show: false, positions: zero, width: 2, material: mkDash() }));
+      beamPolylinesRef.current = pls;
 
-    // -- preRender listener: ALL high-frequency Cesium updates -------------
-    // Runs synchronously before each GPU frame — eliminates the async React
-    // useEffect -> Cesium render gap that caused polyline flicker.
-    const removePreRender = viewer.scene.preRender.addEventListener(() => {
-      const { history, latest: l, antenna, nodes: ns } = useTelemetryStore.getState();
+      // -- preRender listener -----------------------------------------------
+      removePreRender = viewer.scene.preRender.addEventListener(() => {
+        const { history, latest: l, antenna, nodes: ns } = useTelemetryStore.getState();
 
-      // -- Terrain offset: computed every frame from the rendered tile mesh --
-      // globe.getHeight() returns the ellipsoidal height of whatever tile Cesium
-      // has loaded and is about to draw — the same mesh that CLAMP_TO_GROUND
-      // entities snap to. This keeps rocket, trail, and cone flush with the
-      // terrain the user sees at every LOD. Returns undefined until the pad tile
-      // loads; we hide objects until then (no one-frame snaps to wrong altitude).
-      if (l && padAltRef.current === null) {
-        padAltRef.current = l.alt_m;
-        padLatRef.current = l.lat;
-        padLonRef.current = l.lon;
-      }
-
-      let offset: number | null = null;
-      if (padAltRef.current !== null && padLatRef.current !== null && padLonRef.current !== null) {
-        const padH = viewer.scene.globe.getHeight(
-          Cesium.Cartographic.fromDegrees(padLonRef.current, padLatRef.current),
-        );
-        if (padH !== undefined) {
-          offset = padH - padAltRef.current;
+        if (l && padAltRef.current === null) {
+          padAltRef.current = l.alt_m;
+          padLatRef.current = l.lat;
+          padLonRef.current = l.lon;
         }
-      }
 
-      // Trajectory — rebuild when history OR offset changes
-      if (history !== lastHistoryRef.current || offset !== lastOffsetRef.current) {
-        lastHistoryRef.current = history;
-        lastOffsetRef.current  = offset;
-        if (trackPolyRef.current) {
-          if (offset !== null) {
-            const positions = history
-              .filter((t) => t.lat !== 0 && t.lon !== 0)
-              .map((t) => Cesium.Cartesian3.fromDegrees(t.lon, t.lat, t.alt_m + offset));
-            trackPolyRef.current.positions = positions;
-            trackPolyRef.current.show      = positions.length > 1;
-          } else {
-            trackPolyRef.current.show = false;
+        let offset: number | null = null;
+        if (padAltRef.current !== null && padLatRef.current !== null && padLonRef.current !== null) {
+          const padH = viewer.scene.globe.getHeight(
+            Cesium.Cartographic.fromDegrees(padLonRef.current, padLatRef.current),
+          );
+          if (padH !== undefined) {
+            offset = padH - padAltRef.current;
           }
         }
-      }
 
-      // Rocket entity — hidden until offset resolves (avoids one-frame snap)
-      const rocket = rocketRef.current;
-      const rpp    = rocketPosPropRef.current;
-      const rtp    = rocketTextPropRef.current;
-      if (l && rocket && rpp && rtp && offset !== null) {
-        const displayAlt = l.alt_m + offset;
-        const pos = Cesium.Cartesian3.fromDegrees(l.lon, l.lat, displayAlt, undefined, posScratch.current);
-        rpp.setValue(pos, Cesium.ReferenceFrame.FIXED);
-        rtp.setValue(`${l.alt_m.toFixed(0)} m`);
-        rocket.show = true;
-        if (!trackedRef.current) {
-          viewer.trackedEntity = rocket;
-          trackedRef.current   = true;
+        // Trajectory — rebuild when history OR offset changes
+        if (history !== lastHistoryRef.current || offset !== lastOffsetRef.current) {
+          lastHistoryRef.current = history;
+          lastOffsetRef.current  = offset;
+          if (trackPolyRef.current) {
+            if (offset !== null) {
+              const positions = history
+                .filter((t) => t.lat !== 0 && t.lon !== 0)
+                .map((t) => Cesium.Cartesian3.fromDegrees(t.lon, t.lat, t.alt_m + offset));
+              trackPolyRef.current.positions = positions;
+              trackPolyRef.current.show      = positions.length > 1;
+            } else {
+              trackPolyRef.current.show = false;
+            }
+          }
         }
-      }
 
-      // Beam cone
-      const bpls = beamPolylinesRef.current;
-      if (!bpls.length || beamLinesRef.current?.isDestroyed()) return;
+        // Rocket entity
+        const rocket = rocketRef.current;
+        const rpp    = rocketPosPropRef.current;
+        const rtp    = rocketTextPropRef.current;
+        if (l && rocket && rpp && rtp && offset !== null) {
+          const displayAlt = l.alt_m + offset;
+          const pos = Cesium.Cartesian3.fromDegrees(l.lon, l.lat, displayAlt, undefined, posScratch.current);
+          rpp.setValue(pos, Cesium.ReferenceFrame.FIXED);
+          rtp.setValue(`${l.alt_m.toFixed(0)} m`);
+          rocket.show = true;
+          if (!trackedRef.current) {
+            viewer.trackedEntity = rocket;
+            trackedRef.current   = true;
+          }
+        }
 
-      const hide = () => { for (const pl of bpls) pl.show = false; };
-      const gsNode = Object.values(ns)[0];
-      if (!antenna || !gsNode) { hide(); return; }
+        // Beam cone
+        const bpls = beamPolylinesRef.current;
+        if (!bpls.length || beamLinesRef.current?.isDestroyed()) return;
 
-      // GS beam origin: globe.getHeight() gives the rendered tile height at the
-      // GS position — exactly what CLAMP_TO_GROUND uses for the GS dot entity.
-      // The beam base therefore sits flush with the GS dot at every camera LOD.
-      const gsH = viewer.scene.globe.getHeight(
-        Cesium.Cartographic.fromDegrees(gsNode.lon, gsNode.lat),
-      );
-      if (gsH === undefined) { hide(); return; }
-      const gsEcef = Cesium.Cartesian3.fromDegrees(gsNode.lon, gsNode.lat, gsH);
-      const { tip, ring } = coneRingPositions(
-        gsEcef, antenna.actual_az, antenna.actual_el, BEAM_HALF_ANGLE_DEG, BEAM_RANGE_M,
-      );
+        const hide = () => { for (const pl of bpls) pl.show = false; };
+        const gsNode = Object.values(ns)[0];
+        if (!antenna || !gsNode) { hide(); return; }
 
-      bpls[0].positions = [gsEcef, tip];
-      bpls[0].show      = true;
-
-      for (let i = 0; i < N_CONE_EDGES; i++) {
-        bpls[1 + i].positions = [gsEcef, ring[i]];
-        bpls[1 + i].show      = true;
-      }
-
-      for (let i = 0; i < N_CONE_EDGES; i++) {
-        bpls[1 + N_CONE_EDGES + i].positions = [ring[i], ring[(i + 1) % N_CONE_EDGES]];
-        bpls[1 + N_CONE_EDGES + i].show      = true;
-      }
-
-      const tgt = bpls[bpls.length - 1];
-      if (antenna.target_az != null && antenna.target_el != null) {
-        const { tip: tgtTip } = coneRingPositions(
-          gsEcef, antenna.target_az, antenna.target_el, 0, BEAM_RANGE_M,
+        const gsH = viewer.scene.globe.getHeight(
+          Cesium.Cartographic.fromDegrees(gsNode.lon, gsNode.lat),
         );
-        tgt.positions = [gsEcef, tgtTip];
-        tgt.show      = true;
-      } else {
-        tgt.show = false;
+        if (gsH === undefined) { hide(); return; }
+        const gsEcef = Cesium.Cartesian3.fromDegrees(gsNode.lon, gsNode.lat, gsH);
+        const { tip, ring } = coneRingPositions(
+          gsEcef, antenna.actual_az, antenna.actual_el, BEAM_HALF_ANGLE_DEG, BEAM_RANGE_M,
+        );
+
+        bpls[0].positions = [gsEcef, tip];
+        bpls[0].show      = true;
+
+        for (let i = 0; i < N_CONE_EDGES; i++) {
+          bpls[1 + i].positions = [gsEcef, ring[i]];
+          bpls[1 + i].show      = true;
+        }
+
+        for (let i = 0; i < N_CONE_EDGES; i++) {
+          bpls[1 + N_CONE_EDGES + i].positions = [ring[i], ring[(i + 1) % N_CONE_EDGES]];
+          bpls[1 + N_CONE_EDGES + i].show      = true;
+        }
+
+        const tgt = bpls[bpls.length - 1];
+        if (antenna.target_az != null && antenna.target_el != null) {
+          const { tip: tgtTip } = coneRingPositions(
+            gsEcef, antenna.target_az, antenna.target_el, 0, BEAM_RANGE_M,
+          );
+          tgt.positions = [gsEcef, tgtTip];
+          tgt.show      = true;
+        } else {
+          tgt.show = false;
+        }
+      });
+    }
+
+    void (async () => {
+      try {
+        const { imageryProvider, terrainProvider } = await createCachedGlobeProviders();
+        if (cancelled || !containerRef.current) return;
+
+        const viewer = new Cesium.Viewer(containerRef.current, {
+          timeline:             false,
+          animation:            false,
+          homeButton:           false,
+          sceneModePicker:      false,
+          baseLayerPicker:      false,
+          navigationHelpButton: false,
+          geocoder:             false,
+          fullscreenButton:     false,
+          infoBox:              false,
+          selectionIndicator:   false,
+          baseLayer:            new Cesium.ImageryLayer(imageryProvider),
+          terrainProvider,
+        });
+
+        viewerRef.current = viewer;
+        setupViewerPrimitives(viewer);
+      } catch (error) {
+        console.warn('[cesium-cache] tile cache unavailable, using direct providers', error);
+        if (cancelled || !containerRef.current) return;
+
+        const viewer = new Cesium.Viewer(containerRef.current, {
+          timeline:             false,
+          animation:            false,
+          homeButton:           false,
+          sceneModePicker:      false,
+          baseLayerPicker:      false,
+          navigationHelpButton: false,
+          geocoder:             false,
+          fullscreenButton:     false,
+          infoBox:              false,
+          selectionIndicator:   false,
+          baseLayer:            new Cesium.ImageryLayer(satelliteImageryProvider()),
+          terrainProvider:      new Cesium.EllipsoidTerrainProvider(),
+        });
+
+        viewerRef.current = viewer;
+        setupViewerPrimitives(viewer);
       }
-    });
+    })();
 
-    viewerRef.current = viewer;
-
-    // preRender listener must be removed before viewer.destroy()
     return () => {
-      removePreRender();
-      viewer.destroy();
+      cancelled = true;
+      removePreRender?.();
+      viewerRef.current?.destroy();
+      viewerRef.current = null;
     };
   }, []);
 
@@ -361,6 +433,11 @@ export function TrajectoryMap() {
       padLatRef.current     = null;
       padLonRef.current     = null;
       lastOffsetRef.current = null;
+      // Allow camera to re-lock when next flight starts
+      trackedRef.current    = false;
+      if (viewerRef.current) viewerRef.current.trackedEntity = undefined;
+      if (rocketRef.current) rocketRef.current.show = false;
+      if (trackPolyRef.current) trackPolyRef.current.show = false;
     }
   }, [latest]);
 

@@ -18,26 +18,26 @@
 // -----------------------------------------------------------------------------
 // Motor / drive configuration
 //
-// CL57TE DIP-switch: 1600 pulses/rev (SW1=ON, SW2=OFF, SW3=ON, SW4=ON).
+// CL57TE DIP-switch: 800 pulses/rev.
 // Total gear reduction = 10:1 planetary gearbox × belt ratio per axis.
 // -----------------------------------------------------------------------------
 
 namespace StepCfg {
-    static constexpr uint32_t PULSES_PER_REV       = 1600;
+    static constexpr uint32_t PULSES_PER_REV       = 800;
 
     // Per-axis gear ratios  (10:1 planetary gearbox × belt ratio)
-    static constexpr float    AZ_GEAR_RATIO         = 30.0f;   // 10:1 × 3:1 belt  (azimuth)
-    static constexpr float    EL_GEAR_RATIO         = 50.0f;   // 10:1 × 5:1 belt  (elevation)
+    static constexpr float    AZ_GEAR_RATIO         = 50.0f;   // 10:1 × 3:1 belt  (azimuth)
+    static constexpr float    EL_GEAR_RATIO         = 30.0f;   // 10:1 × 5:1 belt  (elevation)
 
     static constexpr float    MAX_SPEED_DPS         = 90.0f;
     static constexpr float    DEFAULT_SPEED_DPS     = 30.0f;
 
-    // Azimuth: half-circle travel around north/up: 270° west -> 0° -> 90° east.
-    static constexpr float    AZ_MIN_DEG            = 270.0f;
-    static constexpr float    AZ_MAX_DEG            =  90.0f;
+    // Azimuth: full 360° travel (no cable-stop limits while yaw sensor is offline).
+    static constexpr float    AZ_MIN_DEG            =   0.0f;
+    static constexpr float    AZ_MAX_DEG            = 360.0f;
 
     // Elevation command convention: 0° = horizon, 90° = straight up.
-    // The motor's old mechanical frame is kept internal: motor_deg = 90 - elevation_deg.
+    // The motor's mechanical frame is kept internal: motor_deg = 90 - elevation_deg.
     static constexpr float    EL_MIN_DEG            = -10.0f;
     static constexpr float    EL_MAX_DEG            =  90.0f;
     static constexpr float    EL_MOTOR_AT_HORIZON_DEG = 90.0f;
@@ -201,15 +201,22 @@ static void axis_task_body( void* arg )
                 const float before_angle = motor_to_cmd_angle( ax, drv.angle_deg() );
                 const float target_motor_angle_deg =
                     cmd_to_motor_angle( ax, target_angle_deg );
+                const float motor_delta_deg = ax.shortest_path
+                    ? normalize_delta_180( wrap_360( target_motor_angle_deg )
+                                           - wrap_360( drv.angle_deg() ) )
+                    : target_motor_angle_deg - drv.angle_deg();
+                const int32_t est_delta_steps =
+                    (int32_t)roundf( motor_delta_deg * drv.steps_per_deg() );
                 if ( drv.set_angle( target_motor_angle_deg, c.speed_dps, ax.shortest_path ) ) {
                     target_dirty = false;
                     if ( drv.is_moving() ) {
                         move_pending_completion = true;
-                        log_print( "[%s] move target=%.2f from=%.2f motor_target=%.2f speed_dps=%.2f dir_gpio=%u dir_readback=%u\n",
+                        log_print( "[%s] move target=%.2f from=%.2f motor_target=%.2f delta_steps=%ld speed_dps=%.2f dir_gpio=%u dir_readback=%u\n",
                                    ax.tag,
                                    (double)target_angle_deg,
                                    (double)before_angle,
                                    (double)target_motor_angle_deg,
+                                   (long)est_delta_steps,
                                    (double)c.speed_dps,
                                    (unsigned)drv.dir_pin(),
                                    drv.dir_gpio_level() ? 1u : 0u );
@@ -281,7 +288,7 @@ static uint8_t s_zen_status_storage[ sizeof(StepperStatus) ];
 
 // -----------------------------------------------------------------------------
 // Azimuth axis  (STEP1 – PUL- GPIO 4, DIR- GPIO 5)
-// 10:1 planetary gearbox × 3:1 belt = 30:1 total, travel 270°..0°..90°
+// 10:1 planetary gearbox × 3:1 belt = 30:1 total, full 360° travel (limits disabled)
 // -----------------------------------------------------------------------------
 
 static AxisContext s_az_ctx;
@@ -309,7 +316,7 @@ void stepper_az_task_init()
         .status_q = &g_stepper_az_status_q,
         .min_deg  = StepCfg::AZ_MIN_DEG,
         .max_deg  = StepCfg::AZ_MAX_DEG,
-        .wrapped_limits = true,
+        .wrapped_limits = false,
         .shortest_path = true,
         .motor_zero_cmd_deg = 0.0f,
         .motor_deg_per_cmd_deg = 1.0f,

@@ -10,6 +10,7 @@
 
 #include "Fusion.h"
 
+#include <math.h>
 #include <stdio.h>
 
 // -----------------------------------------------------------------------------
@@ -80,6 +81,7 @@ float fusion_get_declination()           { return s_declination_deg; }
 #define FUSION_PERIOD_MS        ( 1000 / FUSION_SAMPLE_RATE_HZ )
 #define FUSION_MQTT_INTERVAL_MS 50
 #define FUSION_STATUS_INTERVAL_MS 1000
+#define FUSION_DEBUG_INTERVAL_MS 1000
 #define FUSION_RECOVERY_SAMPLES ( 5 * FUSION_SAMPLE_RATE_HZ )
 
 static StackType_t  s_stack[ 4096 ];
@@ -96,12 +98,49 @@ static float wrap_360( float deg )
     return deg;
 }
 
+static float wrap_180( float deg )
+{
+    while ( deg > 180.0f )   deg -= 360.0f;
+    while ( deg <= -180.0f ) deg += 360.0f;
+    return deg;
+}
+
 static FusionQuaternion quat_conjugate( FusionQuaternion q )
 {
     q.element.x = -q.element.x;
     q.element.y = -q.element.y;
     q.element.z = -q.element.z;
     return q;
+}
+
+static FusionVector quat_rotate_body_to_reference( FusionQuaternion q, FusionVector body )
+{
+    return FusionMatrixMultiply( FusionQuaternionToMatrix( q ), body );
+}
+
+static FusionVector quat_forward_in_reference( FusionQuaternion q )
+{
+    return quat_rotate_body_to_reference( q, (FusionVector){ .axis = {1.0f, 0.0f, 0.0f} } );
+}
+
+static float heading_from_forward_ned( FusionVector forward )
+{
+    return FusionRadiansToDegrees( atan2f( forward.axis.y, forward.axis.x ) );
+}
+
+static float elevation_from_forward_ned( FusionVector forward )
+{
+    const float horizontal = sqrtf( forward.axis.x * forward.axis.x
+                                   + forward.axis.y * forward.axis.y );
+    return FusionRadiansToDegrees( atan2f( -forward.axis.z, horizontal ) );
+}
+
+static void fill_quat4( float out[4], FusionQuaternion q )
+{
+    out[0] = q.element.w;
+    out[1] = q.element.x;
+    out[2] = q.element.y;
+    out[3] = q.element.z;
 }
 
 static float sane_delta_t( uint64_t now_us, uint64_t last_us )
@@ -222,6 +261,7 @@ static void fusion_task( void* )
     uint64_t   last_yaw_update_us = time_us_64();
     TickType_t last_mqtt = xTaskGetTickCount();
     TickType_t last_status = xTaskGetTickCount();
+    TickType_t last_debug = xTaskGetTickCount();
     TickType_t last_tick = xTaskGetTickCount();
     uint32_t   bar_update_count = 0;
     uint32_t   yaw_update_count = 0;
@@ -261,9 +301,19 @@ static void fusion_task( void* )
         FusionQuaternion q_truth = FusionQuaternionProduct( q_yaw, q_yaw_to_bar );    // q_EB
         q_truth = FusionQuaternionNormalise( q_truth );
 
-        const FusionEuler euler = FusionQuaternionToEuler( q_truth );
-        const FusionEuler yaw_euler = FusionQuaternionToEuler( q_yaw );
+        const FusionEuler truth_euler = FusionQuaternionToEuler( q_truth );
         const FusionEuler relative_euler = FusionQuaternionToEuler( q_yaw_to_bar );
+        const FusionVector truth_forward = quat_forward_in_reference( q_truth );
+        const FusionVector yaw_forward = quat_forward_in_reference( q_yaw );
+        const FusionVector relative_forward = quat_forward_in_reference( q_yaw_to_bar );
+        const float truth_heading_signed =
+            wrap_180( heading_from_forward_ned( truth_forward ) + s_declination_deg );
+        const float yaw_heading_signed =
+            wrap_180( heading_from_forward_ned( yaw_forward ) + s_declination_deg );
+        const float relative_heading_signed =
+            wrap_180( heading_from_forward_ned( relative_forward ) );
+        const float truth_pitch = elevation_from_forward_ned( truth_forward );
+        const float relative_pitch = elevation_from_forward_ned( relative_forward );
         const FusionVector earth_accel = FusionAhrsGetEarthAcceleration( &s_bar_ahrs );
         const FusionAhrsFlags bar_flags = FusionAhrsGetFlags( &s_bar_ahrs );
         const FusionAhrsFlags yaw_flags = FusionAhrsGetFlags( &s_yaw_ahrs );
@@ -273,9 +323,9 @@ static void fusion_task( void* )
         out.q[1]           = q_truth.element.x;
         out.q[2]           = q_truth.element.y;
         out.q[3]           = q_truth.element.z;
-        out.euler[0]       = euler.angle.roll;
-        out.euler[1]       = euler.angle.pitch;
-        out.euler[2]       = euler.angle.yaw;
+        out.euler[0]       = truth_euler.angle.roll;
+        out.euler[1]       = truth_pitch;
+        out.euler[2]       = truth_heading_signed;
         out.earth_accel[0] = earth_accel.axis.x;
         out.earth_accel[1] = earth_accel.axis.y;
         out.earth_accel[2] = earth_accel.axis.z;
@@ -294,6 +344,31 @@ static void fusion_task( void* )
                                    bar_update_count, yaw_update_count );
         }
 
+        if ( ( now_ticks - last_debug ) >= pdMS_TO_TICKS(FUSION_DEBUG_INTERVAL_MS) ) {
+            last_debug = now_ticks;
+            log_print( "[ahrs_dbg] imu_pitch=%.2f rel_pitch=%.2f yaw_platform_heading=%.2f yaw_signed=%.2f bar_imu=%u yaw_imu=%u yaw_mag=%u\n",
+                       (double)truth_pitch,
+                       (double)relative_pitch,
+                       (double)wrap_360( yaw_heading_signed ),
+                       (double)yaw_heading_signed,
+                       have_bar_imu ? 1u : 0u,
+                       have_yaw_imu ? 1u : 0u,
+                       have_yaw_mag ? 1u : 0u );
+            log_print( "[ahrs_q] bar_q=[%.4f,%.4f,%.4f,%.4f] yaw_q=[%.4f,%.4f,%.4f,%.4f] rel_q=[%.4f,%.4f,%.4f,%.4f]\n",
+                       (double)q_bar_sensor.element.w,
+                       (double)q_bar_sensor.element.x,
+                       (double)q_bar_sensor.element.y,
+                       (double)q_bar_sensor.element.z,
+                       (double)q_yaw.element.w,
+                       (double)q_yaw.element.x,
+                       (double)q_yaw.element.y,
+                       (double)q_yaw.element.z,
+                       (double)q_yaw_to_bar.element.w,
+                       (double)q_yaw_to_bar.element.x,
+                       (double)q_yaw_to_bar.element.y,
+                       (double)q_yaw_to_bar.element.z );
+        }
+
         if ( mqtt_is_connected()
              && ( now_ticks - last_mqtt ) >= pdMS_TO_TICKS(FUSION_MQTT_INTERVAL_MS) )
         {
@@ -302,13 +377,18 @@ static void fusion_task( void* )
             MqttMessage m = {};
             groundstation_GroundImu pb = groundstation_GroundImu_init_zero;
             pb.has_timestamp = true; pb.timestamp = time_us_64() / 1000u;
-            pb.has_roll = true;      pb.roll = euler.angle.roll;
-            pb.has_pitch = true;     pb.pitch = euler.angle.pitch;
-            pb.has_yaw = true;       pb.yaw = euler.angle.yaw;
-            pb.has_yaw360 = true;    pb.yaw360 = wrap_360( euler.angle.yaw );
+            pb.has_roll = true;      pb.roll = truth_euler.angle.roll;
+            pb.has_pitch = true;     pb.pitch = truth_pitch;
+            pb.has_yaw = true;       pb.yaw = truth_heading_signed;
+            pb.has_yaw360 = true;    pb.yaw360 = wrap_360( truth_heading_signed );
             pb.q_count = 4;
-            pb.q[0] = q_truth.element.w; pb.q[1] = q_truth.element.x;
-            pb.q[2] = q_truth.element.y; pb.q[3] = q_truth.element.z;
+            fill_quat4( pb.q, q_truth );
+            pb.bar_q_count = 4;
+            fill_quat4( pb.bar_q, q_bar_sensor );
+            pb.yaw_q_count = 4;
+            fill_quat4( pb.yaw_q, q_yaw );
+            pb.bar_rel_q_count = 4;
+            fill_quat4( pb.bar_rel_q, q_yaw_to_bar );
             pb.a_count = 3;
             pb.a[0] = bar_imu.accel[0]; pb.a[1] = bar_imu.accel[1];
             pb.a[2] = bar_imu.accel[2];
@@ -318,12 +398,12 @@ static void fusion_task( void* )
             pb.has_have_mag = true;       pb.have_mag = have_bar_mag;
             pb.has_have_yaw_frame = true; pb.have_yaw_frame = have_yaw_imu;
             pb.has_yaw_frame_yaw = true;
-            pb.yaw_frame_yaw = yaw_euler.angle.yaw + s_declination_deg;
+            pb.yaw_frame_yaw = yaw_heading_signed;
             pb.has_yaw_frame_yaw360 = true;
-            pb.yaw_frame_yaw360 = wrap_360( yaw_euler.angle.yaw + s_declination_deg );
+            pb.yaw_frame_yaw360 = wrap_360( yaw_heading_signed );
             pb.has_bar_rel_roll = true;  pb.bar_rel_roll = relative_euler.angle.roll;
-            pb.has_bar_rel_pitch = true; pb.bar_rel_pitch = relative_euler.angle.pitch;
-            pb.has_bar_rel_yaw = true;   pb.bar_rel_yaw = relative_euler.angle.yaw;
+            pb.has_bar_rel_pitch = true; pb.bar_rel_pitch = relative_pitch;
+            pb.has_bar_rel_yaw = true;   pb.bar_rel_yaw = relative_heading_signed;
             pb.has_startup = true;       pb.startup = bar_flags.startup;
             pb.has_mag_rec = true;       pb.mag_rec = bar_flags.magneticRecovery;
             pb.has_acc_rec = true;       pb.acc_rec = bar_flags.accelerationRecovery;
