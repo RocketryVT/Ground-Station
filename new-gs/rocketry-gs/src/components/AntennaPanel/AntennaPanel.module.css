@@ -1,0 +1,74 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #ffffff;
+  padding: 8px;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.panelLabel {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #75787B;
+}
+
+.gauges {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-height: 0;
+}
+
+.gaugeBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 4px;
+  min-height: 0;
+}
+
+.gaugeTitle {
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #75787B;
+}
+
+.compass,
+.elevation {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  max-height: 140px;
+}
+
+.targetRow {
+  display: flex;
+  gap: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  color: #75787B;
+}
+
+.dim { color: #D7D2CB; }
+
+.stats {
+  display: flex;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px solid #D7D2CB;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+}
+
+.stat span:first-child { color: #75787B; font-size: 9px; }
+.stat span:last-child  { color: #1a1a1a; }
