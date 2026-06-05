@@ -1,16 +1,19 @@
 #include "mqtt_task.hpp"
 #include "shared.hpp"
 #include "Tasks/Stepper/stepper_task.hpp"
+#include "Tasks/Stepper/tracker_state.hpp"
 #include "Tasks/Fusion/fusion_task.hpp"
 #include "Proto/ground_station.pb.h"
 
 #include "pico/cyw43_arch.h"
+#include "pico/time.h"
 #include "lwip/ip_addr.h"
 #include "lwip/apps/mqtt.h"
 #include "pb_decode.h"
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 static mqtt_client_t*  s_mqtt           = nullptr;
 static volatile bool   s_mqtt_connected = false;
@@ -40,6 +43,40 @@ struct PendingJogCmd {
 static volatile PendingAxisCmd s_pending_az_cmd  = {};
 static volatile PendingAxisCmd s_pending_zen_cmd = {};
 static volatile PendingJogCmd  s_pending_jog_cmd = {};
+
+struct PendingModeCmd {
+    bool pending;
+    groundstation_TrackerMode mode;
+};
+
+struct PendingArmCmd {
+    bool pending;
+    bool armed;
+};
+
+struct PendingConfigCmd {
+    bool pending;
+    groundstation_TrackerConfigCommand cfg;
+};
+
+struct PendingLocationCmd {
+    bool pending;
+    bool is_ground_station;
+    double lat;
+    double lon;
+    double alt_m;
+};
+
+struct PendingCalibrationCmd {
+    bool pending;
+    groundstation_CalibrationCommand cmd;
+};
+
+static PendingModeCmd     s_pending_mode_cmd = {};
+static PendingArmCmd      s_pending_arm_cmd = {};
+static PendingConfigCmd   s_pending_config_cmd = {};
+static PendingLocationCmd s_pending_location_cmd = {};
+static PendingCalibrationCmd s_pending_calibration_cmd = {};
 
 bool mqtt_is_connected() { return s_mqtt_connected; }
 bool mqtt_raw_imu_enabled()     { return s_raw_imu_enabled; }
@@ -82,6 +119,44 @@ static void store_jog_cmd( const groundstation_JogCommand& cmd )
     s_pending_jog_cmd.pending    = true;
 }
 
+static void store_mode_cmd( const groundstation_TrackerModeCommand& cmd )
+{
+    if ( !cmd.has_mode ) return;
+    s_pending_mode_cmd.mode = cmd.mode;
+    s_pending_mode_cmd.pending = true;
+}
+
+static void store_arm_cmd( const groundstation_TrackerArmCommand& cmd )
+{
+    if ( !cmd.has_armed ) return;
+    s_pending_arm_cmd.armed = cmd.armed;
+    s_pending_arm_cmd.pending = true;
+}
+
+static void store_config_cmd( const groundstation_TrackerConfigCommand& cmd )
+{
+    s_pending_config_cmd.cfg = cmd;
+    s_pending_config_cmd.pending = true;
+}
+
+static void store_calibration_cmd( const groundstation_CalibrationCommand& cmd )
+{
+    if ( !cmd.has_action ) return;
+    s_pending_calibration_cmd.cmd = cmd;
+    s_pending_calibration_cmd.pending = true;
+}
+
+static void store_location_cmd( const groundstation_LocationCommand& cmd,
+                                bool is_ground_station )
+{
+    if ( !cmd.has_lat || !cmd.has_lon || !cmd.has_alt_m ) return;
+    s_pending_location_cmd.is_ground_station = is_ground_station;
+    s_pending_location_cmd.lat = cmd.lat;
+    s_pending_location_cmd.lon = cmd.lon;
+    s_pending_location_cmd.alt_m = cmd.alt_m;
+    s_pending_location_cmd.pending = true;
+}
+
 static bool publish_stepper_cmd( QueueHandle_t q,
                                  const StepperCmd& cmd,
                                  const char* axis )
@@ -98,6 +173,46 @@ static bool publish_stepper_cmd( QueueHandle_t q,
                (double)cmd.speed_dps,
                cmd.stop ? "true" : "false" );
     return true;
+}
+
+static void publish_calibration_event( const char* action,
+                                       const char* result,
+                                       float reference_deg,
+                                       const char* note )
+{
+    MqttMessage msg = {};
+    strncpy( msg.topic, "antenna/calibration/event", sizeof(msg.topic) - 1 );
+
+    const TrackerCalibrationStatus cal = tracker_calibration_status_snapshot();
+    char safe_note[96] = {};
+    if ( note ) {
+        size_t out = 0;
+        for ( size_t in = 0; note[in] != '\0' && out < sizeof(safe_note) - 1; in++ ) {
+            const char c = note[in];
+            safe_note[out++] = ( c == '"' || c == '\\' ) ? '\'' : c;
+        }
+    }
+    const int n = snprintf( (char*)msg.payload, sizeof(msg.payload),
+        "{\"timestamp\":%llu,\"seq\":%lu,\"action\":\"%s\",\"result\":\"%s\","
+        "\"reference_deg\":%.3f,\"az_calibrated\":%s,\"el_calibrated\":%s,"
+        "\"az_reference_deg\":%.3f,\"el_reference_deg\":%.3f,\"note\":\"%s\"}",
+        (unsigned long long)( time_us_64() / 1000u ),
+        (unsigned long)cal.seq,
+        action ? action : "",
+        result ? result : "",
+        (double)reference_deg,
+        cal.az_calibrated ? "true" : "false",
+        cal.el_calibrated ? "true" : "false",
+        (double)cal.az_reference_deg,
+        (double)cal.el_reference_deg,
+        safe_note );
+
+    if ( n > 0 ) {
+        msg.payload_len = (uint16_t)( n < (int)sizeof(msg.payload)
+            ? n
+            : (int)sizeof(msg.payload) - 1 );
+        xQueueSend( g_mqtt_queue, &msg, 0 );
+    }
 }
 
 static bool take_pending_axis_cmd( volatile PendingAxisCmd* pending,
@@ -150,6 +265,13 @@ static void apply_axis_cmd( QueueHandle_t q,
     if ( pending.has_speed )  cmd.speed_dps        = pending.speed_dps;
     if ( pending.has_stop )   cmd.stop             = pending.stop;
 
+    if ( !cmd.stop && !tracker_is_armed() ) {
+        log_print( "[mqtt] %s command dropped: tracker disarmed\n", axis );
+        return;
+    }
+    if ( !cmd.stop ) {
+        tracker_set_mode( TrackerMode::Manual );
+    }
     publish_stepper_cmd( q, cmd, axis );
 }
 
@@ -174,7 +296,147 @@ static void process_pending_commands()
         cmd.stop = false;
         if ( jog.has_speed ) cmd.speed_dps = jog.speed_dps;
 
-        publish_stepper_cmd( q, cmd, axis );
+        if ( !tracker_is_armed() ) {
+            log_print( "[mqtt] %s jog dropped: tracker disarmed\n", axis );
+        } else {
+            tracker_set_mode( TrackerMode::Manual );
+            publish_stepper_cmd( q, cmd, axis );
+        }
+    }
+
+    taskENTER_CRITICAL();
+    PendingModeCmd mode_cmd = {};
+    if ( s_pending_mode_cmd.pending ) {
+        mode_cmd.mode = s_pending_mode_cmd.mode;
+        mode_cmd.pending = true;
+        s_pending_mode_cmd.pending = false;
+    }
+    PendingArmCmd arm_cmd = {};
+    if ( s_pending_arm_cmd.pending ) {
+        arm_cmd.armed = s_pending_arm_cmd.armed;
+        arm_cmd.pending = true;
+        s_pending_arm_cmd.pending = false;
+    }
+    PendingConfigCmd config_cmd = {};
+    if ( s_pending_config_cmd.pending ) {
+        config_cmd.cfg = s_pending_config_cmd.cfg;
+        config_cmd.pending = true;
+        s_pending_config_cmd.pending = false;
+    }
+    PendingLocationCmd loc_cmd = {};
+    if ( s_pending_location_cmd.pending ) {
+        loc_cmd.is_ground_station = s_pending_location_cmd.is_ground_station;
+        loc_cmd.lat = s_pending_location_cmd.lat;
+        loc_cmd.lon = s_pending_location_cmd.lon;
+        loc_cmd.alt_m = s_pending_location_cmd.alt_m;
+        loc_cmd.pending = true;
+        s_pending_location_cmd.pending = false;
+    }
+    PendingCalibrationCmd cal_cmd = {};
+    if ( s_pending_calibration_cmd.pending ) {
+        cal_cmd.cmd = s_pending_calibration_cmd.cmd;
+        cal_cmd.pending = true;
+        s_pending_calibration_cmd.pending = false;
+    }
+    taskEXIT_CRITICAL();
+
+    if ( mode_cmd.pending ) {
+        if ( tracker_set_mode_from_proto( mode_cmd.mode ) ) {
+            log_print( "[mqtt] tracker mode=%s\n", tracker_mode_name( tracker_mode() ) );
+        }
+    }
+    if ( arm_cmd.pending ) {
+        tracker_set_armed( arm_cmd.armed );
+        log_print( "[mqtt] tracker armed=%u\n", arm_cmd.armed ? 1u : 0u );
+    }
+    if ( config_cmd.pending ) {
+        tracker_apply_config_command( config_cmd.cfg );
+        log_print( "[mqtt] tracker config updated\n" );
+    }
+    if ( loc_cmd.pending ) {
+        LocationMsg loc {
+            loc_cmd.lat,
+            loc_cmd.lon,
+            loc_cmd.alt_m,
+            time_us_64()
+        };
+        QueueHandle_t q = loc_cmd.is_ground_station ? g_gs_location_q : g_rocket_location_q;
+        if ( q ) {
+            xQueueOverwrite( q, &loc );
+            log_print( "[mqtt] %s location lat=%.7f lon=%.7f alt=%.1f\n",
+                       loc_cmd.is_ground_station ? "gs" : "rocket",
+                       loc_cmd.lat, loc_cmd.lon, loc_cmd.alt_m );
+        }
+    }
+    if ( cal_cmd.pending ) {
+        const groundstation_CalibrationCommand& cmd = cal_cmd.cmd;
+        const float ref = cmd.has_reference_deg ? cmd.reference_deg : 0.0f;
+        const char* note = cmd.has_note ? cmd.note : "";
+
+        switch ( cmd.action ) {
+        case groundstation_CalibrationAction_CAL_ACTION_BEGIN_GUIDED:
+            tracker_set_mode( TrackerMode::Manual );
+            tracker_set_armed( true );
+            tracker_clear_calibration( "guided calibration started" );
+            publish_calibration_event( "begin_guided", "manual armed", ref, note );
+            log_print( "[cal] guided calibration started\n" );
+            break;
+
+        case groundstation_CalibrationAction_CAL_ACTION_SET_AZ_REFERENCE:
+            if ( cmd.has_reference_deg && g_stepper_az_cal_q ) {
+                StepperCalibrationCmd axis_cal = {};
+                axis_cal.set_current_angle = true;
+                axis_cal.current_angle_deg = ref;
+                xQueueOverwrite( g_stepper_az_cal_q, &axis_cal );
+                publish_calibration_event( "set_az_reference", "queued", ref, note );
+            } else {
+                publish_calibration_event( "set_az_reference", "missing reference", ref, note );
+            }
+            break;
+
+        case groundstation_CalibrationAction_CAL_ACTION_SET_EL_REFERENCE:
+            if ( cmd.has_reference_deg && g_stepper_zen_cal_q ) {
+                StepperCalibrationCmd axis_cal = {};
+                axis_cal.set_current_angle = true;
+                axis_cal.current_angle_deg = ref;
+                xQueueOverwrite( g_stepper_zen_cal_q, &axis_cal );
+                publish_calibration_event( "set_el_reference", "queued", ref, note );
+            } else {
+                publish_calibration_event( "set_el_reference", "missing reference", ref, note );
+            }
+            break;
+
+        case groundstation_CalibrationAction_CAL_ACTION_CLEAR:
+        {
+            StepperCalibrationCmd axis_cal = {};
+            axis_cal.clear = true;
+            if ( g_stepper_az_cal_q ) xQueueOverwrite( g_stepper_az_cal_q, &axis_cal );
+            if ( g_stepper_zen_cal_q ) xQueueOverwrite( g_stepper_zen_cal_q, &axis_cal );
+            tracker_clear_calibration( "calibration cleared" );
+            tracker_set_mode( TrackerMode::Manual );
+            tracker_set_armed( false );
+            publish_calibration_event( "clear", "cleared", ref, note );
+            log_print( "[cal] calibration cleared\n" );
+            break;
+        }
+
+        case groundstation_CalibrationAction_CAL_ACTION_ENABLE_TRACKING:
+            if ( tracker_axes_calibrated() ) {
+                tracker_set_mode( TrackerMode::Auto );
+                tracker_set_armed( true );
+                publish_calibration_event( "enable_tracking", "auto armed", ref, note );
+                log_print( "[cal] tracking enabled after calibration\n" );
+            } else {
+                tracker_set_mode( TrackerMode::Manual );
+                publish_calibration_event( "enable_tracking", "blocked: axes not calibrated", ref, note );
+                log_print( "[cal] tracking enable blocked: axes not calibrated\n" );
+            }
+            break;
+
+        default:
+            publish_calibration_event( "unknown", "ignored", ref, note );
+            break;
+        }
     }
 }
 
@@ -218,6 +480,30 @@ static void incoming_data_cb( void* arg, const u8_t* data, u16_t len, u8_t flags
         groundstation_JogCommand cmd = groundstation_JogCommand_init_zero;
         if ( decode_proto( data, len, groundstation_JogCommand_fields, &cmd ) )
             store_jog_cmd( cmd );
+    } else if ( strcmp( s_in_topic, "gs/cmd/tracker/mode" ) == 0 ) {
+        groundstation_TrackerModeCommand cmd = groundstation_TrackerModeCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_TrackerModeCommand_fields, &cmd ) )
+            store_mode_cmd( cmd );
+    } else if ( strcmp( s_in_topic, "gs/cmd/tracker/arm" ) == 0 ) {
+        groundstation_TrackerArmCommand cmd = groundstation_TrackerArmCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_TrackerArmCommand_fields, &cmd ) )
+            store_arm_cmd( cmd );
+    } else if ( strcmp( s_in_topic, "gs/cmd/tracker/config" ) == 0 ) {
+        groundstation_TrackerConfigCommand cmd = groundstation_TrackerConfigCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_TrackerConfigCommand_fields, &cmd ) )
+            store_config_cmd( cmd );
+    } else if ( strcmp( s_in_topic, "gs/cmd/calibration" ) == 0 ) {
+        groundstation_CalibrationCommand cmd = groundstation_CalibrationCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_CalibrationCommand_fields, &cmd ) )
+            store_calibration_cmd( cmd );
+    } else if ( strcmp( s_in_topic, "gs/location" ) == 0 ) {
+        groundstation_LocationCommand cmd = groundstation_LocationCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_LocationCommand_fields, &cmd ) )
+            store_location_cmd( cmd, true );
+    } else if ( strcmp( s_in_topic, "rocket/location" ) == 0 ) {
+        groundstation_LocationCommand cmd = groundstation_LocationCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_LocationCommand_fields, &cmd ) )
+            store_location_cmd( cmd, false );
     }
 }
 
@@ -312,6 +598,12 @@ static void mqtt_task( void* param )
         mqtt_subscribe( s_mqtt, "gs/cmd/zen",          0, nullptr, nullptr );
         mqtt_subscribe( s_mqtt, "gs/cmd/jog",          0, nullptr, nullptr );
         mqtt_subscribe( s_mqtt, "gs/cmd/declination",  0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/cmd/tracker/mode", 0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/cmd/tracker/arm",  0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/cmd/tracker/config", 0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/cmd/calibration",    0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/location",         0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "rocket/location",     0, nullptr, nullptr );
         cyw43_arch_lwip_end();
 
         // Drain the publish queue while broker is alive

@@ -15,6 +15,7 @@
 #include "Tasks/Fusion/fusion_task.hpp"
 #include "Tasks/LoRa/lora1_task.hpp"
 #include "Tasks/LoRa/lora_task.hpp"
+#include "Tasks/UDP/udp_recv_task.hpp"
 #include "Tasks/Stepper/stepper_task.hpp"
 #include "Tasks/USB/usb_task.hpp"
 
@@ -150,9 +151,11 @@ int main()
 
     lora0_task_init();
     lora1_task_init();
+    udp_recv_task_init();
 
     stepper_az_task_init();
     stepper_zen_task_init();
+    stepper_ctrl_task_init();
     stepper_state_task_init();
 
     usb_task_init();

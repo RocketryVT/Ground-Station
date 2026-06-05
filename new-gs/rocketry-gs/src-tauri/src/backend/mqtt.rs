@@ -123,8 +123,6 @@ async fn publish(
         .await
     {
         Ok(()) => {
-            let message = state.add_raw_message(&request.topic, request.payload);
-            emit(app, &UiEvent::RawMessage { message });
             diagnostic_csv.log_event("mqtt_tx", "tx", &request.topic, "", state);
         }
         Err(error) => {

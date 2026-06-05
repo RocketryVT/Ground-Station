@@ -179,7 +179,7 @@ static void lora0_task( void* )
                     }
 
                     if ( d.flags & SIGMA_FLAG_GPS_VALID ) {
-                        LocationMsg loc = { d.lat, d.lon, (double)d.alt_gps_m };
+                        LocationMsg loc = { d.lat, d.lon, (double)d.alt_gps_m, time_us_64() };
                         xQueueOverwrite( g_rocket_location_q, &loc );
                     }
                 } else {

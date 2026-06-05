@@ -28,6 +28,24 @@ typedef enum _groundstation_JogAxis {
     groundstation_JogAxis_JOG_AXIS_EL = 2
 } groundstation_JogAxis;
 
+typedef enum _groundstation_TrackerMode {
+    groundstation_TrackerMode_TRACKER_MODE_STOP = 0,
+    groundstation_TrackerMode_TRACKER_MODE_MANUAL = 1,
+    groundstation_TrackerMode_TRACKER_MODE_AUTO = 2,
+    groundstation_TrackerMode_TRACKER_MODE_SCAN = 3,
+    groundstation_TrackerMode_TRACKER_MODE_SERVOTEST = 4,
+    groundstation_TrackerMode_TRACKER_MODE_FAULT = 5
+} groundstation_TrackerMode;
+
+typedef enum _groundstation_CalibrationAction {
+    groundstation_CalibrationAction_CAL_ACTION_UNSPECIFIED = 0,
+    groundstation_CalibrationAction_CAL_ACTION_BEGIN_GUIDED = 1,
+    groundstation_CalibrationAction_CAL_ACTION_SET_AZ_REFERENCE = 2,
+    groundstation_CalibrationAction_CAL_ACTION_SET_EL_REFERENCE = 3,
+    groundstation_CalibrationAction_CAL_ACTION_CLEAR = 4,
+    groundstation_CalibrationAction_CAL_ACTION_ENABLE_TRACKING = 5
+} groundstation_CalibrationAction;
+
 /* Struct definitions */
 typedef struct _groundstation_RocketLoRaSample {
     bool has_boot_ms;
@@ -97,6 +115,30 @@ typedef struct _groundstation_AntennaState {
     bool zen_faulted;
     bool has_mode;
     char mode[16];
+    bool has_armed;
+    bool armed;
+    bool has_gs_fresh;
+    bool gs_fresh;
+    bool has_target_fresh;
+    bool target_fresh;
+    bool has_ahrs_el_used;
+    bool ahrs_el_used;
+    bool has_ahrs_az_used;
+    bool ahrs_az_used;
+    bool has_distance_m;
+    float distance_m;
+    bool has_pointing_error_az;
+    float pointing_error_az;
+    bool has_pointing_error_el;
+    float pointing_error_el;
+    bool has_az_reference_deg;
+    float az_reference_deg;
+    bool has_el_reference_deg;
+    float el_reference_deg;
+    bool has_calibration_seq;
+    uint32_t calibration_seq;
+    bool has_calibration_status;
+    char calibration_status[48];
 } groundstation_AntennaState;
 
 typedef struct _groundstation_GroundImu {
@@ -145,11 +187,11 @@ typedef struct _groundstation_GroundImu {
     bool has_bar_rel_yaw;
     float bar_rel_yaw;
     pb_size_t bar_q_count;
-    float bar_q[4];
+    float bar_q[4]; /* Raw bar/zenith AHRS quaternion q_EB [w,x,y,z] */
     pb_size_t yaw_q_count;
-    float yaw_q[4];
+    float yaw_q[4]; /* Raw yaw-platform AHRS quaternion q_EY [w,x,y,z] */
     pb_size_t bar_rel_q_count;
-    float bar_rel_q[4];
+    float bar_rel_q[4]; /* Relative quaternion q_YB = inverse(q_EY) * q_EB [w,x,y,z] */
 } groundstation_GroundImu;
 
 typedef struct _groundstation_AhrsStatus {
@@ -262,6 +304,77 @@ typedef struct _groundstation_DeclinationCommand {
     float declination_deg;
 } groundstation_DeclinationCommand;
 
+typedef struct _groundstation_TrackerModeCommand {
+    bool has_mode;
+    groundstation_TrackerMode mode;
+} groundstation_TrackerModeCommand;
+
+typedef struct _groundstation_TrackerArmCommand {
+    bool has_armed;
+    bool armed;
+} groundstation_TrackerArmCommand;
+
+typedef struct _groundstation_TrackerConfigCommand {
+    bool has_yaw_trim_deg;
+    float yaw_trim_deg;
+    bool has_el_trim_deg;
+    float el_trim_deg;
+    bool has_az_min_deg;
+    float az_min_deg;
+    bool has_az_max_deg;
+    float az_max_deg;
+    bool has_el_min_deg;
+    float el_min_deg;
+    bool has_el_max_deg;
+    float el_max_deg;
+    bool has_default_speed_dps;
+    float default_speed_dps;
+    bool has_max_speed_dps;
+    float max_speed_dps;
+    bool has_scan_speed_az_dps;
+    float scan_speed_az_dps;
+    bool has_scan_speed_el_dps;
+    float scan_speed_el_dps;
+    bool has_gs_timeout_ms;
+    uint32_t gs_timeout_ms;
+    bool has_target_timeout_ms;
+    uint32_t target_timeout_ms;
+    bool has_distance_min_m;
+    float distance_min_m;
+    bool has_scan_on_loss;
+    bool scan_on_loss;
+    bool has_use_ahrs_el;
+    bool use_ahrs_el;
+    bool has_use_ahrs_az;
+    bool use_ahrs_az;
+    bool has_ahrs_max_age_ms;
+    float ahrs_max_age_ms;
+    bool has_ahrs_feedback_gain;
+    float ahrs_feedback_gain;
+    bool has_ahrs_max_correction_deg;
+    float ahrs_max_correction_deg;
+} groundstation_TrackerConfigCommand;
+
+typedef struct _groundstation_CalibrationCommand {
+    bool has_action;
+    groundstation_CalibrationAction action;
+    bool has_reference_deg;
+    float reference_deg;
+    bool has_note;
+    char note[96];
+    bool has_step;
+    uint32_t step;
+} groundstation_CalibrationCommand;
+
+typedef struct _groundstation_LocationCommand {
+    bool has_lat;
+    double lat;
+    bool has_lon;
+    double lon;
+    bool has_alt_m;
+    double alt_m;
+} groundstation_LocationCommand;
+
 typedef struct _groundstation_StarlinkProxyStatus {
     bool has_lat;
     double lat;
@@ -317,6 +430,14 @@ extern "C" {
 #define _groundstation_JogAxis_MAX groundstation_JogAxis_JOG_AXIS_EL
 #define _groundstation_JogAxis_ARRAYSIZE ((groundstation_JogAxis)(groundstation_JogAxis_JOG_AXIS_EL+1))
 
+#define _groundstation_TrackerMode_MIN groundstation_TrackerMode_TRACKER_MODE_STOP
+#define _groundstation_TrackerMode_MAX groundstation_TrackerMode_TRACKER_MODE_FAULT
+#define _groundstation_TrackerMode_ARRAYSIZE ((groundstation_TrackerMode)(groundstation_TrackerMode_TRACKER_MODE_FAULT+1))
+
+#define _groundstation_CalibrationAction_MIN groundstation_CalibrationAction_CAL_ACTION_UNSPECIFIED
+#define _groundstation_CalibrationAction_MAX groundstation_CalibrationAction_CAL_ACTION_ENABLE_TRACKING
+#define _groundstation_CalibrationAction_ARRAYSIZE ((groundstation_CalibrationAction)(groundstation_CalibrationAction_CAL_ACTION_ENABLE_TRACKING+1))
+
 #define groundstation_RocketLoRaSample_state_ENUMTYPE groundstation_FlightState
 
 
@@ -331,12 +452,19 @@ extern "C" {
 #define groundstation_JogCommand_axis_ENUMTYPE groundstation_JogAxis
 
 
+#define groundstation_TrackerModeCommand_mode_ENUMTYPE groundstation_TrackerMode
+
+
+
+#define groundstation_CalibrationCommand_action_ENUMTYPE groundstation_CalibrationAction
+
+
 
 
 /* Initializer values for message structs */
 #define groundstation_RocketLoRaSample_init_default {false, 0, false, _groundstation_FlightState_MIN, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, false, 0, false, 0}
 #define groundstation_Lora1Rf69Packet_init_default {false, {0, {0}}, false, 0, false, 0}
-#define groundstation_AntennaState_init_default  {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, ""}
+#define groundstation_AntennaState_init_default  {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, ""}
 #define groundstation_GroundImu_init_default     {false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, 0, {0, 0, 0}, 0, {0, 0, 0}, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, 0, {0, 0, 0, 0}, 0, {0, 0, 0, 0}}
 #define groundstation_AhrsStatus_init_default    {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define groundstation_RawImuSample_init_default  {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
@@ -346,10 +474,15 @@ extern "C" {
 #define groundstation_AxisCommand_init_default   {false, 0, false, 0, false, 0}
 #define groundstation_JogCommand_init_default    {false, _groundstation_JogAxis_MIN, false, 0, false, 0}
 #define groundstation_DeclinationCommand_init_default {false, 0}
+#define groundstation_TrackerModeCommand_init_default {false, _groundstation_TrackerMode_MIN}
+#define groundstation_TrackerArmCommand_init_default {false, 0}
+#define groundstation_TrackerConfigCommand_init_default {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
+#define groundstation_CalibrationCommand_init_default {false, _groundstation_CalibrationAction_MIN, false, 0, false, "", false, 0}
+#define groundstation_LocationCommand_init_default {false, 0, false, 0, false, 0}
 #define groundstation_StarlinkProxyStatus_init_default {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, "", false, "", false, 0, false, "", false, "", false, 0}
 #define groundstation_RocketLoRaSample_init_zero {false, 0, false, _groundstation_FlightState_MIN, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, false, 0, false, 0}
 #define groundstation_Lora1Rf69Packet_init_zero  {false, {0, {0}}, false, 0, false, 0}
-#define groundstation_AntennaState_init_zero     {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, ""}
+#define groundstation_AntennaState_init_zero     {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, "", false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, ""}
 #define groundstation_GroundImu_init_zero        {false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, 0, {0, 0, 0}, 0, {0, 0, 0}, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, 0, 0, 0}, 0, {0, 0, 0, 0}, 0, {0, 0, 0, 0}}
 #define groundstation_AhrsStatus_init_zero       {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define groundstation_RawImuSample_init_zero     {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
@@ -359,6 +492,11 @@ extern "C" {
 #define groundstation_AxisCommand_init_zero      {false, 0, false, 0, false, 0}
 #define groundstation_JogCommand_init_zero       {false, _groundstation_JogAxis_MIN, false, 0, false, 0}
 #define groundstation_DeclinationCommand_init_zero {false, 0}
+#define groundstation_TrackerModeCommand_init_zero {false, _groundstation_TrackerMode_MIN}
+#define groundstation_TrackerArmCommand_init_zero {false, 0}
+#define groundstation_TrackerConfigCommand_init_zero {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
+#define groundstation_CalibrationCommand_init_zero {false, _groundstation_CalibrationAction_MIN, false, 0, false, "", false, 0}
+#define groundstation_LocationCommand_init_zero  {false, 0, false, 0, false, 0}
 #define groundstation_StarlinkProxyStatus_init_zero {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, "", false, "", false, 0, false, "", false, "", false, 0}
 
 /* Field tags (for use in manual encoding/decoding) */
@@ -392,6 +530,18 @@ extern "C" {
 #define groundstation_AntennaState_az_faulted_tag 13
 #define groundstation_AntennaState_zen_faulted_tag 14
 #define groundstation_AntennaState_mode_tag      15
+#define groundstation_AntennaState_armed_tag     16
+#define groundstation_AntennaState_gs_fresh_tag  17
+#define groundstation_AntennaState_target_fresh_tag 18
+#define groundstation_AntennaState_ahrs_el_used_tag 19
+#define groundstation_AntennaState_ahrs_az_used_tag 20
+#define groundstation_AntennaState_distance_m_tag 21
+#define groundstation_AntennaState_pointing_error_az_tag 22
+#define groundstation_AntennaState_pointing_error_el_tag 23
+#define groundstation_AntennaState_az_reference_deg_tag 24
+#define groundstation_AntennaState_el_reference_deg_tag 25
+#define groundstation_AntennaState_calibration_seq_tag 26
+#define groundstation_AntennaState_calibration_status_tag 27
 #define groundstation_GroundImu_timestamp_tag    1
 #define groundstation_GroundImu_roll_tag         2
 #define groundstation_GroundImu_pitch_tag        3
@@ -460,6 +610,34 @@ extern "C" {
 #define groundstation_JogCommand_delta_deg_tag   2
 #define groundstation_JogCommand_speed_dps_tag   3
 #define groundstation_DeclinationCommand_declination_deg_tag 1
+#define groundstation_TrackerModeCommand_mode_tag 1
+#define groundstation_TrackerArmCommand_armed_tag 1
+#define groundstation_TrackerConfigCommand_yaw_trim_deg_tag 1
+#define groundstation_TrackerConfigCommand_el_trim_deg_tag 2
+#define groundstation_TrackerConfigCommand_az_min_deg_tag 3
+#define groundstation_TrackerConfigCommand_az_max_deg_tag 4
+#define groundstation_TrackerConfigCommand_el_min_deg_tag 5
+#define groundstation_TrackerConfigCommand_el_max_deg_tag 6
+#define groundstation_TrackerConfigCommand_default_speed_dps_tag 7
+#define groundstation_TrackerConfigCommand_max_speed_dps_tag 8
+#define groundstation_TrackerConfigCommand_scan_speed_az_dps_tag 9
+#define groundstation_TrackerConfigCommand_scan_speed_el_dps_tag 10
+#define groundstation_TrackerConfigCommand_gs_timeout_ms_tag 11
+#define groundstation_TrackerConfigCommand_target_timeout_ms_tag 12
+#define groundstation_TrackerConfigCommand_distance_min_m_tag 13
+#define groundstation_TrackerConfigCommand_scan_on_loss_tag 14
+#define groundstation_TrackerConfigCommand_use_ahrs_el_tag 15
+#define groundstation_TrackerConfigCommand_use_ahrs_az_tag 16
+#define groundstation_TrackerConfigCommand_ahrs_max_age_ms_tag 17
+#define groundstation_TrackerConfigCommand_ahrs_feedback_gain_tag 18
+#define groundstation_TrackerConfigCommand_ahrs_max_correction_deg_tag 19
+#define groundstation_CalibrationCommand_action_tag 1
+#define groundstation_CalibrationCommand_reference_deg_tag 2
+#define groundstation_CalibrationCommand_note_tag 3
+#define groundstation_CalibrationCommand_step_tag 4
+#define groundstation_LocationCommand_lat_tag    1
+#define groundstation_LocationCommand_lon_tag    2
+#define groundstation_LocationCommand_alt_m_tag  3
 #define groundstation_StarlinkProxyStatus_lat_tag 1
 #define groundstation_StarlinkProxyStatus_lon_tag 2
 #define groundstation_StarlinkProxyStatus_alt_tag 3
@@ -519,7 +697,19 @@ X(a, STATIC,   OPTIONAL, BOOL,     az_moving,        11) \
 X(a, STATIC,   OPTIONAL, BOOL,     zen_moving,       12) \
 X(a, STATIC,   OPTIONAL, BOOL,     az_faulted,       13) \
 X(a, STATIC,   OPTIONAL, BOOL,     zen_faulted,      14) \
-X(a, STATIC,   OPTIONAL, STRING,   mode,             15)
+X(a, STATIC,   OPTIONAL, STRING,   mode,             15) \
+X(a, STATIC,   OPTIONAL, BOOL,     armed,            16) \
+X(a, STATIC,   OPTIONAL, BOOL,     gs_fresh,         17) \
+X(a, STATIC,   OPTIONAL, BOOL,     target_fresh,     18) \
+X(a, STATIC,   OPTIONAL, BOOL,     ahrs_el_used,     19) \
+X(a, STATIC,   OPTIONAL, BOOL,     ahrs_az_used,     20) \
+X(a, STATIC,   OPTIONAL, FLOAT,    distance_m,       21) \
+X(a, STATIC,   OPTIONAL, FLOAT,    pointing_error_az,  22) \
+X(a, STATIC,   OPTIONAL, FLOAT,    pointing_error_el,  23) \
+X(a, STATIC,   OPTIONAL, FLOAT,    az_reference_deg,  24) \
+X(a, STATIC,   OPTIONAL, FLOAT,    el_reference_deg,  25) \
+X(a, STATIC,   OPTIONAL, UINT32,   calibration_seq,  26) \
+X(a, STATIC,   OPTIONAL, STRING,   calibration_status,  27)
 #define groundstation_AntennaState_CALLBACK NULL
 #define groundstation_AntennaState_DEFAULT NULL
 
@@ -627,6 +817,54 @@ X(a, STATIC,   OPTIONAL, FLOAT,    declination_deg,   1)
 #define groundstation_DeclinationCommand_CALLBACK NULL
 #define groundstation_DeclinationCommand_DEFAULT NULL
 
+#define groundstation_TrackerModeCommand_FIELDLIST(X, a) \
+X(a, STATIC,   OPTIONAL, UENUM,    mode,              1)
+#define groundstation_TrackerModeCommand_CALLBACK NULL
+#define groundstation_TrackerModeCommand_DEFAULT NULL
+
+#define groundstation_TrackerArmCommand_FIELDLIST(X, a) \
+X(a, STATIC,   OPTIONAL, BOOL,     armed,             1)
+#define groundstation_TrackerArmCommand_CALLBACK NULL
+#define groundstation_TrackerArmCommand_DEFAULT NULL
+
+#define groundstation_TrackerConfigCommand_FIELDLIST(X, a) \
+X(a, STATIC,   OPTIONAL, FLOAT,    yaw_trim_deg,      1) \
+X(a, STATIC,   OPTIONAL, FLOAT,    el_trim_deg,       2) \
+X(a, STATIC,   OPTIONAL, FLOAT,    az_min_deg,        3) \
+X(a, STATIC,   OPTIONAL, FLOAT,    az_max_deg,        4) \
+X(a, STATIC,   OPTIONAL, FLOAT,    el_min_deg,        5) \
+X(a, STATIC,   OPTIONAL, FLOAT,    el_max_deg,        6) \
+X(a, STATIC,   OPTIONAL, FLOAT,    default_speed_dps,   7) \
+X(a, STATIC,   OPTIONAL, FLOAT,    max_speed_dps,     8) \
+X(a, STATIC,   OPTIONAL, FLOAT,    scan_speed_az_dps,   9) \
+X(a, STATIC,   OPTIONAL, FLOAT,    scan_speed_el_dps,  10) \
+X(a, STATIC,   OPTIONAL, UINT32,   gs_timeout_ms,    11) \
+X(a, STATIC,   OPTIONAL, UINT32,   target_timeout_ms,  12) \
+X(a, STATIC,   OPTIONAL, FLOAT,    distance_min_m,   13) \
+X(a, STATIC,   OPTIONAL, BOOL,     scan_on_loss,     14) \
+X(a, STATIC,   OPTIONAL, BOOL,     use_ahrs_el,      15) \
+X(a, STATIC,   OPTIONAL, BOOL,     use_ahrs_az,      16) \
+X(a, STATIC,   OPTIONAL, FLOAT,    ahrs_max_age_ms,  17) \
+X(a, STATIC,   OPTIONAL, FLOAT,    ahrs_feedback_gain,  18) \
+X(a, STATIC,   OPTIONAL, FLOAT,    ahrs_max_correction_deg,  19)
+#define groundstation_TrackerConfigCommand_CALLBACK NULL
+#define groundstation_TrackerConfigCommand_DEFAULT NULL
+
+#define groundstation_CalibrationCommand_FIELDLIST(X, a) \
+X(a, STATIC,   OPTIONAL, UENUM,    action,            1) \
+X(a, STATIC,   OPTIONAL, FLOAT,    reference_deg,     2) \
+X(a, STATIC,   OPTIONAL, STRING,   note,              3) \
+X(a, STATIC,   OPTIONAL, UINT32,   step,              4)
+#define groundstation_CalibrationCommand_CALLBACK NULL
+#define groundstation_CalibrationCommand_DEFAULT NULL
+
+#define groundstation_LocationCommand_FIELDLIST(X, a) \
+X(a, STATIC,   OPTIONAL, DOUBLE,   lat,               1) \
+X(a, STATIC,   OPTIONAL, DOUBLE,   lon,               2) \
+X(a, STATIC,   OPTIONAL, DOUBLE,   alt_m,             3)
+#define groundstation_LocationCommand_CALLBACK NULL
+#define groundstation_LocationCommand_DEFAULT NULL
+
 #define groundstation_StarlinkProxyStatus_FIELDLIST(X, a) \
 X(a, STATIC,   OPTIONAL, DOUBLE,   lat,               1) \
 X(a, STATIC,   OPTIONAL, DOUBLE,   lon,               2) \
@@ -662,6 +900,11 @@ extern const pb_msgdesc_t groundstation_RawSensorsCommand_msg;
 extern const pb_msgdesc_t groundstation_AxisCommand_msg;
 extern const pb_msgdesc_t groundstation_JogCommand_msg;
 extern const pb_msgdesc_t groundstation_DeclinationCommand_msg;
+extern const pb_msgdesc_t groundstation_TrackerModeCommand_msg;
+extern const pb_msgdesc_t groundstation_TrackerArmCommand_msg;
+extern const pb_msgdesc_t groundstation_TrackerConfigCommand_msg;
+extern const pb_msgdesc_t groundstation_CalibrationCommand_msg;
+extern const pb_msgdesc_t groundstation_LocationCommand_msg;
 extern const pb_msgdesc_t groundstation_StarlinkProxyStatus_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
@@ -677,16 +920,23 @@ extern const pb_msgdesc_t groundstation_StarlinkProxyStatus_msg;
 #define groundstation_AxisCommand_fields &groundstation_AxisCommand_msg
 #define groundstation_JogCommand_fields &groundstation_JogCommand_msg
 #define groundstation_DeclinationCommand_fields &groundstation_DeclinationCommand_msg
+#define groundstation_TrackerModeCommand_fields &groundstation_TrackerModeCommand_msg
+#define groundstation_TrackerArmCommand_fields &groundstation_TrackerArmCommand_msg
+#define groundstation_TrackerConfigCommand_fields &groundstation_TrackerConfigCommand_msg
+#define groundstation_CalibrationCommand_fields &groundstation_CalibrationCommand_msg
+#define groundstation_LocationCommand_fields &groundstation_LocationCommand_msg
 #define groundstation_StarlinkProxyStatus_fields &groundstation_StarlinkProxyStatus_msg
 
 /* Maximum encoded size of messages (where known) */
 #define GROUNDSTATION_GROUND_STATION_PB_H_MAX_SIZE groundstation_StarlinkProxyStatus_size
 #define groundstation_AhrsStatus_size            33
-#define groundstation_AntennaState_size          72
+#define groundstation_AntennaState_size          174
 #define groundstation_AxisCommand_size           12
+#define groundstation_CalibrationCommand_size    110
 #define groundstation_DeclinationCommand_size    5
-#define groundstation_GroundImu_size             197
+#define groundstation_GroundImu_size             209
 #define groundstation_JogCommand_size            12
+#define groundstation_LocationCommand_size       27
 #define groundstation_Lora1Rf69Packet_size       268
 #define groundstation_RawImuSample_size          46
 #define groundstation_RawMagSample_size          26
@@ -694,6 +944,9 @@ extern const pb_msgdesc_t groundstation_StarlinkProxyStatus_msg;
 #define groundstation_RawYawImuSample_size       65
 #define groundstation_RocketLoRaSample_size      84
 #define groundstation_StarlinkProxyStatus_size   548
+#define groundstation_TrackerArmCommand_size     2
+#define groundstation_TrackerConfigCommand_size  92
+#define groundstation_TrackerModeCommand_size    2
 
 #ifdef __cplusplus
 } /* extern "C" */

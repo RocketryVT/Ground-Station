@@ -15,6 +15,7 @@ const ORANGE = Cesium.Color.fromCssColorString('#CA4F00');
 const PANEL  = Cesium.Color.fromCssColorString('#861F41').withAlpha(0.85);
 
 const N_CONE_EDGES = 16;
+const MIN_CLEARANCE_M = 0.5;
 
 type TileCacheInfo = {
   proxy_url: string;
@@ -117,6 +118,20 @@ function coneRingPositions(
   }
 
   return { tip, ring };
+}
+
+function clampToTerrainHeight(
+  viewer: Cesium.Viewer,
+  lon: number,
+  lat: number,
+  altitudeM: number,
+): number {
+  const terrainHeight = viewer.scene.globe.getHeight(
+    Cesium.Cartographic.fromDegrees(lon, lat),
+  );
+
+  if (terrainHeight === undefined) return altitudeM;
+  return Math.max(altitudeM, terrainHeight + MIN_CLEARANCE_M);
 }
 
 export function TrajectoryMap() {
@@ -260,7 +275,10 @@ export function TrajectoryMap() {
             if (offset !== null) {
               const positions = history
                 .filter((t) => t.lat !== 0 && t.lon !== 0)
-                .map((t) => Cesium.Cartesian3.fromDegrees(t.lon, t.lat, t.alt_m + offset));
+                .map((t) => {
+                  const altitude = clampToTerrainHeight(viewer, t.lon, t.lat, t.alt_m + offset);
+                  return Cesium.Cartesian3.fromDegrees(t.lon, t.lat, altitude);
+                });
               trackPolyRef.current.positions = positions;
               trackPolyRef.current.show      = positions.length > 1;
             } else {
@@ -274,7 +292,7 @@ export function TrajectoryMap() {
         const rpp    = rocketPosPropRef.current;
         const rtp    = rocketTextPropRef.current;
         if (l && rocket && rpp && rtp && offset !== null) {
-          const displayAlt = l.alt_m + offset;
+          const displayAlt = clampToTerrainHeight(viewer, l.lon, l.lat, l.alt_m + offset);
           const pos = Cesium.Cartesian3.fromDegrees(l.lon, l.lat, displayAlt, undefined, posScratch.current);
           rpp.setValue(pos, Cesium.ReferenceFrame.FIXED);
           rtp.setValue(`${l.alt_m.toFixed(0)} m`);

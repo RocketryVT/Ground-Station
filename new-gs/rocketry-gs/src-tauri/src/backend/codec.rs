@@ -19,6 +19,12 @@ pub const STEPPER_EL_CMD: &str = "gs/cmd/zen";
 pub const STEPPER_JOG_CMD: &str = "gs/cmd/jog";
 pub const RAW_SENSORS_CMD: &str = "gs/cmd/raw_sensors";
 pub const DECLINATION_CMD: &str = "gs/cmd/declination";
+pub const CALIBRATION_CMD: &str = "gs/cmd/calibration";
+pub const TRACKER_MODE_CMD: &str = "gs/cmd/tracker/mode";
+pub const TRACKER_ARM_CMD: &str = "gs/cmd/tracker/arm";
+pub const TRACKER_CONFIG_CMD: &str = "gs/cmd/tracker/config";
+pub const GS_LOCATION: &str = "gs/location";
+pub const ROCKET_LOCATION: &str = "rocket/location";
 
 pub fn decode_topic_payload(topic: &str, payload: &[u8]) -> Option<Result<Value, String>> {
     let decoded = match topic {
@@ -30,6 +36,15 @@ pub fn decode_topic_payload(topic: &str, payload: &[u8]) -> Option<Result<Value,
         RAW_IMU => decode_raw_imu(payload),
         RAW_MAG => decode_raw_mag(payload),
         RAW_YAW_IMU => decode_raw_yaw_imu(payload),
+        RAW_SENSORS_CMD => decode_raw_sensors_cmd(payload),
+        STEPPER_AZ_CMD | STEPPER_EL_CMD => decode_axis_cmd(payload),
+        STEPPER_JOG_CMD => decode_jog_cmd(payload),
+        DECLINATION_CMD => decode_declination_cmd(payload),
+        CALIBRATION_CMD => decode_calibration_cmd(payload),
+        TRACKER_MODE_CMD => decode_tracker_mode_cmd(payload),
+        TRACKER_ARM_CMD => decode_tracker_arm_cmd(payload),
+        TRACKER_CONFIG_CMD => decode_tracker_config_cmd(payload),
+        GS_LOCATION | ROCKET_LOCATION => decode_location_cmd(payload),
         _ => return None,
     };
     Some(decoded)
@@ -78,6 +93,44 @@ pub fn encode_command_payload(topic: &str, payload: &str) -> Vec<u8> {
         }),
         DECLINATION_CMD => encode_message(proto::DeclinationCommand {
             declination_deg: f32_field(&data, "declination_deg"),
+        }),
+        CALIBRATION_CMD => encode_message(proto::CalibrationCommand {
+            action: calibration_action_field(&data, "action"),
+            reference_deg: f32_field(&data, "reference_deg"),
+            note: string_field(&data, "note"),
+            step: u32_field(&data, "step"),
+        }),
+        TRACKER_MODE_CMD => encode_message(proto::TrackerModeCommand {
+            mode: tracker_mode_field(&data, "mode"),
+        }),
+        TRACKER_ARM_CMD => encode_message(proto::TrackerArmCommand {
+            armed: bool_field(&data, "armed"),
+        }),
+        TRACKER_CONFIG_CMD => encode_message(proto::TrackerConfigCommand {
+            yaw_trim_deg: f32_field(&data, "yaw_trim_deg"),
+            el_trim_deg: f32_field(&data, "el_trim_deg"),
+            az_min_deg: f32_field(&data, "az_min_deg"),
+            az_max_deg: f32_field(&data, "az_max_deg"),
+            el_min_deg: f32_field(&data, "el_min_deg"),
+            el_max_deg: f32_field(&data, "el_max_deg"),
+            default_speed_dps: f32_field(&data, "default_speed_dps"),
+            max_speed_dps: f32_field(&data, "max_speed_dps"),
+            scan_speed_az_dps: f32_field(&data, "scan_speed_az_dps"),
+            scan_speed_el_dps: f32_field(&data, "scan_speed_el_dps"),
+            gs_timeout_ms: u32_field(&data, "gs_timeout_ms"),
+            target_timeout_ms: u32_field(&data, "target_timeout_ms"),
+            distance_min_m: f32_field(&data, "distance_min_m"),
+            scan_on_loss: bool_field(&data, "scan_on_loss"),
+            use_ahrs_el: bool_field(&data, "use_ahrs_el"),
+            use_ahrs_az: bool_field(&data, "use_ahrs_az"),
+            ahrs_max_age_ms: f32_field(&data, "ahrs_max_age_ms"),
+            ahrs_feedback_gain: f32_field(&data, "ahrs_feedback_gain"),
+            ahrs_max_correction_deg: f32_field(&data, "ahrs_max_correction_deg"),
+        }),
+        GS_LOCATION | ROCKET_LOCATION => encode_message(proto::LocationCommand {
+            lat: f64_field(&data, "lat"),
+            lon: f64_field(&data, "lon"),
+            alt_m: f64_field(&data, "alt_m"),
         }),
         _ => payload.as_bytes().to_vec(),
     }
@@ -173,6 +226,18 @@ fn decode_antenna(payload: &[u8]) -> Result<Value, String> {
         ("az_faulted", json!(msg.az_faulted)),
         ("zen_faulted", json!(msg.zen_faulted)),
         ("mode", json!(msg.mode)),
+        ("armed", json!(msg.armed)),
+        ("gs_fresh", json!(msg.gs_fresh)),
+        ("target_fresh", json!(msg.target_fresh)),
+        ("ahrs_el_used", json!(msg.ahrs_el_used)),
+        ("ahrs_az_used", json!(msg.ahrs_az_used)),
+        ("distance_m", json!(msg.distance_m)),
+        ("pointing_error_az", json!(msg.pointing_error_az)),
+        ("pointing_error_el", json!(msg.pointing_error_el)),
+        ("az_reference_deg", json!(msg.az_reference_deg)),
+        ("el_reference_deg", json!(msg.el_reference_deg)),
+        ("calibration_seq", json!(msg.calibration_seq)),
+        ("calibration_status", json!(msg.calibration_status)),
     ]))
 }
 
@@ -303,6 +368,104 @@ fn decode_raw_yaw_imu(payload: &[u8]) -> Result<Value, String> {
     ]))
 }
 
+fn decode_raw_sensors_cmd(payload: &[u8]) -> Result<Value, String> {
+    let msg = proto::RawSensorsCommand::decode(payload).map_err(|error| error.to_string())?;
+    Ok(object([
+        ("imu", json!(msg.imu)),
+        ("mag", json!(msg.mag)),
+        ("yaw_imu", json!(msg.yaw_imu)),
+    ]))
+}
+
+fn decode_axis_cmd(payload: &[u8]) -> Result<Value, String> {
+    let msg = proto::AxisCommand::decode(payload).map_err(|error| error.to_string())?;
+    Ok(object([
+        ("target_angle_deg", json!(msg.target_angle_deg)),
+        ("speed_dps", json!(msg.speed_dps)),
+        ("stop", json!(msg.stop)),
+    ]))
+}
+
+fn decode_jog_cmd(payload: &[u8]) -> Result<Value, String> {
+    let msg = proto::JogCommand::decode(payload).map_err(|error| error.to_string())?;
+    Ok(object([
+        (
+            "axis",
+            json!(msg.axis.and_then(|value| proto::JogAxis::try_from(value).ok()).map(jog_axis_name)),
+        ),
+        ("delta_deg", json!(msg.delta_deg)),
+        ("speed_dps", json!(msg.speed_dps)),
+    ]))
+}
+
+fn decode_declination_cmd(payload: &[u8]) -> Result<Value, String> {
+    let msg = proto::DeclinationCommand::decode(payload).map_err(|error| error.to_string())?;
+    Ok(object([("declination_deg", json!(msg.declination_deg))]))
+}
+
+fn decode_calibration_cmd(payload: &[u8]) -> Result<Value, String> {
+    let msg = proto::CalibrationCommand::decode(payload).map_err(|error| error.to_string())?;
+    Ok(object([
+        (
+            "action",
+            json!(msg
+                .action
+                .and_then(|value| proto::CalibrationAction::try_from(value).ok())
+                .map(calibration_action_name)),
+        ),
+        ("reference_deg", json!(msg.reference_deg)),
+        ("note", json!(msg.note)),
+        ("step", json!(msg.step)),
+    ]))
+}
+
+fn decode_tracker_mode_cmd(payload: &[u8]) -> Result<Value, String> {
+    let msg = proto::TrackerModeCommand::decode(payload).map_err(|error| error.to_string())?;
+    Ok(object([(
+        "mode",
+        json!(msg.mode.and_then(|value| proto::TrackerMode::try_from(value).ok()).map(tracker_mode_name)),
+    )]))
+}
+
+fn decode_tracker_arm_cmd(payload: &[u8]) -> Result<Value, String> {
+    let msg = proto::TrackerArmCommand::decode(payload).map_err(|error| error.to_string())?;
+    Ok(object([("armed", json!(msg.armed))]))
+}
+
+fn decode_tracker_config_cmd(payload: &[u8]) -> Result<Value, String> {
+    let msg = proto::TrackerConfigCommand::decode(payload).map_err(|error| error.to_string())?;
+    Ok(object([
+        ("yaw_trim_deg", json!(msg.yaw_trim_deg)),
+        ("el_trim_deg", json!(msg.el_trim_deg)),
+        ("az_min_deg", json!(msg.az_min_deg)),
+        ("az_max_deg", json!(msg.az_max_deg)),
+        ("el_min_deg", json!(msg.el_min_deg)),
+        ("el_max_deg", json!(msg.el_max_deg)),
+        ("default_speed_dps", json!(msg.default_speed_dps)),
+        ("max_speed_dps", json!(msg.max_speed_dps)),
+        ("scan_speed_az_dps", json!(msg.scan_speed_az_dps)),
+        ("scan_speed_el_dps", json!(msg.scan_speed_el_dps)),
+        ("gs_timeout_ms", json!(msg.gs_timeout_ms)),
+        ("target_timeout_ms", json!(msg.target_timeout_ms)),
+        ("distance_min_m", json!(msg.distance_min_m)),
+        ("scan_on_loss", json!(msg.scan_on_loss)),
+        ("use_ahrs_el", json!(msg.use_ahrs_el)),
+        ("use_ahrs_az", json!(msg.use_ahrs_az)),
+        ("ahrs_max_age_ms", json!(msg.ahrs_max_age_ms)),
+        ("ahrs_feedback_gain", json!(msg.ahrs_feedback_gain)),
+        ("ahrs_max_correction_deg", json!(msg.ahrs_max_correction_deg)),
+    ]))
+}
+
+fn decode_location_cmd(payload: &[u8]) -> Result<Value, String> {
+    let msg = proto::LocationCommand::decode(payload).map_err(|error| error.to_string())?;
+    Ok(object([
+        ("lat", json!(msg.lat)),
+        ("lon", json!(msg.lon)),
+        ("alt_m", json!(msg.alt_m)),
+    ]))
+}
+
 fn encode_message(message: impl Message) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(message.encoded_len());
     message.encode(&mut bytes).expect("encode protobuf command");
@@ -318,6 +481,79 @@ fn f32_field(data: &Value, key: &str) -> Option<f32> {
         .and_then(Value::as_f64)
         .filter(|value| value.is_finite())
         .map(|value| value as f32)
+}
+
+fn f64_field(data: &Value, key: &str) -> Option<f64> {
+    data.get(key).and_then(Value::as_f64).filter(|value| value.is_finite())
+}
+
+fn u32_field(data: &Value, key: &str) -> Option<u32> {
+    data.get(key)
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+}
+
+fn string_field(data: &Value, key: &str) -> Option<String> {
+    data.get(key).and_then(Value::as_str).map(str::to_owned)
+}
+
+fn tracker_mode_field(data: &Value, key: &str) -> Option<i32> {
+    let mode = data.get(key)?.as_str()?.to_ascii_lowercase();
+    let mode = match mode.as_str() {
+        "stop" => proto::TrackerMode::Stop,
+        "manual" => proto::TrackerMode::Manual,
+        "auto" => proto::TrackerMode::Auto,
+        "scan" => proto::TrackerMode::Scan,
+        "servotest" | "servo_test" | "servo-test" => proto::TrackerMode::Servotest,
+        "fault" => proto::TrackerMode::Fault,
+        _ => return None,
+    };
+    Some(mode as i32)
+}
+
+fn calibration_action_field(data: &Value, key: &str) -> Option<i32> {
+    match data.get(key).and_then(Value::as_str)? {
+        "begin_guided" | "begin" => Some(proto::CalibrationAction::BeginGuided as i32),
+        "set_az_reference" | "set_az_zero" => {
+            Some(proto::CalibrationAction::SetAzReference as i32)
+        }
+        "set_el_reference" | "set_zen_reference" | "set_zen_zero" => {
+            Some(proto::CalibrationAction::SetElReference as i32)
+        }
+        "clear" | "clear_calibration" => Some(proto::CalibrationAction::Clear as i32),
+        "enable_tracking" => Some(proto::CalibrationAction::EnableTracking as i32),
+        _ => None,
+    }
+}
+
+fn jog_axis_name(axis: proto::JogAxis) -> &'static str {
+    match axis {
+        proto::JogAxis::Unspecified => "unspecified",
+        proto::JogAxis::Az => "az",
+        proto::JogAxis::El => "el",
+    }
+}
+
+fn tracker_mode_name(mode: proto::TrackerMode) -> &'static str {
+    match mode {
+        proto::TrackerMode::Stop => "stop",
+        proto::TrackerMode::Manual => "manual",
+        proto::TrackerMode::Auto => "auto",
+        proto::TrackerMode::Scan => "scan",
+        proto::TrackerMode::Servotest => "servotest",
+        proto::TrackerMode::Fault => "fault",
+    }
+}
+
+fn calibration_action_name(action: proto::CalibrationAction) -> &'static str {
+    match action {
+        proto::CalibrationAction::Unspecified => "unspecified",
+        proto::CalibrationAction::BeginGuided => "begin_guided",
+        proto::CalibrationAction::SetAzReference => "set_az_reference",
+        proto::CalibrationAction::SetElReference => "set_el_reference",
+        proto::CalibrationAction::Clear => "clear",
+        proto::CalibrationAction::EnableTracking => "enable_tracking",
+    }
 }
 
 fn first_number(data: &Value, keys: &[&str]) -> Option<f64> {

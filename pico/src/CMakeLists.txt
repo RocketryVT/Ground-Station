@@ -16,6 +16,10 @@ add_executable(gs_pico
     Tasks/Baro/baro_task.cpp
     Tasks/Fusion/fusion_task.cpp
     Tasks/Stepper/cl57te.cpp
+    Tasks/Stepper/tracker_state.cpp
+    Tasks/Stepper/axis_task.cpp
+    Tasks/Stepper/tracker_control.cpp
+    Tasks/Stepper/antenna_state.cpp
     Tasks/Stepper/stepper_task.cpp
     Tasks/USB/usb_task.cpp
     Proto/ground_station.pb.c

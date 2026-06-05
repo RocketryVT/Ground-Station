@@ -12,10 +12,10 @@ PB_BIND(groundstation_RocketLoRaSample, groundstation_RocketLoRaSample, AUTO)
 PB_BIND(groundstation_Lora1Rf69Packet, groundstation_Lora1Rf69Packet, 2)
 
 
-PB_BIND(groundstation_AntennaState, groundstation_AntennaState, AUTO)
+PB_BIND(groundstation_AntennaState, groundstation_AntennaState, 2)
 
 
-PB_BIND(groundstation_GroundImu, groundstation_GroundImu, AUTO)
+PB_BIND(groundstation_GroundImu, groundstation_GroundImu, 2)
 
 
 PB_BIND(groundstation_AhrsStatus, groundstation_AhrsStatus, AUTO)
@@ -42,7 +42,26 @@ PB_BIND(groundstation_JogCommand, groundstation_JogCommand, AUTO)
 PB_BIND(groundstation_DeclinationCommand, groundstation_DeclinationCommand, AUTO)
 
 
+PB_BIND(groundstation_TrackerModeCommand, groundstation_TrackerModeCommand, AUTO)
+
+
+PB_BIND(groundstation_TrackerArmCommand, groundstation_TrackerArmCommand, AUTO)
+
+
+PB_BIND(groundstation_TrackerConfigCommand, groundstation_TrackerConfigCommand, AUTO)
+
+
+PB_BIND(groundstation_CalibrationCommand, groundstation_CalibrationCommand, AUTO)
+
+
+PB_BIND(groundstation_LocationCommand, groundstation_LocationCommand, AUTO)
+
+
 PB_BIND(groundstation_StarlinkProxyStatus, groundstation_StarlinkProxyStatus, 2)
+
+
+
+
 
 
 

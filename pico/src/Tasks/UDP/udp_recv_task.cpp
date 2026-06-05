@@ -15,6 +15,7 @@
 
 #include "SIGMA.hpp"
 
+#include "pico/time.h"
 #include "pico/cyw43_arch.h"
 #include "lwip/udp.h"
 #include "lwip/pbuf.h"
@@ -120,7 +121,7 @@ static void udp_recv_task( void* )
 
         // Update rocket location queue (antenna tracker reads this)
         if ( d.flags & SIGMA::FLAG_GPS_VALID ) {
-            LocationMsg loc { d.lat, d.lon, (double)d.alt_gps_m };
+            LocationMsg loc { d.lat, d.lon, (double)d.alt_gps_m, time_us_64() };
             xQueueOverwrite( g_rocket_location_q, &loc );
         }
 

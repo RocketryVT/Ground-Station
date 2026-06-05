@@ -36,6 +36,18 @@ export interface AntennaState {
   zen_moving?:      boolean;
   az_faulted?:      boolean;
   zen_faulted?:     boolean;
+  armed?:           boolean;
+  gs_fresh?:        boolean;
+  target_fresh?:    boolean;
+  ahrs_el_used?:    boolean;
+  ahrs_az_used?:    boolean;
+  distance_m?:      number;
+  pointing_error_az?: number;
+  pointing_error_el?: number;
+  az_reference_deg?: number;
+  el_reference_deg?: number;
+  calibration_seq?: number;
+  calibration_status?: string;
 }
 
 export interface GroundImuState {

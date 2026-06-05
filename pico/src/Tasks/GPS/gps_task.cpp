@@ -2,6 +2,8 @@
 #include "shared.hpp"
 #include "../Starlink/starlink.hpp"
 
+#include "pico/time.h"
+
 #include <math.h>
 
 // ── Averaging parameters ──────────────────────────────────────────────────────
@@ -100,7 +102,7 @@ static void gps_task( void* )
 
             // Publish running estimate even before convergence so the
             // antenna tracker has something to work with from the start.
-            LocationMsg msg = { lat_w.mean, lon_w.mean, alt_w.mean };
+            LocationMsg msg = { lat_w.mean, lon_w.mean, alt_w.mean, time_us_64() };
             xQueueOverwrite( g_gs_location_q, &msg );
 
             vTaskDelay( pdMS_TO_TICKS( POLL_INTERVAL_AVERAGING_MS ) );

@@ -48,6 +48,19 @@ interface AhrsStatus {
   updates: number;
 }
 
+interface CalibrationEvent {
+  timestamp: number;
+  seq?: number;
+  action?: string;
+  result?: string;
+  reference_deg?: number;
+  az_calibrated?: boolean;
+  el_calibrated?: boolean;
+  az_reference_deg?: number;
+  el_reference_deg?: number;
+  note?: string;
+}
+
 type DebugTab = 'log' | 'topics' | 'orientation' | 'ahrs' | 'raw' | 'starlink' | 'sim';
 
 const DEBUG_TABS: Array<{ id: DebugTab; label: string; section: string }> = [
@@ -960,6 +973,31 @@ export function DebugPanel({ mqtt }: Props) {
   const [jogStep,  setJogStep]  = useState('2');
   const [jogSpeed, setJogSpeed] = useState('10');
 
+  // Tracker config/calibration state
+  const [cfgYawTrim, setCfgYawTrim] = useState('0');
+  const [cfgElTrim, setCfgElTrim] = useState('0');
+  const [cfgAzMin, setCfgAzMin] = useState('0');
+  const [cfgAzMax, setCfgAzMax] = useState('360');
+  const [cfgElMin, setCfgElMin] = useState('-10');
+  const [cfgElMax, setCfgElMax] = useState('90');
+  const [cfgDefaultSpeed, setCfgDefaultSpeed] = useState('30');
+  const [cfgMaxSpeed, setCfgMaxSpeed] = useState('90');
+  const [cfgScanAz, setCfgScanAz] = useState('20');
+  const [cfgScanEl, setCfgScanEl] = useState('5');
+  const [cfgGsTimeout, setCfgGsTimeout] = useState('30000');
+  const [cfgTargetTimeout, setCfgTargetTimeout] = useState('5000');
+  const [cfgDistanceMin, setCfgDistanceMin] = useState('3');
+  const [cfgScanOnLoss, setCfgScanOnLoss] = useState(true);
+  const [cfgUseAhrsEl, setCfgUseAhrsEl] = useState(true);
+  const [cfgUseAhrsAz, setCfgUseAhrsAz] = useState(false);
+  const [cfgAhrsAge, setCfgAhrsAge] = useState('250');
+  const [cfgAhrsGain, setCfgAhrsGain] = useState('0.35');
+  const [cfgAhrsMaxCorrection, setCfgAhrsMaxCorrection] = useState('8');
+  const [calStep, setCalStep] = useState(1);
+  const [calAzReference, setCalAzReference] = useState('0');
+  const [calElReference, setCalElReference] = useState('0');
+  const [calNote, setCalNote] = useState('external reference');
+
   // Debug oscillation state
   const [oscAxis,    setOscAxis]    = useState<'az' | 'el'>('el');
   const [oscDeg,     setOscDeg]     = useState('5');
@@ -1003,8 +1041,66 @@ export function DebugPanel({ mqtt }: Props) {
     setPendingDirectAxis(null);
   }
 
-  function publishCalibration(action: string) {
-    mqtt.publish(TOPICS.CALIBRATION_CMD, JSON.stringify({ action }));
+  function publishCalibration(action: string, referenceDeg?: number, note = calNote) {
+    mqtt.publish(TOPICS.CALIBRATION_CMD, JSON.stringify({
+      action,
+      reference_deg: referenceDeg,
+      note,
+      step: calStep,
+    }));
+  }
+
+  function numberOrUndefined(value: string): number | undefined {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  function publishTrackerConfig() {
+    mqtt.publish(TOPICS.TRACKER_CONFIG_CMD, JSON.stringify({
+      yaw_trim_deg: numberOrUndefined(cfgYawTrim),
+      el_trim_deg: numberOrUndefined(cfgElTrim),
+      az_min_deg: numberOrUndefined(cfgAzMin),
+      az_max_deg: numberOrUndefined(cfgAzMax),
+      el_min_deg: numberOrUndefined(cfgElMin),
+      el_max_deg: numberOrUndefined(cfgElMax),
+      default_speed_dps: numberOrUndefined(cfgDefaultSpeed),
+      max_speed_dps: numberOrUndefined(cfgMaxSpeed),
+      scan_speed_az_dps: numberOrUndefined(cfgScanAz),
+      scan_speed_el_dps: numberOrUndefined(cfgScanEl),
+      gs_timeout_ms: numberOrUndefined(cfgGsTimeout),
+      target_timeout_ms: numberOrUndefined(cfgTargetTimeout),
+      distance_min_m: numberOrUndefined(cfgDistanceMin),
+      scan_on_loss: cfgScanOnLoss,
+      use_ahrs_el: cfgUseAhrsEl,
+      use_ahrs_az: cfgUseAhrsAz,
+      ahrs_max_age_ms: numberOrUndefined(cfgAhrsAge),
+      ahrs_feedback_gain: numberOrUndefined(cfgAhrsGain),
+      ahrs_max_correction_deg: numberOrUndefined(cfgAhrsMaxCorrection),
+    }));
+  }
+
+  function beginGuidedCalibration() {
+    setCalStep(1);
+    publishCalibration('begin_guided', undefined, calNote);
+  }
+
+  function setAzReference() {
+    const ref = parseFloat(calAzReference);
+    if (!Number.isFinite(ref)) return;
+    publishCalibration('set_az_reference', ref, calNote);
+    setCalStep(2);
+  }
+
+  function setElReference() {
+    const ref = parseFloat(calElReference);
+    if (!Number.isFinite(ref)) return;
+    publishCalibration('set_el_reference', ref, calNote);
+    setCalStep(3);
+  }
+
+  function enableCalibratedTracking() {
+    publishCalibration('enable_tracking', undefined, calNote);
+    setCalStep(4);
   }
 
   function handleJog(axis: 'az' | 'el', sign: 1 | -1) {
@@ -1021,7 +1117,16 @@ export function DebugPanel({ mqtt }: Props) {
   function handleStopMotion() {
     mqtt.publish(TOPICS.STEPPER_AZ_CMD,  JSON.stringify({ stop: true }));
     mqtt.publish(TOPICS.STEPPER_EL_CMD, JSON.stringify({ stop: true }));
-    publishCalibration('disable_tracking');
+    mqtt.publish(TOPICS.TRACKER_MODE_CMD, JSON.stringify({ mode: 'stop' }));
+    mqtt.publish(TOPICS.TRACKER_ARM_CMD, JSON.stringify({ armed: false }));
+  }
+
+  function handleTrackerMode(mode: 'stop' | 'manual' | 'auto' | 'scan') {
+    mqtt.publish(TOPICS.TRACKER_MODE_CMD, JSON.stringify({ mode }));
+  }
+
+  function handleTrackerArm(armed: boolean) {
+    mqtt.publish(TOPICS.TRACKER_ARM_CMD, JSON.stringify({ armed }));
   }
 
   const topicOptions = useMemo(
@@ -1047,6 +1152,11 @@ export function DebugPanel({ mqtt }: Props) {
     () => latestJson<AntennaState>(rawMessages, TOPICS.ANTENNA_STATE),
     [rawMessages],
   );
+  const calibrationEvents = useMemo(
+    () => jsonHistory<CalibrationEvent>(rawMessages, TOPICS.CALIBRATION_EVENT).slice(-8),
+    [rawMessages],
+  );
+  const latestCalibrationEvent = calibrationEvents[calibrationEvents.length - 1] ?? null;
   const ahrsStatus = useMemo(
     () => latestJson<AhrsStatus>(rawMessages, TOPICS.AHRS_STATUS),
     [rawMessages],
@@ -1228,8 +1338,40 @@ export function DebugPanel({ mqtt }: Props) {
               <strong>{antenna?.zen_calibrated ? 'SET' : 'OPEN'}</strong>
               <span>TRACKING</span>
               <strong>{antenna?.tracking_enabled ? 'ON' : 'OFF'}</strong>
+              <span>ARMED</span>
+              <strong>{antenna?.armed ? 'YES' : 'NO'}</strong>
+              <span>FIXES</span>
+              <strong>{antenna?.gs_fresh ? 'GS' : '--'} / {antenna?.target_fresh ? 'TGT' : '--'}</strong>
+              <span>ERR</span>
+              <strong>
+                {antenna?.pointing_error_az != null ? antenna.pointing_error_az.toFixed(1) : '--'} /
+                {antenna?.pointing_error_el != null ? antenna.pointing_error_el.toFixed(1) : '--'}°
+              </strong>
+              <span>AHRS</span>
+              <strong>{antenna?.ahrs_az_used ? 'AZ' : '--'} / {antenna?.ahrs_el_used ? 'EL' : '--'}</strong>
               <span>AZ MECH</span>
               <strong>{antenna?.actual_az_mech != null ? `${antenna.actual_az_mech.toFixed(1)}°` : '--'}</strong>
+              <span>CAL</span>
+              <strong>{antenna?.calibration_status ?? '--'}</strong>
+              <span>REF</span>
+              <strong>
+                {antenna?.az_reference_deg != null ? antenna.az_reference_deg.toFixed(1) : '--'} /
+                {antenna?.el_reference_deg != null ? antenna.el_reference_deg.toFixed(1) : '--'}°
+              </strong>
+            </div>
+          </div>
+
+          {/* TRACKER */}
+          <div className={styles.ctrlCard}>
+            <div className={styles.ctrlCardTitle}>TRACKER</div>
+            <div className={styles.jogGrid}>
+              <button className={styles.sendBtn} onClick={() => handleTrackerArm(true)}>ARM</button>
+              <button className={styles.stopBtn} onClick={() => handleTrackerArm(false)}>DISARM</button>
+              <button className={styles.axisBtn} onClick={() => handleTrackerMode('auto')}>AUTO</button>
+              <button className={styles.axisBtn} onClick={() => handleTrackerMode('scan')}>SCAN</button>
+              <button className={styles.axisBtn} onClick={() => handleTrackerMode('manual')}>MANUAL</button>
+              <button className={styles.stopBtn} onClick={() => handleTrackerMode('stop')}>STOP</button>
+              <button className={styles.stopBtn} onClick={handleStopMotion}>STOP ALL</button>
             </div>
           </div>
 
@@ -1260,16 +1402,129 @@ export function DebugPanel({ mqtt }: Props) {
             </div>
           </div>
 
-          {/* CALIBRATION */}
-          <div className={styles.ctrlCard}>
-            <div className={styles.ctrlCardTitle}>CALIBRATION</div>
-            <button className={styles.sendBtn} onClick={() => publishCalibration('set_az_zero')}>SET AZ ZERO</button>
-            <button className={styles.sendBtn} onClick={() => publishCalibration('set_zen_zero')}>SET EL ZERO</button>
-            <button className={styles.sendBtn} onClick={() => publishCalibration('enable_tracking')}>ENABLE TRACKING</button>
-            <button className={styles.stopBtn} onClick={handleStopMotion}>STOP / DISABLE</button>
-            <button className={styles.stopBtn} onClick={() => publishCalibration('clear_calibration')}>CLEAR CAL</button>
+          {/* GUIDED CALIBRATION */}
+          <div className={`${styles.ctrlCard} ${styles.ctrlCardFull}`}>
+            <div className={styles.ctrlCardTitle}>GUIDED CALIBRATION</div>
             <div className={styles.cmdNote}>
-              Jog to cable-center, set az zero, jog to horizontal reference, set elevation zero, then enable tracking.
+              Step {calStep}: stop tracking, jog the antenna to match an external reference, then record the reference reading.
+            </div>
+            <button className={styles.sendBtn} onClick={beginGuidedCalibration}>BEGIN GUIDED CAL</button>
+            <div className={styles.ctrlInlineRow}>
+              <span className={styles.cmdLabel}>AZ REF</span>
+              <input
+                className={styles.cmdInputSm}
+                type="number"
+                step="0.1"
+                min="0"
+                max="360"
+                value={calAzReference}
+                onChange={e => setCalAzReference(e.target.value)}
+              />
+              <button className={styles.axisBtn} onClick={setAzReference}>SET AZ</button>
+            </div>
+            <div className={styles.ctrlInlineRow}>
+              <span className={styles.cmdLabel}>EL REF</span>
+              <input
+                className={styles.cmdInputSm}
+                type="number"
+                step="0.1"
+                min="-90"
+                max="90"
+                value={calElReference}
+                onChange={e => setCalElReference(e.target.value)}
+              />
+              <button className={styles.axisBtn} onClick={setElReference}>SET EL</button>
+            </div>
+            <label className={styles.cmdLabel}>Log note</label>
+            <input
+              className={styles.cmdInput}
+              value={calNote}
+              onChange={e => setCalNote(e.target.value)}
+            />
+            <div className={styles.jogGrid}>
+              <button className={styles.sendBtn} onClick={enableCalibratedTracking}>ENABLE AUTO</button>
+              <button className={styles.stopBtn} onClick={() => publishCalibration('clear')}>CLEAR CAL</button>
+            </div>
+            <div className={styles.cmdNote}>
+              Last event: {latestCalibrationEvent
+                ? `${latestCalibrationEvent.action ?? '--'} / ${latestCalibrationEvent.result ?? '--'}`
+                : 'none'}
+              <br />
+              Topic: <code>{TOPICS.CALIBRATION_EVENT}</code>
+            </div>
+            {calibrationEvents.length > 0 && (
+              <div className={styles.statusGrid}>
+                {calibrationEvents.slice(-3).map((event, index) => (
+                  <span key={`${event.timestamp}-${index}`}>
+                    {(event.action ?? '--').slice(0, 14)}
+                    <strong>{event.result ?? '--'}</strong>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* TRACKER CONFIG */}
+          <div className={`${styles.ctrlCard} ${styles.ctrlCardFull}`}>
+            <div className={styles.ctrlCardTitle}>TRACKER CONFIG</div>
+            <div className={styles.ctrlInlineRow}>
+              <span className={styles.cmdLabel}>YAW TRIM</span>
+              <input className={styles.cmdInputSm} type="number" step="0.1" value={cfgYawTrim} onChange={e => setCfgYawTrim(e.target.value)} />
+              <span className={styles.cmdLabel}>EL TRIM</span>
+              <input className={styles.cmdInputSm} type="number" step="0.1" value={cfgElTrim} onChange={e => setCfgElTrim(e.target.value)} />
+            </div>
+            <div className={styles.ctrlInlineRow}>
+              <span className={styles.cmdLabel}>AZ MIN/MAX</span>
+              <input className={styles.cmdInputSm} type="number" step="1" value={cfgAzMin} onChange={e => setCfgAzMin(e.target.value)} />
+              <input className={styles.cmdInputSm} type="number" step="1" value={cfgAzMax} onChange={e => setCfgAzMax(e.target.value)} />
+            </div>
+            <div className={styles.ctrlInlineRow}>
+              <span className={styles.cmdLabel}>EL MIN/MAX</span>
+              <input className={styles.cmdInputSm} type="number" step="1" value={cfgElMin} onChange={e => setCfgElMin(e.target.value)} />
+              <input className={styles.cmdInputSm} type="number" step="1" value={cfgElMax} onChange={e => setCfgElMax(e.target.value)} />
+            </div>
+            <div className={styles.ctrlInlineRow}>
+              <span className={styles.cmdLabel}>SPEED</span>
+              <input className={styles.cmdInputSm} type="number" step="1" min="1" value={cfgDefaultSpeed} onChange={e => setCfgDefaultSpeed(e.target.value)} />
+              <input className={styles.cmdInputSm} type="number" step="1" min="1" value={cfgMaxSpeed} onChange={e => setCfgMaxSpeed(e.target.value)} />
+            </div>
+            <div className={styles.ctrlInlineRow}>
+              <span className={styles.cmdLabel}>SCAN AZ/EL</span>
+              <input className={styles.cmdInputSm} type="number" step="1" min="0.1" value={cfgScanAz} onChange={e => setCfgScanAz(e.target.value)} />
+              <input className={styles.cmdInputSm} type="number" step="1" min="0.1" value={cfgScanEl} onChange={e => setCfgScanEl(e.target.value)} />
+            </div>
+            <div className={styles.ctrlInlineRow}>
+              <span className={styles.cmdLabel}>TIMEOUTS</span>
+              <input className={styles.cmdInputSm} type="number" step="250" min="1000" value={cfgGsTimeout} onChange={e => setCfgGsTimeout(e.target.value)} />
+              <input className={styles.cmdInputSm} type="number" step="250" min="250" value={cfgTargetTimeout} onChange={e => setCfgTargetTimeout(e.target.value)} />
+            </div>
+            <div className={styles.ctrlInlineRow}>
+              <span className={styles.cmdLabel}>DIST MIN</span>
+              <input className={styles.cmdInputSm} type="number" step="1" min="0" value={cfgDistanceMin} onChange={e => setCfgDistanceMin(e.target.value)} />
+              <label className={styles.scrollToggle}>
+                <input type="checkbox" checked={cfgScanOnLoss} onChange={e => setCfgScanOnLoss(e.target.checked)} />
+                scan loss
+              </label>
+            </div>
+            <div className={styles.ctrlInlineRow}>
+              <label className={styles.scrollToggle}>
+                <input type="checkbox" checked={cfgUseAhrsEl} onChange={e => setCfgUseAhrsEl(e.target.checked)} />
+                AHRS EL
+              </label>
+              <label className={styles.scrollToggle}>
+                <input type="checkbox" checked={cfgUseAhrsAz} onChange={e => setCfgUseAhrsAz(e.target.checked)} />
+                AHRS AZ
+              </label>
+            </div>
+            <div className={styles.ctrlInlineRow}>
+              <span className={styles.cmdLabel}>AHRS AGE/GAIN/CORR</span>
+              <input className={styles.cmdInputSm} type="number" step="10" min="20" value={cfgAhrsAge} onChange={e => setCfgAhrsAge(e.target.value)} />
+              <input className={styles.cmdInputSm} type="number" step="0.05" min="0" max="1" value={cfgAhrsGain} onChange={e => setCfgAhrsGain(e.target.value)} />
+              <input className={styles.cmdInputSm} type="number" step="1" min="0" value={cfgAhrsMaxCorrection} onChange={e => setCfgAhrsMaxCorrection(e.target.value)} />
+            </div>
+            <button className={styles.sendBtn} onClick={publishTrackerConfig}>APPLY CONFIG</button>
+            <div className={styles.cmdNote}>
+              Runtime config only. The Pico sanitizes values and applies them through <code>{TOPICS.TRACKER_CONFIG_CMD}</code>.
             </div>
           </div>
 

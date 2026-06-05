@@ -144,6 +144,7 @@ struct LocationMsg {
     double lat;
     double lon;
     double alt_m;
+    uint64_t timestamp_us;
 };
 
 extern QueueHandle_t g_gs_location_q;
@@ -195,12 +196,16 @@ extern QueueHandle_t g_baro_q;
 // Readers call xQueuePeek() to get the latest orientation without consuming it.
 // `valid` is false until the Fusion AHRS startup ramp has completed (~3 s).
 struct ImuMsg {
+    uint64_t timestamp_us;
     float q[4];             // quaternion [w, x, y, z] sensor->Earth (NED)
     float euler[3];         // [roll_deg, pitch_deg, yaw_deg] ZYX convention
     float earth_accel[3];   // linear acceleration, Earth frame, g (gravity removed)
     float baro_alt_m;       // barometric altitude, metres MSL
     float temp_c;           // temperature (baro sensor preferred, else IMU)
     bool  valid;            // true once AHRS startup ramp is done
+    bool  have_yaw_frame;
+    float yaw_frame_yaw360;
+    float bar_rel_pitch;
 };
 
 extern QueueHandle_t g_imu_q;

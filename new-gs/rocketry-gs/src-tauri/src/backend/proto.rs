@@ -23,6 +23,28 @@ pub enum JogAxis {
     El = 2,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
+#[repr(i32)]
+pub enum TrackerMode {
+    Stop = 0,
+    Manual = 1,
+    Auto = 2,
+    Scan = 3,
+    Servotest = 4,
+    Fault = 5,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
+#[repr(i32)]
+pub enum CalibrationAction {
+    Unspecified = 0,
+    BeginGuided = 1,
+    SetAzReference = 2,
+    SetElReference = 3,
+    Clear = 4,
+    EnableTracking = 5,
+}
+
 #[derive(Clone, PartialEq, Message)]
 pub struct RocketLoRaSample {
     #[prost(uint32, optional, tag = "1")]
@@ -93,6 +115,30 @@ pub struct AntennaState {
     pub zen_faulted: Option<bool>,
     #[prost(string, optional, tag = "15")]
     pub mode: Option<String>,
+    #[prost(bool, optional, tag = "16")]
+    pub armed: Option<bool>,
+    #[prost(bool, optional, tag = "17")]
+    pub gs_fresh: Option<bool>,
+    #[prost(bool, optional, tag = "18")]
+    pub target_fresh: Option<bool>,
+    #[prost(bool, optional, tag = "19")]
+    pub ahrs_el_used: Option<bool>,
+    #[prost(bool, optional, tag = "20")]
+    pub ahrs_az_used: Option<bool>,
+    #[prost(float, optional, tag = "21")]
+    pub distance_m: Option<f32>,
+    #[prost(float, optional, tag = "22")]
+    pub pointing_error_az: Option<f32>,
+    #[prost(float, optional, tag = "23")]
+    pub pointing_error_el: Option<f32>,
+    #[prost(float, optional, tag = "24")]
+    pub az_reference_deg: Option<f32>,
+    #[prost(float, optional, tag = "25")]
+    pub el_reference_deg: Option<f32>,
+    #[prost(uint32, optional, tag = "26")]
+    pub calibration_seq: Option<u32>,
+    #[prost(string, optional, tag = "27")]
+    pub calibration_status: Option<String>,
 }
 
 #[derive(Clone, PartialEq, Message)]
@@ -265,4 +311,80 @@ pub struct JogCommand {
 pub struct DeclinationCommand {
     #[prost(float, optional, tag = "1")]
     pub declination_deg: Option<f32>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct TrackerModeCommand {
+    #[prost(enumeration = "TrackerMode", optional, tag = "1")]
+    pub mode: Option<i32>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct TrackerArmCommand {
+    #[prost(bool, optional, tag = "1")]
+    pub armed: Option<bool>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct TrackerConfigCommand {
+    #[prost(float, optional, tag = "1")]
+    pub yaw_trim_deg: Option<f32>,
+    #[prost(float, optional, tag = "2")]
+    pub el_trim_deg: Option<f32>,
+    #[prost(float, optional, tag = "3")]
+    pub az_min_deg: Option<f32>,
+    #[prost(float, optional, tag = "4")]
+    pub az_max_deg: Option<f32>,
+    #[prost(float, optional, tag = "5")]
+    pub el_min_deg: Option<f32>,
+    #[prost(float, optional, tag = "6")]
+    pub el_max_deg: Option<f32>,
+    #[prost(float, optional, tag = "7")]
+    pub default_speed_dps: Option<f32>,
+    #[prost(float, optional, tag = "8")]
+    pub max_speed_dps: Option<f32>,
+    #[prost(float, optional, tag = "9")]
+    pub scan_speed_az_dps: Option<f32>,
+    #[prost(float, optional, tag = "10")]
+    pub scan_speed_el_dps: Option<f32>,
+    #[prost(uint32, optional, tag = "11")]
+    pub gs_timeout_ms: Option<u32>,
+    #[prost(uint32, optional, tag = "12")]
+    pub target_timeout_ms: Option<u32>,
+    #[prost(float, optional, tag = "13")]
+    pub distance_min_m: Option<f32>,
+    #[prost(bool, optional, tag = "14")]
+    pub scan_on_loss: Option<bool>,
+    #[prost(bool, optional, tag = "15")]
+    pub use_ahrs_el: Option<bool>,
+    #[prost(bool, optional, tag = "16")]
+    pub use_ahrs_az: Option<bool>,
+    #[prost(float, optional, tag = "17")]
+    pub ahrs_max_age_ms: Option<f32>,
+    #[prost(float, optional, tag = "18")]
+    pub ahrs_feedback_gain: Option<f32>,
+    #[prost(float, optional, tag = "19")]
+    pub ahrs_max_correction_deg: Option<f32>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct CalibrationCommand {
+    #[prost(enumeration = "CalibrationAction", optional, tag = "1")]
+    pub action: Option<i32>,
+    #[prost(float, optional, tag = "2")]
+    pub reference_deg: Option<f32>,
+    #[prost(string, optional, tag = "3")]
+    pub note: Option<String>,
+    #[prost(uint32, optional, tag = "4")]
+    pub step: Option<u32>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct LocationCommand {
+    #[prost(double, optional, tag = "1")]
+    pub lat: Option<f64>,
+    #[prost(double, optional, tag = "2")]
+    pub lon: Option<f64>,
+    #[prost(double, optional, tag = "3")]
+    pub alt_m: Option<f64>,
 }

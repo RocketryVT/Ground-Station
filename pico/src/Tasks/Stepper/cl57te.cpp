@@ -1,8 +1,13 @@
 #include "cl57te.hpp"
 #include "hardware/gpio.h"
+#include "hardware/sync.h"
 #include "hardware/timer.h"
 #include "pico/time.h"
 #include <math.h>
+
+static constexpr uint32_t kDirSetupUs = 100;
+static constexpr uint32_t kStopIdleUs = 1000;
+static constexpr uint32_t kPulseLowUs = 5;
 
 static float wrap_360_local( float deg )
 {
@@ -30,16 +35,44 @@ static bool step_isr_cb( repeating_timer_t* rt )
 
 bool Cl57te::isr_tick()
 {
-    if ( remaining_ <= 0 ) return false;
+    if ( !timer_running_ ) return false;
+
+    const int32_t delta_steps = target_steps_ - pos_steps_;
+    if ( delta_steps == 0 ) {
+        timer_running_ = false;
+        active_step_sign_ = 0;
+        gpio_put( cfg_.pul_n, true );
+        return false;
+    }
+
+    const int8_t desired_sign = ( delta_steps > 0 ) ? 1 : -1;
+    if ( active_step_sign_ != desired_sign ) {
+        const bool dir_level = dir_level_for_steps( desired_sign );
+        const bool direction_changed =
+            have_last_dir_level_ && ( dir_level != last_dir_level_ );
+
+        gpio_put( cfg_.pul_n, true );
+        gpio_put( cfg_.dir_n, dir_level );
+        last_dir_level_ = dir_level;
+        have_last_dir_level_ = true;
+        active_step_sign_ = desired_sign;
+
+        const uint32_t guard_us = direction_changed ? kStopIdleUs : kDirSetupUs;
+        dir_hold_until_us_ = time_us_32() + guard_us;
+        return true;
+    }
+
+    if ( (int32_t)( time_us_32() - dir_hold_until_us_ ) < 0 ) {
+        return true;
+    }
 
     // PUL- is active-low: idle HIGH, pulse LOW, then return HIGH.
     gpio_put( cfg_.pul_n, false );
-    busy_wait_us_32( 5 );   // spec minimum 2.5 µs; 5 µs gives 2× margin
+    busy_wait_us_32( kPulseLowUs );
     gpio_put( cfg_.pul_n, true );
 
-    pos_steps_ = pos_steps_ + step_sign_;
-    remaining_ = remaining_ - 1;
-    return remaining_ > 0;      // false -> timer self-cancels
+    pos_steps_ = pos_steps_ + active_step_sign_;
+    return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -57,6 +90,8 @@ void Cl57te::init( const Config& cfg )
     gpio_init( cfg_.dir_n );
     gpio_set_dir( cfg_.dir_n, GPIO_OUT );
     gpio_put( cfg_.dir_n, true );     // DIR- idle = positive direction
+    have_last_dir_level_ = true;
+    last_dir_level_ = true;
 
     // Pre-compute steps/degree for angle conversions
     float motor_revs_per_output_rev = cfg_.gear_ratio;
@@ -64,8 +99,11 @@ void Cl57te::init( const Config& cfg )
                                  * motor_revs_per_output_rev;
     steps_per_deg_ = output_steps_per_rev / 360.0f;
 
-    remaining_ = 0;
     pos_steps_ = 0;
+    target_steps_ = 0;
+    active_step_sign_ = 0;
+    timer_running_ = false;
+    dir_hold_until_us_ = 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -80,7 +118,11 @@ int32_t Cl57te::angle_to_steps( float angle_deg ) const
 void Cl57te::set_current_angle( float angle_deg )
 {
     stop();
-    pos_steps_ = angle_to_steps( angle_deg );
+    const int32_t steps = angle_to_steps( angle_deg );
+    const uint32_t irq_state = save_and_disable_interrupts();
+    pos_steps_ = steps;
+    target_steps_ = steps;
+    restore_interrupts( irq_state );
 }
 
 int32_t Cl57te::target_steps_for_angle( float target_angle_deg,
@@ -112,8 +154,12 @@ bool Cl57te::set_angle( float target_angle_deg,
 {
     const int32_t target_steps =
         target_steps_for_angle( target_angle_deg, shortest_path );
-    const int32_t delta_steps = target_steps - pos_steps_;
-    return start_move( delta_steps, step_hz_for_speed( speed_dps ) );
+
+    const uint32_t irq_state = save_and_disable_interrupts();
+    target_steps_ = target_steps;
+    restore_interrupts( irq_state );
+
+    return ensure_timer_running( step_hz_for_speed( speed_dps ) );
 }
 
 // -----------------------------------------------------------------------------
@@ -135,14 +181,18 @@ bool Cl57te::start_move( int32_t n_steps, uint32_t step_hz )
 {
     if ( n_steps == 0 ) return true;
 
-    // Abort any in-progress move
-    if ( remaining_ > 0 ) stop();
+    const uint32_t irq_state = save_and_disable_interrupts();
+    target_steps_ = pos_steps_ + n_steps;
+    restore_interrupts( irq_state );
 
-    // Set direction first, then observe DIR setup time (≥ 5 µs)
-    bool forward = ( n_steps > 0 );
-    bool dir_level = dir_level_for_steps( n_steps );
-    gpio_put( cfg_.dir_n, dir_level );
-    busy_wait_us_32( 10 );  // 10 µs ≥ the 5 µs minimum
+    return ensure_timer_running( step_hz );
+}
+
+bool Cl57te::ensure_timer_running( uint32_t step_hz )
+{
+    if ( target_steps_ == pos_steps_ ) return true;
+
+    if ( timer_running_ ) return true;
 
     // Choose step rate
     if ( step_hz == 0 ) {
@@ -156,10 +206,21 @@ bool Cl57te::start_move( int32_t n_steps, uint32_t step_hz )
 
     int64_t period_us = -( static_cast<int64_t>( 1'000'000 ) / step_hz );
 
-    remaining_ = ( n_steps > 0 ) ? n_steps : -n_steps;
-    step_sign_ = forward ? 1 : -1;
+    const uint32_t irq_state = save_and_disable_interrupts();
+    if ( target_steps_ == pos_steps_ ) {
+        restore_interrupts( irq_state );
+        return true;
+    }
+    timer_running_ = true;
+    active_step_sign_ = 0;
+    dir_hold_until_us_ = 0;
+    restore_interrupts( irq_state );
+
     if ( !add_repeating_timer_us( period_us, step_isr_cb, this, &timer ) ) {
-        remaining_ = 0;
+        const uint32_t fail_irq_state = save_and_disable_interrupts();
+        timer_running_ = false;
+        active_step_sign_ = 0;
+        restore_interrupts( fail_irq_state );
         return false;
     }
     return true;
@@ -171,10 +232,27 @@ bool Cl57te::start_move( int32_t n_steps, uint32_t step_hz )
 
 void Cl57te::stop()
 {
-    if ( remaining_ > 0 ) {
+    const bool was_running = timer_running_;
+    const uint32_t irq_state = save_and_disable_interrupts();
+    target_steps_ = pos_steps_;
+    timer_running_ = false;
+    active_step_sign_ = 0;
+    restore_interrupts( irq_state );
+
+    if ( was_running ) {
         cancel_repeating_timer( &timer );
-        remaining_ = 0;
     }
+
+    // Always leave PUL- idle HIGH, even if stop() is called after the timer has
+    // already self-cancelled. This gives the next direction change a known
+    // electrical starting state.
+    gpio_put( cfg_.pul_n, true );
+    busy_wait_us_32( kStopIdleUs );
+}
+
+bool Cl57te::is_moving() const
+{
+    return timer_running_ || target_steps_ != pos_steps_;
 }
 
 // -----------------------------------------------------------------------------

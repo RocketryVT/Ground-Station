@@ -24,6 +24,10 @@
 //   • PUL high/low ≥ 1 µs   – driver generates 5 µs low pulses
 //   • DIR setup ≥ 5 µs before first PUL after a direction change
 //
+// The driver chases a mutable target position. The owning task can update the
+// target while the timer ISR is stepping, and the ISR will reverse direction
+// after observing a conservative direction-latch guard time.
+//
 // Thread safety:
 //   isr_tick()  is called from the hardware-timer ISR.
 //   All other methods must be called only from the owning FreeRTOS task.
@@ -60,20 +64,20 @@ public:
                     float speed_dps = 0.0f,
                     bool shortest_path = true );
 
-    // start_move: begin stepping toward |n_steps| from current position.
+    // start_move: set a relative target |n_steps| from current position.
     //   n_steps > 0  -> positive direction (DIR- LOW)
     //   n_steps < 0  -> negative direction (DIR- HIGH)
     //   step_hz      -> step pulse rate; 0 = use default from Config
     //
-    // Starts a repeating hardware timer that generates step pulses via isr_tick().
-    // Returns false only if the timer could not be started.
+    // Starts the repeating hardware timer when needed. If the timer is already
+    // running, this updates the target without stopping pulse generation.
     bool start_move( int32_t n_steps, uint32_t step_hz = 0 );
 
     // Abort the current move (cancels the timer). Position remains at the last
     // emitted step.
     void stop();
 
-    bool is_moving() const  { return remaining_ > 0; }
+    bool is_moving() const;
 
     // -- ISR entry point -------------------------------------------------------
     // Returns true to keep the repeating timer alive; false to cancel it.
@@ -84,16 +88,15 @@ public:
     // pos_steps_ is advanced by the timer ISR for each emitted step. It is the
     // commanded mechanical position, not an encoder measurement.
     int32_t  pos_steps() const  { return pos_steps_; }
+    int32_t  target_steps() const { return target_steps_; }
     float    angle_deg()  const;
     float    wrapped_angle_deg() const;
-
-    // Called by task once is_moving() becomes false to finalise pos_steps_.
-    void commit_position( int32_t pos ) { pos_steps_ = pos; }
 
     float steps_per_deg() const { return steps_per_deg_; }
     uint  dir_pin() const { return cfg_.dir_n; }
     bool  dir_level_for_steps( int32_t n_steps ) const;
     bool  dir_gpio_level() const;
+    bool  last_dir_level() const { return last_dir_level_; }
 
     // -- Public timer handle (needed for add_repeating_timer_us user_data) ----
     repeating_timer_t timer;
@@ -101,16 +104,19 @@ public:
 private:
     Config   cfg_{};
     volatile int32_t  pos_steps_ = 0;
-    volatile int8_t   step_sign_ = 1;
+    volatile int32_t  target_steps_ = 0;
+    volatile int8_t   active_step_sign_ = 0;
+    volatile bool     timer_running_ = false;
+    volatile uint32_t dir_hold_until_us_ = 0;
 
     float    steps_per_deg_ = 1.0f;   // cached at init
 
-    // Modified by ISR, read by task — volatile is sufficient here because
-    // the task only reads (never writes while the timer is running).
-    volatile int32_t  remaining_ = 0;
+    volatile bool     have_last_dir_level_ = false;
+    volatile bool     last_dir_level_ = true;
 
     int32_t angle_to_steps( float angle_deg ) const;
     int32_t target_steps_for_angle( float target_angle_deg,
                                     bool shortest_path ) const;
     uint32_t step_hz_for_speed( float speed_dps ) const;
+    bool ensure_timer_running( uint32_t step_hz );
 };

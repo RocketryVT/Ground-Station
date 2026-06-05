@@ -319,6 +319,7 @@ static void fusion_task( void* )
         const FusionAhrsFlags yaw_flags = FusionAhrsGetFlags( &s_yaw_ahrs );
 
         ImuMsg out = {};
+        out.timestamp_us    = time_us_64();
         out.q[0]           = q_truth.element.w;
         out.q[1]           = q_truth.element.x;
         out.q[2]           = q_truth.element.y;
@@ -333,6 +334,9 @@ static void fusion_task( void* )
         out.temp_c         = have_baro ? baro.temp_c
                                        : ( have_bar_imu ? bar_imu.temp_c : 25.0f );
         out.valid          = have_bar_imu && !bar_flags.startup;
+        out.have_yaw_frame = have_yaw_imu && !yaw_flags.startup;
+        out.yaw_frame_yaw360 = wrap_360( yaw_heading_signed );
+        out.bar_rel_pitch  = relative_pitch;
 
         xQueueOverwrite( g_imu_q, &out );
 

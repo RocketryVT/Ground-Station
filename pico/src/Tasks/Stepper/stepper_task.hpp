@@ -46,9 +46,17 @@ struct StepperStatus {
     uint64_t timestamp_us;
 };
 
+struct StepperCalibrationCmd {
+    bool  set_current_angle;
+    float current_angle_deg;
+    bool  clear;
+};
+
 // -- Command queues (depth 1, use xQueueOverwrite to send) --------------------
 extern QueueHandle_t g_stepper_az_cmd_q;    // Azimuth  (STEP1 – GPIO 4/5)
 extern QueueHandle_t g_stepper_zen_cmd_q;   // Elevation (STEP2 – GPIO 6/7)
+extern QueueHandle_t g_stepper_az_cal_q;
+extern QueueHandle_t g_stepper_zen_cal_q;
 
 // -- Status queues (depth 1, use xQueuePeek to read) --------------------------
 extern QueueHandle_t g_stepper_az_status_q;
