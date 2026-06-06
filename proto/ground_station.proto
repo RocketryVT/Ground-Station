@@ -184,6 +184,17 @@ message DeclinationCommand {
   optional float declination_deg = 1;
 }
 
+// Magnetometer hard/soft-iron calibration for one sensor.  The app fits an
+// ellipsoid from raw samples and pushes the result to the Pico, which applies it
+// in the AHRS via FusionModelMagnetic before the sensor remap.  hard_iron is the
+// ellipsoid centre (µT, sensor native frame); soft_iron is a 3x3 row-major matrix
+// that maps the ellipsoid to a sphere.
+message MagCalibrationCommand {
+  optional bool  yaw = 1;          // true = yaw-platform LIS3MDL, false = bar/zenith LIS3MDL
+  repeated float hard_iron = 2;    // [hx, hy, hz]
+  repeated float soft_iron = 3;    // 9 elements, row-major 3x3
+}
+
 message TrackerModeCommand {
   optional TrackerMode mode = 1;
 }

@@ -43,7 +43,7 @@ static bool read_ahrs_display( const TrackerConfig& cfg,
     }
 
     if ( control.ahrs_el_used ) {
-        *actual_el = imu.euler[1];
+        *actual_el = imu.bar_rel_pitch;
     }
     if ( control.ahrs_az_used ) {
         *actual_az = imu.have_yaw_frame ? imu.yaw_frame_yaw360 : wrap_360( imu.euler[2] );

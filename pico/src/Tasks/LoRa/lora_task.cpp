@@ -113,10 +113,8 @@ static void lora0_task( void* )
     gpio_set_dir( Pins::LORA0_EN, GPIO_OUT );
     gpio_put( Pins::LORA0_EN, 1 );
 
-    for ( int i = 10; i > 0; i-- ) {
-        log_print( "[lora0] RFM9x init in %d s...\n", i );
-        vTaskDelay( pdMS_TO_TICKS( 1000 ) );
-    }
+    log_print( "[lora0] RFM9x init after 10 s radio power settle\n" );
+    vTaskDelay( pdMS_TO_TICKS( 10000 ) );
 
     diag_spi();
 
@@ -140,19 +138,6 @@ static void lora0_task( void* )
             if ( state == 0 ) {
                 SigmaLoRaData d;
                 if ( SigmaLoRaData::deserialize( pkt.data, pkt.len, d ) ) {
-                    log_print( "[lora0] %lu,%s,%u,%u,%.7f,%.7f,%.1f,%.1f,%.2f,"
-                               "%.5f,%.5f,%.5f,%.5f,%.1f,%.1f\n",
-                               (unsigned long)d.boot_ms,
-                               state_name( d.state ),
-                               (unsigned)d.satellites,
-                               (unsigned)d.flags,
-                               d.lat, d.lon,
-                               (double)d.alt_gps_m, (double)d.alt_baro_m,
-                               (double)d.speed_ms,
-                               (double)d.q[0], (double)d.q[1],
-                               (double)d.q[2], (double)d.q[3],
-                               (double)pkt.rssi, (double)pkt.snr );
-
                     if ( mqtt_is_connected() ) {
                         MqttMessage m = {};
                         groundstation_RocketLoRaSample pb =

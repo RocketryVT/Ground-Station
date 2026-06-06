@@ -84,6 +84,8 @@ pub fn run() {
             commands::clear_raw_sensors,
             commands::clear_ahrs_history,
             commands::get_tile_cache_info,
+            commands::save_mag_cal,
+            commands::load_mag_cal,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

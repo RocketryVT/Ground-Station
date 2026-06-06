@@ -115,10 +115,6 @@ static void udp_recv_task( void* )
             continue;
         }
 
-        log_print( "[udp_rx] lat=%.5f lon=%.5f alt_gps=%.0f m  RSSI=%d dBm  SNR=%.1f dB\n",
-                   d.lat, d.lon, (double)d.alt_gps_m,
-                   d.rssi, (double)d.snr_dB );
-
         // Update rocket location queue (antenna tracker reads this)
         if ( d.flags & SIGMA::FLAG_GPS_VALID ) {
             LocationMsg loc { d.lat, d.lon, (double)d.alt_gps_m, time_us_64() };

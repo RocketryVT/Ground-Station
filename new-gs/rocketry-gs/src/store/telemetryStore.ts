@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  RocketTelemetry, AntennaState, MobileNode, GroundImuState,
+  RocketTelemetry, AntennaState, MobileNode, GroundImuState, AhrsStatus, CalibrationEvent,
   RawImuSample, RawMagSample, RawYawImuSample,
 } from '../types/telemetry';
 import { MAX_HISTORY } from '../config';
@@ -9,6 +9,7 @@ const MAX_LOG = 500;
 const MAX_RAW = 500;
 const MAX_SENSOR_RAW = 500;
 const MAX_AHRS = 500;
+const MAX_CALIBRATION_EVENTS = 25;
 
 let _seq = 0;
 
@@ -42,11 +43,12 @@ function capTail<T>(items: T[], limit: number): T[] {
   return items.length > limit ? items.slice(-limit) : items;
 }
 
-interface TelemetryState {
+export interface TelemetryState {
   latest:      RocketTelemetry | null;
   history:     RocketTelemetry[];
   antenna:     AntennaState | null;
   groundImu:   GroundImuState | null;
+  ahrsStatus:  AhrsStatus | null;
   nodes:       Record<string, MobileNode>;
   connected:   boolean;
   flightStart: number | null;
@@ -56,10 +58,13 @@ interface TelemetryState {
   rawMag:      RawMagSample[];
   rawYawImu:   RawYawImuSample[];
   ahrsHistory: GroundImuState[];
+  calibrationEvents: CalibrationEvent[];
 
   addTelemetry: (t: RocketTelemetry) => void;
   setAntenna:   (a: AntennaState) => void;
   setGroundImu: (i: GroundImuState) => void;
+  setAhrsStatus: (s: AhrsStatus) => void;
+  addCalibrationEvent: (e: CalibrationEvent) => void;
   updateNode:   (n: MobileNode) => void;
   setConnected: (v: boolean) => void;
   clearFlight:  () => void;
@@ -82,6 +87,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   history:     [],
   antenna:     null,
   groundImu:   null,
+  ahrsStatus:  null,
   nodes:       {},
   connected:   false,
   flightStart: null,
@@ -91,6 +97,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   rawMag:      [],
   rawYawImu:   [],
   ahrsHistory: [],
+  calibrationEvents: [],
 
   addTelemetry: (t) =>
     set((s) => ({
@@ -105,6 +112,13 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
     set((s) => ({
       groundImu: i,
       ahrsHistory: appendCapped(s.ahrsHistory, i, MAX_AHRS),
+    })),
+
+  setAhrsStatus: (status) => set({ ahrsStatus: status }),
+
+  addCalibrationEvent: (event) =>
+    set((s) => ({
+      calibrationEvents: appendCapped(s.calibrationEvents, event, MAX_CALIBRATION_EVENTS),
     })),
 
   updateNode: (n) =>
@@ -148,7 +162,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
 
   clearAhrsHistory: () => set({ ahrsHistory: [] }),
 
-  clearDebug: () => set({ logLines: [], rawMessages: [] }),
+  clearDebug: () => set({ logLines: [], rawMessages: [], calibrationEvents: [] }),
 
   setActiveDrag: (d) =>
     set((s) => (s.latest ? { latest: { ...s.latest, ...d } } : {})),

@@ -26,15 +26,29 @@ static const FusionMatrix k_accel_misalign = {1,0,0, 0,1,0, 0,0,1};
 static const FusionVector k_accel_sens     = {1.0f, 1.0f, 1.0f};
 static const FusionVector k_accel_offset   = {0.0f, 0.0f, 0.0f};
 
-// Zenith bar LIS3MDL (bar sensor) — no calibration yet.
-static const FusionMatrix k_mag_soft_iron  = {1,0,0, 0,1,0, 0,0,1};
-static const FusionVector k_mag_hard_iron  = {0.0f, 0.0f, 0.0f};
+// Mag hard/soft-iron calibration.  Mutable at runtime via the mag calibration
+// wizard (gs/cmd/mag_cal → fusion_set_mag_calibration).  Guarded by a critical
+// section because the fusion task reads them at 100 Hz while MQTT may rewrite them.
+//
+// Zenith/bar LIS3MDL — default identity until calibrated.
+static FusionMatrix k_mag_soft_iron  = {1,0,0, 0,1,0, 0,0,1};
+static FusionVector k_mag_hard_iron  = {0.0f, 0.0f, 0.0f};
 
-// Yaw platform LIS3MDL (µT, sensor native frame — applied before PYNXPZ remap).
-// Derived from two-point calibration: 210° → 130° rotation with stepper motor removed.
-// hx=-12.71, hy=-59.22 solve heading error exactly; hz is midpoint of mz range.
-static const FusionMatrix k_yaw_mag_soft_iron  = {1,0,0, 0,1,0, 0,0,1};
-static const FusionVector k_yaw_mag_hard_iron  = {-12.71f, -59.22f, -92.24f};
+// Yaw platform LIS3MDL (µT, sensor native frame — applied before the sensor remap).
+// Seed values from the OLD mounting (PYNXPZ); stale after the +Y-fwd/+X-right
+// remount and meant to be overwritten by a fresh wizard calibration.
+static FusionMatrix k_yaw_mag_soft_iron  = {1,0,0, 0,1,0, 0,0,1};
+static FusionVector k_yaw_mag_hard_iron  = {-12.71f, -59.22f, -92.24f};
+
+void fusion_set_mag_calibration( bool yaw, const float hard_iron[3], const float soft_iron[9] )
+{
+    taskENTER_CRITICAL();
+    FusionMatrix* soft = yaw ? &k_yaw_mag_soft_iron : &k_mag_soft_iron;
+    FusionVector* hard = yaw ? &k_yaw_mag_hard_iron : &k_mag_hard_iron;
+    for ( int i = 0; i < 3; ++i ) hard->array[i] = hard_iron[i];
+    for ( int i = 0; i < 9; ++i ) soft->array[i] = soft_iron[i];
+    taskEXIT_CRITICAL();
+}
 
 // -----------------------------------------------------------------------------
 // Coordinate frames
@@ -55,16 +69,15 @@ static const FusionVector k_yaw_mag_hard_iron  = {-12.71f, -59.22f, -92.24f};
 // Change these remaps to match the physical mounting of each sensor.
 //
 // Fusion remap names list the sensor axes which become body [X,Y,Z].
-// Yaw LSM6DSOX+LIS3MDL: sensor +Y faces body-forward, sensor +Z faces body-down.
-//   Board is mounted component-side-down: chip Z-circle faces down, so +Z = body down.
-//   Sensor +X therefore points LEFT (right-hand rule: Y_fwd × Z_down = X_left).
-//   → body X (fwd) = +sensor Y, body Y (right) = -sensor X, body Z (down) = +sensor Z
-//   Empirically verified: raw accel ≈(0,0.745,0.658) at 48° elev → roll≈0°, not 175°.
-// Bar ISM330DLC: sensor +Y faces bar/body-forward (counter-clockwise as
-// described), sensor +X points body-left, so body-right is sensor -X.
+// Both boards (yaw LSM6DSOX+LIS3MDL and bar ISM330DLC+LIS3MDL) are now mounted
+// with sensor +Y facing body-forward and sensor +X facing body-right.
+//   Sensor frames are right-handed, so with +Y = X_fwd and +X = Y_right the body
+//   Z (down) is forced to -sensor Z (the board is flipped about the forward axis
+//   relative to the old component-side-down mounting, so +Z now points up).
+//   → body X (fwd) = +sensor Y, body Y (right) = +sensor X, body Z (down) = -sensor Z
 
-#define BAR_SENSOR_REMAP  FusionRemapAlignmentPYNXPZ  // body [X,Y,Z] = sensor [+Y,-X,+Z]
-#define YAW_SENSOR_REMAP  FusionRemapAlignmentPYNXPZ  // body [X,Y,Z] = sensor [+Y,-X,+Z]
+#define BAR_SENSOR_REMAP  FusionRemapAlignmentPYPXNZ  // body [X,Y,Z] = sensor [+Y,+X,-Z]
+#define YAW_SENSOR_REMAP  FusionRemapAlignmentPYPXNZ  // body [X,Y,Z] = sensor [+Y,+X,-Z]
 
 // Magnetic declination: true_heading = magnetic_heading + declination_deg.
 // Negative = west (Blacksburg VA ≈ -8.53°).  Updated at runtime via gs/cmd/declination.
@@ -82,6 +95,7 @@ float fusion_get_declination()           { return s_declination_deg; }
 #define FUSION_PERIOD_MS        ( 1000 / FUSION_SAMPLE_RATE_HZ )
 #define FUSION_MQTT_INTERVAL_MS 50
 #define FUSION_STATUS_INTERVAL_MS 1000
+#define FUSION_DEBUG_LOGS       0
 #define FUSION_DEBUG_INTERVAL_MS 1000
 #define FUSION_RECOVERY_SAMPLES ( 5 * FUSION_SAMPLE_RATE_HZ )
 
@@ -213,7 +227,11 @@ static void update_yaw_frame( const YawImuMsg& yaw_imu, bool have_yaw_mag, float
     FusionVector accel = {yaw_imu.accel[0], yaw_imu.accel[1], yaw_imu.accel[2]};
     FusionVector mag   = {yaw_imu.mag_ut[0], yaw_imu.mag_ut[1], yaw_imu.mag_ut[2]};
 
-    mag   = FusionModelMagnetic( mag, k_yaw_mag_soft_iron, k_yaw_mag_hard_iron );
+    taskENTER_CRITICAL();
+    const FusionMatrix yaw_soft = k_yaw_mag_soft_iron;
+    const FusionVector yaw_hard = k_yaw_mag_hard_iron;
+    taskEXIT_CRITICAL();
+    mag   = FusionModelMagnetic( mag, yaw_soft, yaw_hard );
 
     gyro  = FusionRemap( gyro,  YAW_SENSOR_REMAP );
     accel = FusionRemap( accel, YAW_SENSOR_REMAP );
@@ -239,7 +257,11 @@ static void update_bar_frame( const IcmMsg& bar_imu,
 
     gyro  = FusionModelInertial( gyro,  k_gyro_misalign,  k_gyro_sens,  k_gyro_offset  );
     accel = FusionModelInertial( accel, k_accel_misalign, k_accel_sens, k_accel_offset );
-    mag   = FusionModelMagnetic( mag, k_mag_soft_iron, k_mag_hard_iron );
+    taskENTER_CRITICAL();
+    const FusionMatrix bar_soft = k_mag_soft_iron;
+    const FusionVector bar_hard = k_mag_hard_iron;
+    taskEXIT_CRITICAL();
+    mag   = FusionModelMagnetic( mag, bar_soft, bar_hard );
 
     gyro  = FusionRemap( gyro,  BAR_SENSOR_REMAP );
     accel = FusionRemap( accel, BAR_SENSOR_REMAP );
@@ -358,7 +380,8 @@ static void fusion_task( void* )
                                    bar_update_count, yaw_update_count );
         }
 
-        if ( ( now_ticks - last_debug ) >= pdMS_TO_TICKS(FUSION_DEBUG_INTERVAL_MS) ) {
+        if ( FUSION_DEBUG_LOGS &&
+             ( now_ticks - last_debug ) >= pdMS_TO_TICKS(FUSION_DEBUG_INTERVAL_MS) ) {
             last_debug = now_ticks;
             log_print( "[ahrs_dbg] imu_pitch=%.2f rel_pitch=%.2f yaw_platform_heading=%.2f yaw_signed=%.2f bar_imu=%u yaw_imu=%u yaw_mag=%u\n",
                        (double)truth_pitch,

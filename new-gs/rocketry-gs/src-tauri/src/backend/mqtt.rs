@@ -144,13 +144,7 @@ fn handle_publish(
     let (raw_text, decoded) = codec::decode_to_raw_text(topic, payload);
     logger.log_packet("rx", topic, payload, Some(&raw_text));
 
-    let raw_message = state.add_raw_message(topic, raw_text.clone());
-    emit(
-        app,
-        &UiEvent::RawMessage {
-            message: raw_message,
-        },
-    );
+    state.add_raw_message(topic, raw_text.clone());
 
     match topic {
         codec::ROCKET_TELEMETRY => {
@@ -168,14 +162,26 @@ fn handle_publish(
         }
         codec::ANTENNA_STATE => {
             if let Some(antenna) = decoded {
-                state.set_antenna(antenna.clone());
+                let antenna = state.set_antenna(antenna);
                 emit(app, &UiEvent::Antenna { antenna });
             }
         }
         codec::GROUND_IMU => {
             if let Some(imu) = decoded {
-                state.set_ground_imu(imu.clone());
+                let imu = state.set_ground_imu(imu);
                 emit(app, &UiEvent::GroundImu { imu });
+            }
+        }
+        codec::AHRS_STATUS => {
+            if let Some(status) = decoded {
+                let status = state.set_ahrs_status(status);
+                emit(app, &UiEvent::AhrsStatus { status });
+            }
+        }
+        codec::CALIBRATION_EVENT => {
+            if let Some(event) = decoded {
+                let event = state.add_calibration_event(event);
+                emit(app, &UiEvent::CalibrationEvent { event });
             }
         }
         codec::RAW_IMU => {

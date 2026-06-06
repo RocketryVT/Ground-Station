@@ -11,3 +11,8 @@ void  fusion_set_declination( float deg );
 float fusion_get_declination();
 void  fusion_adjust_heading_offset( float delta_deg );
 float fusion_get_heading_offset();
+
+// Apply hard/soft-iron mag calibration at runtime. yaw=true targets the yaw
+// platform LIS3MDL, false the bar/zenith LIS3MDL. hard_iron is [hx,hy,hz];
+// soft_iron is a 3x3 row-major matrix (9 elements).
+void  fusion_set_mag_calibration( bool yaw, const float hard_iron[3], const float soft_iron[9] );

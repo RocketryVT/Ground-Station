@@ -42,6 +42,9 @@ PB_BIND(groundstation_JogCommand, groundstation_JogCommand, AUTO)
 PB_BIND(groundstation_DeclinationCommand, groundstation_DeclinationCommand, AUTO)
 
 
+PB_BIND(groundstation_MagCalibrationCommand, groundstation_MagCalibrationCommand, AUTO)
+
+
 PB_BIND(groundstation_TrackerModeCommand, groundstation_TrackerModeCommand, AUTO)
 
 

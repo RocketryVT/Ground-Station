@@ -314,6 +314,16 @@ pub struct DeclinationCommand {
 }
 
 #[derive(Clone, PartialEq, Message)]
+pub struct MagCalibrationCommand {
+    #[prost(bool, optional, tag = "1")]
+    pub yaw: Option<bool>,
+    #[prost(float, repeated, tag = "2")]
+    pub hard_iron: Vec<f32>,
+    #[prost(float, repeated, tag = "3")]
+    pub soft_iron: Vec<f32>,
+}
+
+#[derive(Clone, PartialEq, Message)]
 pub struct TrackerModeCommand {
     #[prost(enumeration = "TrackerMode", optional, tag = "1")]
     pub mode: Option<i32>,

@@ -113,10 +113,8 @@ static void lora1_task( void* )
     gpio_set_dir( Pins::LORA1_EN, GPIO_OUT );
     gpio_put( Pins::LORA1_EN, 1 );
 
-    for ( int i = 12; i > 0; i-- ) {
-        log_print( "[lora1] RFM69HCW init in %d s...\n", i );
-        vTaskDelay( pdMS_TO_TICKS( 1000 ) );
-    }
+    log_print( "[lora1] RFM69HCW init after 12 s radio power settle\n" );
+    vTaskDelay( pdMS_TO_TICKS( 12000 ) );
 
     diag_spi();
 
@@ -138,8 +136,6 @@ static void lora1_task( void* )
             state = s_radio.read_packet( pkt );
 
             if ( state == 0 && pkt.len > 0 ) {
-                log_print( "[lora1] RFM69 rx %u B RSSI %.1f dBm\n",
-                           (unsigned)pkt.len, (double)pkt.rssi );
                 publish_hex_packet( pkt );
             } else if ( state != 0 ) {
                 log_print( "[lora1] read_packet error %d\n", state );

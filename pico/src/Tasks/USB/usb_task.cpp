@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "pico/stdlib.h"
+#include "pico/stdio_usb.h"
 
 // -- log_print -----------------------------------------------------------------
 // Sole caller of printf() in the whole project.  All other tasks call
@@ -95,8 +96,21 @@ static void usb_task( void* )
 {
     char       line[ 128 ] = { 0 };
     size_t     line_len    = 0;
+    bool       was_connected = false;
 
     for ( ;; ) {
+        if ( !stdio_usb_connected() ) {
+            was_connected = false;
+            vTaskDelay( pdMS_TO_TICKS( 100 ) );
+            continue;
+        }
+
+        if ( !was_connected ) {
+            was_connected = true;
+            printf( "\r\n# " );
+            stdio_flush();
+        }
+
         // -- 1. Drain log queue --------------------------------------------
         {
             LogMessage msg;

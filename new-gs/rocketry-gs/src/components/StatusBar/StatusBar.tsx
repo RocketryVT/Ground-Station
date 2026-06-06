@@ -19,7 +19,11 @@ interface Props {
 }
 
 export function StatusBar({ demo, tab, onToggleDemo, onSetTab }: Props) {
-  const { latest, antenna, connected, flightStart, clearFlight } = useTelemetryStore();
+  const latest = useTelemetryStore((s) => s.latest);
+  const antenna = useTelemetryStore((s) => s.antenna);
+  const connected = useTelemetryStore((s) => s.connected);
+  const flightStart = useTelemetryStore((s) => s.flightStart);
+  const clearFlight = useTelemetryStore((s) => s.clearFlight);
   const [elapsed, setElapsed] = useState('T+00:00');
   const [fullscreen, setFullscreen] = useState(false);
 

@@ -54,7 +54,7 @@ target_link_libraries(gs_pico
     gps                                     # NMEA parser (unused now, kept for future)
     lis3mdl                                 # LIS3MDL magnetometer driver
     ism330dlc                               # ISM330DLC accelerometer/gyroscope driver
-    nine_axis_imu                           # ICM-20948 yaw-body 9-axis IMU driver
+    nine_axis_imu                           # yaw-body LSM6DSOX + LIS3MDL driver
     math_utils                              # haversine / azimuth / elevation
     Fusion                                  # x-io Fusion AHRS (Madgwick-derived)
 )

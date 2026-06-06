@@ -11,6 +11,7 @@ import { AntennaScene }     from './components/AntennaScene/AntennaScene';
 import { TelemetryCharts }  from './components/Charts/TelemetryCharts';
 import { VideoFeed }        from './components/VideoFeed/VideoFeed';
 import { DebugPanel }       from './components/DebugPanel/DebugPanel';
+import { useMagCalAutoApply } from './components/MagCalibrationWizard/useMagCalAutoApply';
 
 export type AppTab = 'flight' | 'debug';
 
@@ -28,6 +29,7 @@ export default function App() {
 
   const mqtt = useMQTT(!demo);
   useDemoMode(demo);
+  useMagCalAutoApply(mqtt);
 
   return (
     <div className="root">

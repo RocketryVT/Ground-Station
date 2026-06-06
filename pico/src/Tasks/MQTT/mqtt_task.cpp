@@ -254,6 +254,27 @@ static bool apply_yaw_heading_reference( float reference_deg,
     return true;
 }
 
+// True AHRS-measured elevation of the antenna bar (0 = horizon, +90 = zenith),
+// taken from the fused relative pitch.  Used to anchor EL calibration to the IMU
+// instead of trusting an operator-typed angle.  Returns false if no fresh,
+// valid AHRS sample is available.
+static bool read_ahrs_elevation( float* el_deg )
+{
+    if ( !g_imu_q ) return false;
+
+    ImuMsg imu = {};
+    if ( xQueuePeek( g_imu_q, &imu, 0 ) != pdTRUE || !imu.valid ) return false;
+
+    const uint64_t now_us = time_us_64();
+    if ( imu.timestamp_us == 0 ||
+         now_us - imu.timestamp_us > (uint64_t)kCalibrationAhrsMaxAgeMs * 1000ull ) {
+        return false;
+    }
+
+    if ( el_deg ) *el_deg = imu.bar_rel_pitch;
+    return true;
+}
+
 static bool take_pending_axis_cmd( volatile PendingAxisCmd* pending,
                                    PendingAxisCmd* out )
 {
@@ -310,6 +331,8 @@ static void apply_axis_cmd( QueueHandle_t q,
     }
     if ( !cmd.stop ) {
         tracker_set_mode( TrackerMode::Manual );
+        if ( pending.has_target )
+            tracker_set_manual_target( strcmp( axis, "az" ) == 0, cmd.target_angle_deg );
     }
     publish_stepper_cmd( q, cmd, axis );
 }
@@ -339,6 +362,7 @@ static void process_pending_commands()
             log_print( "[mqtt] %s jog dropped: tracker disarmed\n", axis );
         } else {
             tracker_set_mode( TrackerMode::Manual );
+            tracker_set_manual_target( jog.axis_is_az, cmd.target_angle_deg );
             publish_stepper_cmd( q, cmd, axis );
         }
     }
@@ -448,11 +472,27 @@ static void process_pending_commands()
 
         case groundstation_CalibrationAction_CAL_ACTION_SET_EL_REFERENCE:
             if ( cmd.has_reference_deg && g_stepper_zen_cal_q ) {
+                // Anchor the elevation reference to the IMU-measured bar pitch when
+                // a fresh AHRS sample exists, so "EL home" reflects the antenna's
+                // true elevation instead of the typed value.  Fall back to the
+                // typed reference if AHRS is unavailable.
+                float anchor = ref;
+                float ahrs_el = 0.0f;
+                const bool ahrs_ok = read_ahrs_elevation( &ahrs_el );
+                if ( ahrs_ok ) anchor = ahrs_el;
+
                 StepperCalibrationCmd axis_cal = {};
                 axis_cal.set_current_angle = true;
-                axis_cal.current_angle_deg = ref;
+                axis_cal.current_angle_deg = anchor;
                 xQueueOverwrite( g_stepper_zen_cal_q, &axis_cal );
-                publish_calibration_event( "set_el_reference", "ok", ref, note );
+                publish_calibration_event( "set_el_reference", "ok", anchor, note );
+                if ( ahrs_ok ) {
+                    log_print( "[cal] el reference anchored to AHRS=%.2f (typed=%.2f)\n",
+                               (double)anchor, (double)ref );
+                } else {
+                    log_print( "[cal] el reference %.2f (typed; AHRS unavailable)\n",
+                               (double)anchor );
+                }
             } else {
                 publish_calibration_event( "set_el_reference", "rejected", ref, note );
             }
@@ -520,6 +560,20 @@ static void incoming_data_cb( void* arg, const u8_t* data, u16_t len, u8_t flags
             fusion_set_declination( cmd.declination_deg );
             log_print( "[mqtt] declination set to %.2f deg\n",
                        (double)cmd.declination_deg );
+        }
+    } else if ( strcmp( s_in_topic, "gs/cmd/mag_cal" ) == 0 ) {
+        groundstation_MagCalibrationCommand cmd = groundstation_MagCalibrationCommand_init_zero;
+        if ( decode_proto( data, len, groundstation_MagCalibrationCommand_fields, &cmd )
+             && cmd.hard_iron_count == 3 && cmd.soft_iron_count == 9 )
+        {
+            fusion_set_mag_calibration( cmd.yaw, cmd.hard_iron, cmd.soft_iron );
+            log_print( "[mqtt] %s mag cal set: hard=[%.2f,%.2f,%.2f]\n",
+                       cmd.yaw ? "yaw" : "bar",
+                       (double)cmd.hard_iron[0], (double)cmd.hard_iron[1],
+                       (double)cmd.hard_iron[2] );
+        } else {
+            log_print( "[mqtt] mag cal rejected (bad counts h=%u s=%u)\n",
+                       (unsigned)cmd.hard_iron_count, (unsigned)cmd.soft_iron_count );
         }
     } else if ( strcmp( s_in_topic, "gs/cmd/az" ) == 0 ) {
         groundstation_AxisCommand cmd = groundstation_AxisCommand_init_zero;
@@ -651,6 +705,7 @@ static void mqtt_task( void* param )
         mqtt_subscribe( s_mqtt, "gs/cmd/zen",          0, nullptr, nullptr );
         mqtt_subscribe( s_mqtt, "gs/cmd/jog",          0, nullptr, nullptr );
         mqtt_subscribe( s_mqtt, "gs/cmd/declination",  0, nullptr, nullptr );
+        mqtt_subscribe( s_mqtt, "gs/cmd/mag_cal",      0, nullptr, nullptr );
         mqtt_subscribe( s_mqtt, "gs/cmd/tracker/mode", 0, nullptr, nullptr );
         mqtt_subscribe( s_mqtt, "gs/cmd/tracker/arm",  0, nullptr, nullptr );
         mqtt_subscribe( s_mqtt, "gs/cmd/tracker/config", 0, nullptr, nullptr );
@@ -660,6 +715,7 @@ static void mqtt_task( void* param )
         cyw43_arch_lwip_end();
 
         // Drain the publish queue while broker is alive
+        TickType_t last_publish_error_log = 0;
         while ( s_mqtt_connected ) {
             process_pending_commands();
 
@@ -673,7 +729,10 @@ static void mqtt_task( void* param )
                                                0,        // not retained
                                                nullptr, nullptr );
                 cyw43_arch_lwip_end();
-                if ( pub_err != ERR_OK ) {
+                const TickType_t now_ticks = xTaskGetTickCount();
+                if ( pub_err != ERR_OK &&
+                     now_ticks - last_publish_error_log >= pdMS_TO_TICKS(1000) ) {
+                    last_publish_error_log = now_ticks;
                     log_print( "[mqtt] publish failed topic=%s len=%u err=%d\n",
                                msg.topic,
                                (unsigned)msg.payload_len,

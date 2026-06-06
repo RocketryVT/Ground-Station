@@ -75,13 +75,42 @@ static bool i2c_read_regs( void* context, uint8_t dev, uint8_t reg, uint8_t* out
 
 using Device = nine_axis_imu::lsm6dsox_lis3mdl::Device;
 
-static bool yaw_imu_init( Device& device )
+static bool yaw_imu_init( Device& device, uint8_t imu_addr )
 {
-    if ( !device.initialize() ) {
-        log_print( "[yaw_imu] LSM6DSOX+LIS3MDL init failed\n" );
+    uint8_t imu_who = 0;
+    const bool imu_who_ok = device.imu().read_who_am_i( imu_who );
+    if ( !imu_who_ok ||
+         ( imu_who != lsm6dsox::Device::kWhoAmIExpected &&
+           imu_who != lsm6dsox::Device::kWhoAmICompatible ) ) {
+        log_print( "[yaw_imu] no LSM6DSOX at 0x%02X (who_ok=%u who=0x%02X)\n",
+                   imu_addr, imu_who_ok ? 1u : 0u, imu_who );
         return false;
     }
-    log_print( "[yaw_imu] LSM6DSOX+LIS3MDL OK on I2C1\n" );
+
+    if ( !device.imu().initialize() ) {
+        log_print( "[yaw_imu] LSM6DSOX init failed at 0x%02X (WHO=0x%02X)\n",
+                   imu_addr, imu_who );
+        return false;
+    }
+
+    uint8_t mag_who = 0;
+    const bool mag_who_ok = device.mag().read_who_am_i( mag_who );
+    if ( !mag_who_ok || mag_who != lis3mdl::Device::kWhoAmIExpected ) {
+        log_print( "[yaw_imu] LIS3MDL not found at 0x%02X (who_ok=%u who=0x%02X)\n",
+                   lis3mdl::Device::kDefaultAddress,
+                   mag_who_ok ? 1u : 0u,
+                   mag_who );
+        return false;
+    }
+
+    if ( !device.mag().initialize() ) {
+        log_print( "[yaw_imu] LIS3MDL init failed at 0x%02X (WHO=0x%02X)\n",
+                   lis3mdl::Device::kDefaultAddress, mag_who );
+        return false;
+    }
+
+    log_print( "[yaw_imu] LSM6DSOX+LIS3MDL OK on I2C1 imu=0x%02X mag=0x%02X\n",
+               imu_addr, lis3mdl::Device::kDefaultAddress );
     return true;
 }
 
@@ -124,12 +153,21 @@ static void yaw_imu_task( void* )
         .write_reg = i2c_write_reg,
         .read_regs = i2c_read_regs,
     };
-    Device device( transport );
+    Device device_a( transport, lsm6dsox::Device::kDefaultAddress,
+                     lis3mdl::Device::kDefaultAddress );
+    Device device_b( transport, lsm6dsox::Device::kAltAddress,
+                     lis3mdl::Device::kDefaultAddress );
+    Device* device = nullptr;
 
     vTaskDelay( pdMS_TO_TICKS(200) );
 
     while ( true ) {
-        if ( yaw_imu_init( device ) ) {
+        if ( yaw_imu_init( device_a, lsm6dsox::Device::kDefaultAddress ) ) {
+            device = &device_a;
+            break;
+        }
+        if ( yaw_imu_init( device_b, lsm6dsox::Device::kAltAddress ) ) {
+            device = &device_b;
             break;
         }
         log_print( "[yaw_imu] init retry in 2 s\n" );
@@ -138,12 +176,13 @@ static void yaw_imu_task( void* )
 
     TickType_t last_tick = xTaskGetTickCount();
     TickType_t last_mqtt = xTaskGetTickCount();
+    TickType_t last_read_fail_log = 0;
 
     for ( ;; ) {
         YawImuMsg m = {};
         m.timestamp_us = time_us_64();
 
-        if ( yaw_imu_read( device, m ) ) {
+        if ( yaw_imu_read( *device, m ) ) {
             m.valid = true;
             xQueueOverwrite( g_yaw_imu_q, &m );
 
@@ -175,7 +214,8 @@ static void yaw_imu_task( void* )
                                         groundstation_RawYawImuSample_fields, &pb ) )
                     xQueueSend( g_mqtt_queue, &msg, 0 );
             }
-        } else {
+        } else if ( xTaskGetTickCount() - last_read_fail_log >= pdMS_TO_TICKS(1000) ) {
+            last_read_fail_log = xTaskGetTickCount();
             log_print( "[yaw_imu] read fail\n" );
         }
 

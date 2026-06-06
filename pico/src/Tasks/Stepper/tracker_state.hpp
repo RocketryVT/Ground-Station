@@ -74,6 +74,14 @@ bool tracker_is_armed();
 void tracker_set_armed( bool armed );
 
 void tracker_set_control_status( const TrackerControlStatus& status );
+
+// Last operator-commanded manual target per axis.  Recorded when a manual az/el
+// (or jog) command is accepted so the controller can hold/servo to it via AHRS
+// while in Manual mode.  Cleared automatically when leaving Manual mode.
+void tracker_set_manual_target( bool is_az, float deg );
+bool tracker_get_manual_target( bool is_az, float* deg );
+void tracker_clear_manual_targets();
+
 void tracker_mark_az_calibrated( float reference_deg, const char* status );
 void tracker_mark_el_calibrated( float reference_deg, const char* status );
 void tracker_clear_calibration( const char* status );

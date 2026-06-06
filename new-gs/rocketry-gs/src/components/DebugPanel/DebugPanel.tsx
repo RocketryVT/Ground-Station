@@ -3,12 +3,20 @@ import {
   LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip,
 } from 'recharts';
 import { useTelemetryStore } from '../../store/telemetryStore';
-import { TOPICS, KNOWN_MQTT_TOPICS, STARLINK_PROXY_URL } from '../../config';
+import { TOPICS, STARLINK_PROXY_URL } from '../../config';
 import type { MQTTHandle } from '../../hooks/useMQTT';
 import { decodeStarlinkProxyStatus } from '../../proto/groundStationCodec';
-import type { AntennaState, GroundImuState, RawImuSample, RawMagSample, RawYawImuSample } from '../../types/telemetry';
+import type {
+  AhrsStatus,
+  AntennaState,
+  GroundImuState,
+  RawImuSample,
+  RawMagSample,
+  RawYawImuSample,
+} from '../../types/telemetry';
 import { SimTab } from './SimTab';
 import { CalibrationWizard } from '../CalibrationWizard/CalibrationWizard';
+import { MagCalibrationWizard } from '../MagCalibrationWizard/MagCalibrationWizard';
 import styles from './DebugPanel.module.css';
 
 interface Props {
@@ -41,38 +49,17 @@ interface StarlinkData {
   last_ok:        number | null;
 }
 
-interface AhrsStatus {
-  timestamp: number;
-  running: boolean;
-  have_imu: boolean;
-  have_mag: boolean;
-  updates: number;
-}
-
-interface CalibrationEvent {
-  timestamp: number;
-  seq?: number;
-  action?: string;
-  result?: string;
-  reference_deg?: number;
-  az_calibrated?: boolean;
-  el_calibrated?: boolean;
-  az_reference_deg?: number;
-  el_reference_deg?: number;
-  note?: string;
-}
-
-type DebugTab = 'log' | 'topics' | 'orientation' | 'ahrs' | 'raw' | 'starlink' | 'sim' | 'calibration';
+type DebugTab = 'log' | 'orientation' | 'ahrs' | 'raw' | 'starlink' | 'sim' | 'magcal' | 'calibration';
 
 const DEBUG_TABS: Array<{ id: DebugTab; label: string; section: string }> = [
   { id: 'log',         label: 'Console',     section: 'Streams' },
-  { id: 'topics',      label: 'MQTT Topics', section: 'Streams' },
   { id: 'orientation', label: 'Orientation', section: 'Avionics' },
   { id: 'ahrs',        label: 'AHRS',        section: 'Avionics' },
   { id: 'raw',         label: 'Raw Sensors', section: 'Avionics' },
   { id: 'starlink',    label: 'Starlink',    section: 'Network' },
   { id: 'sim',         label: 'Simulation',  section: 'Tools' },
-  { id: 'calibration', label: 'Calibration', section: 'Setup' },
+  { id: 'calibration', label: 'Simple Calibration',    section: 'Setup' },
+  { id: 'magcal',      label: 'Full Axis Calibration', section: 'Setup' },
 ];
 
 // -- Starlink tab component ---------------------------------------------------
@@ -192,6 +179,12 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
 
 // -- Confirmation dialog -------------------------------------------------------
 type DirectAxis = 'az' | 'el';
+type TrackerMode = 'stop' | 'manual' | 'auto' | 'scan';
+type PendingTrackerCommand = {
+  id: 'arm' | 'disarm' | 'stop_all' | TrackerMode;
+  label: string;
+  startedAt: number;
+};
 
 interface ConfirmDialogProps {
   axis:   DirectAxis;
@@ -246,47 +239,13 @@ function fmtSeen(ts: number | null): string {
   return `${(age / 1000).toFixed(1)}s ago`;
 }
 
-function latestJson<T>(messages: { ts: number; topic: string; payload: string }[], topic: string): (T & { timestamp: number }) | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg.topic !== topic) continue;
-    try {
-      const data = JSON.parse(msg.payload) as T;
-      return { ...data, timestamp: msg.ts };
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
+const SENSOR_WINDOW_OPTIONS = [5, 10, 30, 60] as const;
 
-function jsonHistory<T>(messages: { ts: number; topic: string; payload: string }[], topic: string): Array<T & { timestamp: number }> {
-  const parsed: Array<T & { timestamp: number }> = [];
-  for (const msg of messages) {
-    if (msg.topic !== topic) continue;
-    try {
-      const data = JSON.parse(msg.payload) as T;
-      parsed.push({ ...data, timestamp: msg.ts });
-    } catch {
-      // The AHRS tab shows seen-vs-parsed counts for malformed payloads.
-    }
-  }
-  return parsed;
-}
-
-function mqttFilterMatches(filter: string, topic: string): boolean {
-  if (!filter.includes('+') && !filter.includes('#')) return topic.includes(filter);
-
-  const filterParts = filter.split('/');
-  const topicParts = topic.split('/');
-
-  for (let i = 0; i < filterParts.length; i++) {
-    const part = filterParts[i];
-    if (part === '#') return i === filterParts.length - 1;
-    if (part !== '+' && part !== topicParts[i]) return false;
-  }
-
-  return filterParts.length === topicParts.length;
+function filterSensorWindow<T extends { timestamp: number }>(samples: T[], seconds: number): T[] {
+  const latest = samples.at(-1)?.timestamp;
+  if (latest == null) return samples;
+  const cutoff = latest - seconds * 1000;
+  return samples.filter((sample) => sample.timestamp >= cutoff);
 }
 
 function OrientationTab({
@@ -305,9 +264,10 @@ function OrientationTab({
   mqtt: MQTTHandle;
 }) {
   const baseAz = antenna?.actual_az ?? 0;
-  // Use IMU pitch (physical bar tilt) for the side view when available,
-  // falling back to the stepper's reported elevation.
-  const elevation = imu?.pitch ?? antenna?.actual_el ?? 0;
+  // Use yaw-frame-relative bar pitch for elevation. Raw bar Euler pitch is
+  // sensor-frame dependent and is negative for the current mounting.
+  const imuElevation = imu?.bar_rel_pitch;
+  const elevation = imuElevation ?? antenna?.actual_el ?? 0;
 
   // Declination state
   const [declInput,     setDeclInput]     = useState('-8.53');
@@ -388,7 +348,8 @@ function OrientationTab({
             />
             <div className={styles.sideHub} />
           </div>
-          <div className={styles.legendRow}>IMU pitch {fmtDeg(imu?.pitch)}</div>
+          <div className={styles.legendRow}>IMU elevation {fmtDeg(imuElevation)}</div>
+          <div className={styles.legendRow}>Raw pitch {fmtDeg(imu?.pitch)}</div>
           <div className={styles.legendRow}>Stepper el {fmtDeg(antenna?.actual_el)}</div>
           <div className={styles.legendRow}>Target {fmtDeg(antenna?.target_el)}</div>
         </div>
@@ -410,7 +371,7 @@ function OrientationTab({
           <div className={styles.rawGroupHeader} style={{marginTop:8}}>ZENITH BAR — ISM330DLC+LIS3MDL</div>
           <div className={styles.kvGrid}>
             <span>Roll</span><strong>{fmtDeg(imu?.roll)}</strong>
-            <span>Pitch (elev)</span><strong>{fmtDeg(imu?.pitch)}</strong>
+            <span>Raw pitch</span><strong>{fmtDeg(imu?.pitch)}</strong>
             <span>Bar yaw</span><strong>{fmtDeg(imu?.yaw360 ?? norm360(imu?.yaw))}</strong>
             <span>Mag valid</span><strong>{imu ? (imu.have_mag ? 'YES' : 'NO') : '--'}</strong>
             <span>AHRS</span><strong>{imu ? (imu.valid ? 'VALID' : 'STARTUP') : '--'}</strong>
@@ -420,7 +381,7 @@ function OrientationTab({
           <div className={styles.rawGroupHeader} style={{marginTop:8}}>RELATIVE (YAW→BAR)</div>
           <div className={styles.kvGrid}>
             <span>Rel roll</span><strong>{fmtDeg(imu?.bar_rel_roll)}</strong>
-            <span>Rel pitch</span><strong>{fmtDeg(imu?.bar_rel_pitch)}</strong>
+            <span>Elevation</span><strong>{fmtDeg(imu?.bar_rel_pitch)}</strong>
             <span>Rel yaw</span><strong>{fmtDeg(imu?.bar_rel_yaw)}</strong>
           </div>
         </div>
@@ -617,6 +578,7 @@ function RawSensorsTab({
   const [zenithImuEnabled, setZenithImuEnabled] = useState(false);
   const [zenithMagEnabled, setZenithMagEnabled] = useState(false);
   const [azEnabled,        setAzEnabled]        = useState(false);
+  const [windowSeconds,    setWindowSeconds]    = useState<number>(10);
 
   // Recording state
   const [isRecording,   setIsRecording]   = useState(false);
@@ -723,22 +685,35 @@ function RawSensorsTab({
   const recZenImuCount = isRecording ? recZenImuRef.current.length  : (hasRecording ? recZenImuRef.current.length  : 0);
   const recZenMagCount = isRecording ? recZenMagRef.current.length  : (hasRecording ? recZenMagRef.current.length  : 0);
 
+  const chartRawImu = useMemo(
+    () => filterSensorWindow(rawImu, windowSeconds),
+    [rawImu, windowSeconds],
+  );
+  const chartRawMag = useMemo(
+    () => filterSensorWindow(rawMag, windowSeconds),
+    [rawMag, windowSeconds],
+  );
+  const chartRawYawImu = useMemo(
+    () => filterSensorWindow(rawYawImu, windowSeconds),
+    [rawYawImu, windowSeconds],
+  );
+
   const zenithImuData = useMemo(
-    () => rawImu.map((s, i) => ({ i, ax: s.ax, ay: s.ay, az: s.az, gx: s.gx, gy: s.gy, gz: s.gz })),
-    [rawImu],
+    () => chartRawImu.map((s, i) => ({ i, ax: s.ax, ay: s.ay, az: s.az, gx: s.gx, gy: s.gy, gz: s.gz })),
+    [chartRawImu],
   );
   const zenithMagData = useMemo(
-    () => rawMag.map((s, i) => ({ i, mx: s.mx, my: s.my, mz: s.mz })),
-    [rawMag],
+    () => chartRawMag.map((s, i) => ({ i, mx: s.mx, my: s.my, mz: s.mz })),
+    [chartRawMag],
   );
   const azData = useMemo(
-    () => rawYawImu.map((s, i) => ({
+    () => chartRawYawImu.map((s, i) => ({
       i,
       ax: s.ax, ay: s.ay, az: s.az,
       gx: s.gx, gy: s.gy, gz: s.gz,
       mx: s.mx_ut, my: s.my_ut, mz: s.mz_ut,
     })),
-    [rawYawImu],
+    [chartRawYawImu],
   );
 
   const accelLines = [
@@ -784,8 +759,18 @@ function RawSensorsTab({
         </button>
         <button className={styles.rawStopBtn} onClick={stopAll}>STOP ALL</button>
         <button className={styles.rawClearDataBtn} onClick={clearRawSensors}>CLEAR DATA</button>
+        <select
+          className={styles.windowSelect}
+          value={windowSeconds}
+          onChange={(event) => setWindowSeconds(Number(event.target.value))}
+          title="Chart buffer"
+        >
+          {SENSOR_WINDOW_OPTIONS.map((seconds) => (
+            <option key={seconds} value={seconds}>{seconds}s</option>
+          ))}
+        </select>
         <span className={styles.rawSensorCount}>
-          AZ {rawYawImu.length} / ZEN IMU {rawImu.length} / ZEN MAG {rawMag.length}
+          AZ {chartRawYawImu.length}/{rawYawImu.length} / ZEN IMU {chartRawImu.length}/{rawImu.length} / ZEN MAG {chartRawMag.length}/{rawMag.length}
         </span>
       </div>
 
@@ -848,25 +833,31 @@ function AhrsTab({
   parsedCount: number;
   clearAhrsHistory: () => void;
 }) {
+  const [windowSeconds, setWindowSeconds] = useState<number>(10);
+  const chartHistory = useMemo(
+    () => filterSensorWindow(ahrsHistory, windowSeconds),
+    [ahrsHistory, windowSeconds],
+  );
+
   const rpyData = useMemo(
-    () => ahrsHistory.map((s, i) => ({
+    () => chartHistory.map((s, i) => ({
       i,
       roll: s.roll,
       pitch: s.pitch,
     })),
-    [ahrsHistory],
+    [chartHistory],
   );
 
   const yawData = useMemo(
-    () => ahrsHistory.map((s, i) => ({
+    () => chartHistory.map((s, i) => ({
       i,
       yaw: s.yaw360 ?? norm360(s.yaw) ?? 0,
     })),
-    [ahrsHistory],
+    [chartHistory],
   );
 
   const quatData = useMemo(
-    () => ahrsHistory
+    () => chartHistory
       .filter((s) => s.q != null)
       .map((s, i) => ({
         i,
@@ -875,15 +866,25 @@ function AhrsTab({
         qy: s.q?.[2] ?? 0,
         qz: s.q?.[3] ?? 0,
       })),
-    [ahrsHistory],
+    [chartHistory],
   );
 
   return (
     <div className={styles.rawSensorsRoot}>
       <div className={styles.rawSensorToolbar}>
         <span className={styles.rawSensorCount}>
-          AHRS {ahrsHistory.length} samples / seen {seenCount} / parsed {parsedCount} / latest {latest ? (latest.valid ? 'VALID' : 'STARTUP') : '--'}
+          AHRS {chartHistory.length}/{ahrsHistory.length} samples / seen {seenCount} / parsed {parsedCount} / latest {latest ? (latest.valid ? 'VALID' : 'STARTUP') : '--'}
         </span>
+        <select
+          className={styles.windowSelect}
+          value={windowSeconds}
+          onChange={(event) => setWindowSeconds(Number(event.target.value))}
+          title="Chart buffer"
+        >
+          {SENSOR_WINDOW_OPTIONS.map((seconds) => (
+            <option key={seconds} value={seconds}>{seconds}s</option>
+          ))}
+        </select>
         <button className={styles.clearBtn} onClick={clearAhrsHistory}>CLEAR DATA</button>
       </div>
 
@@ -957,23 +958,30 @@ function AhrsTab({
 
 // -- Main panel ----------------------------------------------------------------
 export function DebugPanel({ mqtt }: Props) {
-  const {
-    logLines, rawMessages, clearDebug, antenna, groundImu, connected,
-    rawImu, rawMag, rawYawImu, clearRawSensors, ahrsHistory, clearAhrsHistory,
-  } = useTelemetryStore();
+  const logLines = useTelemetryStore((s) => s.logLines);
+  const clearDebug = useTelemetryStore((s) => s.clearDebug);
+  const antenna = useTelemetryStore((s) => s.antenna);
+  const groundImu = useTelemetryStore((s) => s.groundImu);
+  const ahrsStatus = useTelemetryStore((s) => s.ahrsStatus);
+  const connected = useTelemetryStore((s) => s.connected);
+  const rawImu = useTelemetryStore((s) => s.rawImu);
+  const rawMag = useTelemetryStore((s) => s.rawMag);
+  const rawYawImu = useTelemetryStore((s) => s.rawYawImu);
+  const clearRawSensors = useTelemetryStore((s) => s.clearRawSensors);
+  const ahrsHistory = useTelemetryStore((s) => s.ahrsHistory);
+  const clearAhrsHistory = useTelemetryStore((s) => s.clearAhrsHistory);
+  const calibrationEvents = useTelemetryStore((s) => s.calibrationEvents);
 
   const [subTab, setSubTab] = useState<DebugTab>('log');
 
-  // Topic filter for the inspector
-  const [topicFilter, setTopicFilter] = useState('');
-
   // Antenna command state
   const [az,    setAz]    = useState('0');
-  const [el,    setEl]    = useState('90');
-  const [speed, setSpeed] = useState('30');
+  const [el,    setEl]    = useState('0');
+  const [speed, setSpeed] = useState('10');
   const [pendingDirectAxis, setPendingDirectAxis] = useState<DirectAxis | null>(null);
   const [jogStep,  setJogStep]  = useState('2');
   const [jogSpeed, setJogSpeed] = useState('10');
+  const [pendingTracker, setPendingTracker] = useState<PendingTrackerCommand | null>(null);
 
   // Tracker config/calibration state
   const [cfgYawTrim, setCfgYawTrim] = useState('0');
@@ -995,11 +1003,6 @@ export function DebugPanel({ mqtt }: Props) {
   const [cfgAhrsAge, setCfgAhrsAge] = useState('250');
   const [cfgAhrsGain, setCfgAhrsGain] = useState('0.35');
   const [cfgAhrsMaxCorrection, setCfgAhrsMaxCorrection] = useState('8');
-  const [calStep, setCalStep] = useState(1);
-  const [calAzReference, setCalAzReference] = useState('0');
-  const [calElReference, setCalElReference] = useState('0');
-  const [calNote, setCalNote] = useState('external reference');
-
   // Debug oscillation state
   const [oscAxis,    setOscAxis]    = useState<'az' | 'el'>('el');
   const [oscDeg,     setOscDeg]     = useState('5');
@@ -1008,15 +1011,13 @@ export function DebugPanel({ mqtt }: Props) {
 
   // Auto-scroll the log
   const logEndRef    = useRef<HTMLDivElement>(null);
-  const topicEndRef  = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
   useEffect(() => {
     if (autoScroll) {
       logEndRef.current?.scrollIntoView({ behavior: 'instant' });
-      topicEndRef.current?.scrollIntoView({ behavior: 'instant' });
     }
-  }, [logLines, rawMessages, autoScroll]);
+  }, [logLines, autoScroll]);
 
   function handleOscStart() {
     const deg   = parseFloat(oscDeg);
@@ -1041,15 +1042,6 @@ export function DebugPanel({ mqtt }: Props) {
     const topic = axis === 'az' ? TOPICS.STEPPER_AZ_CMD : TOPICS.STEPPER_EL_CMD;
     mqtt.publish(topic, JSON.stringify({ target_angle_deg: targetVal, speed_dps: speedVal, stop: false }));
     setPendingDirectAxis(null);
-  }
-
-  function publishCalibration(action: string, referenceDeg?: number, note = calNote) {
-    mqtt.publish(TOPICS.CALIBRATION_CMD, JSON.stringify({
-      action,
-      reference_deg: referenceDeg,
-      note,
-      step: calStep,
-    }));
   }
 
   function numberOrUndefined(value: string): number | undefined {
@@ -1081,30 +1073,6 @@ export function DebugPanel({ mqtt }: Props) {
     }));
   }
 
-  function beginGuidedCalibration() {
-    setCalStep(1);
-    publishCalibration('begin_guided', undefined, calNote);
-  }
-
-  function setAzReference() {
-    const ref = parseFloat(calAzReference);
-    if (!Number.isFinite(ref)) return;
-    publishCalibration('set_az_reference', ref, calNote);
-    setCalStep(2);
-  }
-
-  function setElReference() {
-    const ref = parseFloat(calElReference);
-    if (!Number.isFinite(ref)) return;
-    publishCalibration('set_el_reference', ref, calNote);
-    setCalStep(3);
-  }
-
-  function enableCalibratedTracking() {
-    publishCalibration('enable_tracking', undefined, calNote);
-    setCalStep(4);
-  }
-
   function handleJog(axis: 'az' | 'el', sign: 1 | -1) {
     const step = parseFloat(jogStep);
     const spd  = parseFloat(jogSpeed);
@@ -1117,69 +1085,48 @@ export function DebugPanel({ mqtt }: Props) {
   }
 
   function handleStopMotion() {
+    setPendingTracker({ id: 'stop_all', label: 'STOP ALL', startedAt: Date.now() });
     mqtt.publish(TOPICS.STEPPER_AZ_CMD,  JSON.stringify({ stop: true }));
     mqtt.publish(TOPICS.STEPPER_EL_CMD, JSON.stringify({ stop: true }));
     mqtt.publish(TOPICS.TRACKER_MODE_CMD, JSON.stringify({ mode: 'stop' }));
     mqtt.publish(TOPICS.TRACKER_ARM_CMD, JSON.stringify({ armed: false }));
   }
 
-  function handleTrackerMode(mode: 'stop' | 'manual' | 'auto' | 'scan') {
+  function handleTrackerMode(mode: TrackerMode) {
+    setPendingTracker({ id: mode, label: mode.toUpperCase(), startedAt: Date.now() });
     mqtt.publish(TOPICS.TRACKER_MODE_CMD, JSON.stringify({ mode }));
   }
 
   function handleTrackerArm(armed: boolean) {
+    setPendingTracker({ id: armed ? 'arm' : 'disarm', label: armed ? 'ARM' : 'DISARM', startedAt: Date.now() });
     mqtt.publish(TOPICS.TRACKER_ARM_CMD, JSON.stringify({ armed }));
   }
 
-  const topicOptions = useMemo(
-    () => Array.from(new Set([
-      ...KNOWN_MQTT_TOPICS,
-      ...rawMessages.map((message) => message.topic),
-    ])).sort((a, b) => a.localeCompare(b)),
-    [rawMessages],
-  );
+  useEffect(() => {
+    if (!pendingTracker || !antenna) return;
+    const mode = (antenna.mode ?? '').toLowerCase();
+    const acked =
+      (pendingTracker.id === 'arm' && antenna.armed === true) ||
+      (pendingTracker.id === 'disarm' && antenna.armed === false) ||
+      (pendingTracker.id === 'stop_all' && antenna.armed === false && mode === 'stop') ||
+      (pendingTracker.id !== 'arm' &&
+        pendingTracker.id !== 'disarm' &&
+        pendingTracker.id !== 'stop_all' &&
+        mode === pendingTracker.id);
+    if (acked) setPendingTracker(null);
+  }, [antenna, pendingTracker]);
 
-  const filteredMessages = useMemo(() => {
-    const filter = topicFilter.trim();
-    return filter
-      ? rawMessages.filter((message) => mqttFilterMatches(filter, message.topic))
-      : rawMessages;
-  }, [rawMessages, topicFilter]);
-
-  const fallbackImu = useMemo(
-    () => latestJson<GroundImuState>(rawMessages, TOPICS.GROUND_IMU),
-    [rawMessages],
-  );
-  const fallbackAntenna = useMemo(
-    () => latestJson<AntennaState>(rawMessages, TOPICS.ANTENNA_STATE),
-    [rawMessages],
-  );
-  const calibrationEvents = useMemo(
-    () => jsonHistory<CalibrationEvent>(rawMessages, TOPICS.CALIBRATION_EVENT).slice(-8),
-    [rawMessages],
-  );
-  const latestCalibrationEvent = calibrationEvents[calibrationEvents.length - 1] ?? null;
-  const ahrsStatus = useMemo(
-    () => latestJson<AhrsStatus>(rawMessages, TOPICS.AHRS_STATUS),
-    [rawMessages],
-  );
-  const fallbackAhrsHistory = useMemo(
-    () => jsonHistory<GroundImuState>(rawMessages, TOPICS.GROUND_IMU),
-    [rawMessages],
-  );
-  const ahrsSeenCount = useMemo(
-    () => rawMessages.filter(m => m.topic === TOPICS.GROUND_IMU).length,
-    [rawMessages],
-  );
-  const orientationImu = groundImu ?? fallbackImu;
-  const orientationAntenna = antenna ?? fallbackAntenna;
-  const imuSeen = groundImu?.timestamp ?? fallbackImu?.timestamp ?? null;
-  const antennaSeen = fallbackAntenna?.timestamp ?? null;
-  const displayAhrsHistory = ahrsHistory.length > 0 ? ahrsHistory : fallbackAhrsHistory;
+  const orientationImu = groundImu;
+  const orientationAntenna = antenna;
+  const imuSeen = groundImu?.timestamp ?? null;
+  const antennaSeen = antenna?.timestamp ?? null;
+  const ahrsSeenCount = ahrsHistory.length;
+  const displayAhrsHistory = ahrsHistory;
+  const trackerMode = (antenna?.mode ?? '').toLowerCase();
+  const directCommandReady = antenna?.armed === true && trackerMode === 'manual';
   const activeTab = DEBUG_TABS.find((item) => item.id === subTab) ?? DEBUG_TABS[0];
   const tabCounts: Partial<Record<DebugTab, number>> = {
     log: logLines.length,
-    topics: rawMessages.length,
     raw: rawImu.length + rawMag.length + rawYawImu.length,
     ahrs: displayAhrsHistory.length,
   };
@@ -1229,32 +1176,7 @@ export function DebugPanel({ mqtt }: Props) {
             <h2>{activeTab.label}</h2>
           </div>
           <div className={styles.workspaceTools}>
-            {subTab === 'topics' && (
-              <div className={styles.topicPicker}>
-                <input
-                  className={styles.filterInput}
-                  list="mqtt-topic-options"
-                  placeholder="All topics"
-                  value={topicFilter}
-                  onChange={e => setTopicFilter(e.target.value)}
-                />
-                <datalist id="mqtt-topic-options">
-                  {topicOptions.map((topic) => (
-                    <option key={topic} value={topic} />
-                  ))}
-                </datalist>
-                {topicFilter && (
-                  <button
-                    className={styles.topicClearBtn}
-                    onClick={() => setTopicFilter('')}
-                    title="Show all topics"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            )}
-            {(subTab === 'log' || subTab === 'topics') && (
+            {subTab === 'log' && (
               <label className={styles.scrollToggle}>
                 <input type="checkbox" checked={autoScroll} onChange={e => setAutoScroll(e.target.checked)} />
                 auto-scroll
@@ -1277,19 +1199,6 @@ export function DebugPanel({ mqtt }: Props) {
             </div>
           )}
 
-          {subTab === 'topics' && (
-            <div className={styles.console}>
-              {filteredMessages.map(msg => (
-                <div key={msg.id} className={styles.rawLine}>
-                  <span className={styles.logTs}>{formatTs(msg.ts)}</span>
-                  <span className={styles.rawTopic}>{msg.topic}</span>
-                  <span className={styles.rawPayload}>{msg.payload}</span>
-                </div>
-              ))}
-              <div ref={topicEndRef} />
-            </div>
-          )}
-
           {subTab === 'starlink' && <StarlinkTab />}
           {subTab === 'orientation' && (
             <OrientationTab
@@ -1307,7 +1216,7 @@ export function DebugPanel({ mqtt }: Props) {
               latest={orientationImu}
               status={ahrsStatus}
               seenCount={ahrsSeenCount}
-              parsedCount={fallbackAhrsHistory.length}
+              parsedCount={displayAhrsHistory.length}
               clearAhrsHistory={clearAhrsHistory}
             />
           )}
@@ -1321,14 +1230,26 @@ export function DebugPanel({ mqtt }: Props) {
             />
           )}
           {subTab === 'sim' && <SimTab />}
+          {subTab === 'magcal' && (
+            <div className={styles.calibrationScroll}>
+              <MagCalibrationWizard
+                mqtt={mqtt}
+                connected={connected}
+                rawMag={rawMag}
+                rawYawImu={rawYawImu}
+              />
+            </div>
+          )}
           {subTab === 'calibration' && (
-            <CalibrationWizard
-              mqtt={mqtt}
-              antenna={antenna}
-              imu={orientationImu}
-              connected={connected}
-              calibrationEvents={calibrationEvents}
-            />
+            <div className={styles.calibrationScroll}>
+              <CalibrationWizard
+                mqtt={mqtt}
+                antenna={antenna}
+                imu={orientationImu}
+                connected={connected}
+                calibrationEvents={calibrationEvents}
+              />
+            </div>
           )}
         </div>
       </main>
@@ -1376,13 +1297,44 @@ export function DebugPanel({ mqtt }: Props) {
           <div className={styles.ctrlCard}>
             <div className={styles.ctrlCardTitle}>TRACKER</div>
             <div className={styles.jogGrid}>
-              <button className={styles.sendBtn} onClick={() => handleTrackerArm(true)}>ARM</button>
-              <button className={styles.stopBtn} onClick={() => handleTrackerArm(false)}>DISARM</button>
-              <button className={styles.axisBtn} onClick={() => handleTrackerMode('auto')}>AUTO</button>
-              <button className={styles.axisBtn} onClick={() => handleTrackerMode('scan')}>SCAN</button>
-              <button className={styles.axisBtn} onClick={() => handleTrackerMode('manual')}>MANUAL</button>
-              <button className={styles.stopBtn} onClick={() => handleTrackerMode('stop')}>STOP</button>
-              <button className={styles.stopBtn} onClick={handleStopMotion}>STOP ALL</button>
+              <button
+                className={`${styles.sendBtn} ${antenna?.armed ? styles.trackerBtnActive : ''} ${pendingTracker?.id === 'arm' ? styles.trackerBtnPending : ''}`}
+                onClick={() => handleTrackerArm(true)}
+              >ARM</button>
+              <button
+                className={`${styles.stopBtn} ${antenna?.armed === false ? styles.trackerBtnActive : ''} ${pendingTracker?.id === 'disarm' ? styles.trackerBtnPending : ''}`}
+                onClick={() => handleTrackerArm(false)}
+              >DISARM</button>
+              <button
+                className={`${styles.axisBtn} ${trackerMode === 'auto' ? styles.trackerBtnActive : ''} ${pendingTracker?.id === 'auto' ? styles.trackerBtnPending : ''}`}
+                onClick={() => handleTrackerMode('auto')}
+              >AUTO</button>
+              <button
+                className={`${styles.axisBtn} ${trackerMode === 'scan' ? styles.trackerBtnActive : ''} ${pendingTracker?.id === 'scan' ? styles.trackerBtnPending : ''}`}
+                onClick={() => handleTrackerMode('scan')}
+              >SCAN</button>
+              <button
+                className={`${styles.axisBtn} ${trackerMode === 'manual' ? styles.trackerBtnActive : ''} ${pendingTracker?.id === 'manual' ? styles.trackerBtnPending : ''}`}
+                onClick={() => handleTrackerMode('manual')}
+              >MANUAL</button>
+              <button
+                className={`${styles.stopBtn} ${trackerMode === 'stop' ? styles.trackerBtnActive : ''} ${pendingTracker?.id === 'stop' ? styles.trackerBtnPending : ''}`}
+                onClick={() => handleTrackerMode('stop')}
+              >STOP</button>
+              <button
+                className={`${styles.stopBtn} ${pendingTracker?.id === 'stop_all' ? styles.trackerBtnPending : ''}`}
+                onClick={handleStopMotion}
+              >STOP ALL</button>
+            </div>
+            <div className={styles.trackerAck}>
+              {pendingTracker ? (
+                <>
+                  <span>Waiting for Pico: {pendingTracker.label}</span>
+                  <div className={styles.trackerProgress}><span /></div>
+                </>
+              ) : (
+                <span>State: {antenna?.armed ? 'armed' : 'disarmed'} / {trackerMode || '--'}</span>
+              )}
             </div>
           </div>
 
@@ -1411,68 +1363,6 @@ export function DebugPanel({ mqtt }: Props) {
               <button className={styles.axisBtn} onClick={() => handleJog('el', -1)}>EL −</button>
               <button className={styles.axisBtn} onClick={() => handleJog('el',  1)}>EL +</button>
             </div>
-          </div>
-
-          {/* GUIDED CALIBRATION */}
-          <div className={`${styles.ctrlCard} ${styles.ctrlCardFull}`}>
-            <div className={styles.ctrlCardTitle}>GUIDED CALIBRATION</div>
-            <div className={styles.cmdNote}>
-              Step {calStep}: stop tracking, jog the antenna to match an external reference, then record the reference reading.
-            </div>
-            <button className={styles.sendBtn} onClick={beginGuidedCalibration}>BEGIN GUIDED CAL</button>
-            <div className={styles.ctrlInlineRow}>
-              <span className={styles.cmdLabel}>AZ REF</span>
-              <input
-                className={styles.cmdInputSm}
-                type="number"
-                step="0.1"
-                min="0"
-                max="360"
-                value={calAzReference}
-                onChange={e => setCalAzReference(e.target.value)}
-              />
-              <button className={styles.axisBtn} onClick={setAzReference}>SET AZ</button>
-            </div>
-            <div className={styles.ctrlInlineRow}>
-              <span className={styles.cmdLabel}>EL REF</span>
-              <input
-                className={styles.cmdInputSm}
-                type="number"
-                step="0.1"
-                min="-90"
-                max="90"
-                value={calElReference}
-                onChange={e => setCalElReference(e.target.value)}
-              />
-              <button className={styles.axisBtn} onClick={setElReference}>SET EL</button>
-            </div>
-            <label className={styles.cmdLabel}>Log note</label>
-            <input
-              className={styles.cmdInput}
-              value={calNote}
-              onChange={e => setCalNote(e.target.value)}
-            />
-            <div className={styles.jogGrid}>
-              <button className={styles.sendBtn} onClick={enableCalibratedTracking}>ENABLE AUTO</button>
-              <button className={styles.stopBtn} onClick={() => publishCalibration('clear')}>CLEAR CAL</button>
-            </div>
-            <div className={styles.cmdNote}>
-              Last event: {latestCalibrationEvent
-                ? `${latestCalibrationEvent.action ?? '--'} / ${latestCalibrationEvent.result ?? '--'}`
-                : 'none'}
-              <br />
-              Topic: <code>{TOPICS.CALIBRATION_EVENT}</code>
-            </div>
-            {calibrationEvents.length > 0 && (
-              <div className={styles.statusGrid}>
-                {calibrationEvents.slice(-3).map((event, index) => (
-                  <span key={`${event.timestamp}-${index}`}>
-                    {(event.action ?? '--').slice(0, 14)}
-                    <strong>{event.result ?? '--'}</strong>
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* TRACKER CONFIG */}
@@ -1563,10 +1453,21 @@ export function DebugPanel({ mqtt }: Props) {
               value={speed}
               onChange={e => setSpeed(e.target.value)}
             />
-            <button className={styles.sendBtn} onClick={() => setPendingDirectAxis('az')}>SEND AZ</button>
-            <button className={styles.sendBtn} onClick={() => setPendingDirectAxis('el')}>SEND EL</button>
+            <button
+              className={styles.sendBtn}
+              onClick={() => setPendingDirectAxis('az')}
+              disabled={!directCommandReady}
+            >SEND AZ</button>
+            <button
+              className={styles.sendBtn}
+              onClick={() => setPendingDirectAxis('el')}
+              disabled={!directCommandReady}
+            >SEND EL</button>
             <div className={styles.cmdNote}>
-              Each button publishes one axis only.<br />
+              {directCommandReady
+                ? 'Each button publishes one axis only.'
+                : 'Arm the tracker and switch to manual before direct motion.'}
+              <br />
               <code>{TOPICS.STEPPER_AZ_CMD}</code><br />
               <code>{TOPICS.STEPPER_EL_CMD}</code>
             </div>

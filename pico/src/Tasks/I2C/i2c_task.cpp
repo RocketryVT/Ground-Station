@@ -24,6 +24,30 @@ struct I2cBusCfg {
     const char*    tag;
 };
 
+static void scan_i2c_bus( const I2cBusCfg* cfg )
+{
+    char line[ 160 ] = {};
+    int n = snprintf( line, sizeof(line), "[%s] scan:", cfg->tag );
+    bool found = false;
+
+    for ( uint8_t addr = 0x08; addr <= 0x77; addr++ ) {
+        uint8_t byte = 0;
+        const int rc = i2c_read_blocking( cfg->bus, addr, &byte, 1, false );
+        if ( rc >= 0 ) {
+            found = true;
+            if ( n > 0 && n < (int)sizeof(line) ) {
+                n += snprintf( line + n, sizeof(line) - (size_t)n,
+                               " 0x%02X", addr );
+            }
+        }
+    }
+
+    if ( !found && n > 0 && n < (int)sizeof(line) ) {
+        snprintf( line + n, sizeof(line) - (size_t)n, " none" );
+    }
+    log_print( "%s\n", line );
+}
+
 // -- Generic bus worker --------------------------------------------------------
 // A single task function serves both I2C0 and I2C1; the per-bus config is
 // passed via the FreeRTOS task parameter.
@@ -39,6 +63,7 @@ static void i2c_bus_task( void* arg )
 
     log_print( "[%s] ready at %lu Hz  SDA=GPIO%u  SCL=GPIO%u\n",
                cfg->tag, (unsigned long)cfg->baud_hz, cfg->sda, cfg->scl );
+    scan_i2c_bus( cfg );
 
     QueueHandle_t req_q = *cfg->req_q_ptr;
 

@@ -11,6 +11,10 @@ static TrackerMode s_mode = TrackerMode::Auto;
 static bool s_armed = false;
 static TrackerControlStatus s_control_status;
 static TrackerCalibrationStatus s_cal_status;
+static float s_manual_az_deg = 0.0f;
+static float s_manual_el_deg = 0.0f;
+static bool  s_manual_az_valid = false;
+static bool  s_manual_el_valid = false;
 
 static float sane_float( float value, float fallback )
 {
@@ -137,6 +141,37 @@ void tracker_set_mode( TrackerMode mode )
 {
     taskENTER_CRITICAL();
     s_mode = mode;
+    // Manual targets only make sense while actively in Manual mode.
+    if ( mode != TrackerMode::Manual ) {
+        s_manual_az_valid = false;
+        s_manual_el_valid = false;
+    }
+    taskEXIT_CRITICAL();
+}
+
+void tracker_set_manual_target( bool is_az, float deg )
+{
+    taskENTER_CRITICAL();
+    if ( is_az ) { s_manual_az_deg = deg; s_manual_az_valid = true; }
+    else         { s_manual_el_deg = deg; s_manual_el_valid = true; }
+    taskEXIT_CRITICAL();
+}
+
+bool tracker_get_manual_target( bool is_az, float* deg )
+{
+    bool valid;
+    taskENTER_CRITICAL();
+    if ( is_az ) { valid = s_manual_az_valid; if ( deg ) *deg = s_manual_az_deg; }
+    else         { valid = s_manual_el_valid; if ( deg ) *deg = s_manual_el_deg; }
+    taskEXIT_CRITICAL();
+    return valid;
+}
+
+void tracker_clear_manual_targets()
+{
+    taskENTER_CRITICAL();
+    s_manual_az_valid = false;
+    s_manual_el_valid = false;
     taskEXIT_CRITICAL();
 }
 

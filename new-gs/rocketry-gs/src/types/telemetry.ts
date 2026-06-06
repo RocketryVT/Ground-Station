@@ -81,6 +81,33 @@ export interface GroundImuState {
   bar_rel_yaw?: number;
 }
 
+export interface AhrsStatus {
+  timestamp: number;
+  running: boolean;
+  have_imu: boolean;
+  have_mag: boolean;
+  have_bar_imu?: boolean;
+  have_bar_mag?: boolean;
+  have_yaw_imu?: boolean;
+  have_yaw_mag?: boolean;
+  updates: number;
+  bar_updates?: number;
+  yaw_updates?: number;
+}
+
+export interface CalibrationEvent {
+  timestamp: number;
+  seq?: number;
+  action?: string;
+  result?: string;
+  reference_deg?: number;
+  az_calibrated?: boolean;
+  el_calibrated?: boolean;
+  az_reference_deg?: number;
+  el_reference_deg?: number;
+  note?: string;
+}
+
 export interface RawImuSample {
   timestamp: number;
   ax: number;

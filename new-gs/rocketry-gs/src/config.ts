@@ -28,6 +28,7 @@ export const TOPICS = {
   CALIBRATION_EVENT: 'antenna/calibration/event',
   RAW_SENSORS_CMD:   'gs/cmd/raw_sensors',
   DECLINATION_CMD:   'gs/cmd/declination',
+  MAG_CAL_CMD:       'gs/cmd/mag_cal',
   TRACKER_MODE_CMD:  'gs/cmd/tracker/mode',
   TRACKER_ARM_CMD:   'gs/cmd/tracker/arm',
   TRACKER_CONFIG_CMD:'gs/cmd/tracker/config',

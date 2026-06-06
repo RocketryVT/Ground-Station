@@ -172,9 +172,9 @@ struct MagMsg {
 };
 
 struct YawImuMsg {
-    float    accel[3];      // g           (ICM-20948 on yaw moving body)
+    float    accel[3];      // g           (LSM6DSOX on yaw moving body)
     float    gyro[3];       // deg/s
-    float    mag_ut[3];     // microtesla  (AK09916 inside ICM-20948)
+    float    mag_ut[3];     // microtesla  (LIS3MDL on yaw moving body)
     float    temp_c;
     uint64_t timestamp_us;
     bool     mag_valid;

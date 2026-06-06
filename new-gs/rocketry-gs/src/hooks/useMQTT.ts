@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { useTelemetryStore, type LogLine, type RawMessage } from '../store/telemetryStore';
+import { useTelemetryStore, type LogLine, type RawMessage, type TelemetryState } from '../store/telemetryStore';
 import type {
   AntennaState,
+  AhrsStatus,
+  CalibrationEvent,
   GroundImuState,
   MobileNode,
   RawImuSample,
@@ -21,6 +23,7 @@ interface TelemetrySnapshot {
   history: RocketTelemetry[];
   antenna: AntennaState | null;
   groundImu: GroundImuState | null;
+  ahrsStatus: AhrsStatus | null;
   nodes: Record<string, MobileNode>;
   connected: boolean;
   flightStart: number | null;
@@ -30,23 +33,36 @@ interface TelemetrySnapshot {
   rawMag: RawMagSample[];
   rawYawImu: RawYawImuSample[];
   ahrsHistory: GroundImuState[];
+  calibrationEvents: CalibrationEvent[];
 }
 
 type TelemetryEvent =
   | { kind: 'connected'; connected: boolean }
   | { kind: 'log_line'; line: LogLine }
-  | { kind: 'raw_message'; message: RawMessage }
   | { kind: 'telemetry'; telemetry: RocketTelemetry }
   | { kind: 'antenna'; antenna: AntennaState }
   | { kind: 'ground_imu'; imu: GroundImuState }
+  | { kind: 'ahrs_status'; status: AhrsStatus }
+  | { kind: 'calibration_event'; event: CalibrationEvent }
   | { kind: 'node'; node: MobileNode }
   | { kind: 'raw_imu'; sample: RawImuSample }
   | { kind: 'raw_mag'; sample: RawMagSample }
   | { kind: 'raw_yaw_imu'; sample: RawYawImuSample }
-  | { kind: 'active_drag'; data: Partial<RocketTelemetry> }
-  | { kind: 'snapshot'; snapshot: TelemetrySnapshot };
+  | { kind: 'active_drag'; data: Partial<RocketTelemetry> };
 
 const EVENT_NAME = 'telemetry://event';
+const UI_FLUSH_INTERVAL_MS = 50;
+const MAX_LOG = 500;
+const MAX_SENSOR_RAW = 500;
+const MAX_HISTORY = 500;
+const MAX_AHRS = 500;
+const MAX_CALIBRATION_EVENTS = 25;
+
+function appendCapped<T>(items: T[], next: T, limit: number): T[] {
+  return items.length >= limit
+    ? [...items.slice(items.length - limit + 1), next]
+    : [...items, next];
+}
 
 function applySnapshot(snapshot: TelemetrySnapshot) {
   useTelemetryStore.setState({
@@ -54,15 +70,17 @@ function applySnapshot(snapshot: TelemetrySnapshot) {
     history: snapshot.history ?? [],
     antenna: snapshot.antenna,
     groundImu: snapshot.groundImu,
+    ahrsStatus: snapshot.ahrsStatus,
     nodes: snapshot.nodes ?? {},
     connected: snapshot.connected,
     flightStart: snapshot.flightStart,
     logLines: snapshot.logLines ?? [],
-    rawMessages: snapshot.rawMessages ?? [],
+    rawMessages: [],
     rawImu: snapshot.rawImu ?? [],
     rawMag: snapshot.rawMag ?? [],
     rawYawImu: snapshot.rawYawImu ?? [],
     ahrsHistory: snapshot.ahrsHistory ?? [],
+    calibrationEvents: snapshot.calibrationEvents ?? [],
   });
 }
 
@@ -78,11 +96,6 @@ function applyEvent(event: TelemetryEvent) {
         logLines: [...state.logLines.slice(-499), event.line],
       }));
       break;
-    case 'raw_message':
-      useTelemetryStore.setState((state) => ({
-        rawMessages: [...state.rawMessages.slice(-499), event.message],
-      }));
-      break;
     case 'telemetry':
       store.addTelemetry(event.telemetry);
       break;
@@ -91,6 +104,12 @@ function applyEvent(event: TelemetryEvent) {
       break;
     case 'ground_imu':
       store.setGroundImu(event.imu);
+      break;
+    case 'ahrs_status':
+      store.setAhrsStatus(event.status);
+      break;
+    case 'calibration_event':
+      store.addCalibrationEvent(event.event);
       break;
     case 'node':
       store.updateNode(event.node);
@@ -107,10 +126,96 @@ function applyEvent(event: TelemetryEvent) {
     case 'active_drag':
       store.setActiveDrag(event.data);
       break;
-    case 'snapshot':
-      applySnapshot(event.snapshot);
-      break;
   }
+}
+
+function applyEvents(events: TelemetryEvent[]) {
+  if (events.length === 0) return;
+  if (events.length === 1) {
+    applyEvent(events[0]);
+    return;
+  }
+
+  useTelemetryStore.setState((state) => {
+    let latest = state.latest;
+    let history = state.history;
+    let antenna = state.antenna;
+    let groundImu = state.groundImu;
+    let ahrsStatus = state.ahrsStatus;
+    let nodes = state.nodes;
+    let connected = state.connected;
+    let flightStart = state.flightStart;
+    let logLines = state.logLines;
+    let rawMessages = state.rawMessages;
+    let rawImu = state.rawImu;
+    let rawMag = state.rawMag;
+    let rawYawImu = state.rawYawImu;
+    let ahrsHistory = state.ahrsHistory;
+    let calibrationEvents = state.calibrationEvents;
+
+    for (const event of events) {
+      switch (event.kind) {
+        case 'connected':
+          connected = event.connected;
+          break;
+        case 'log_line':
+          logLines = appendCapped(logLines, event.line, MAX_LOG);
+          break;
+        case 'telemetry':
+          latest = event.telemetry;
+          history = appendCapped(history, event.telemetry, MAX_HISTORY);
+          flightStart = flightStart ?? event.telemetry.timestamp;
+          break;
+        case 'antenna':
+          antenna = event.antenna;
+          break;
+        case 'ground_imu':
+          groundImu = event.imu;
+          ahrsHistory = appendCapped(ahrsHistory, event.imu, MAX_AHRS);
+          break;
+        case 'ahrs_status':
+          ahrsStatus = event.status;
+          break;
+        case 'calibration_event':
+          calibrationEvents = appendCapped(calibrationEvents, event.event, MAX_CALIBRATION_EVENTS);
+          break;
+        case 'node':
+          if (nodes === state.nodes) nodes = { ...nodes };
+          nodes[event.node.id] = event.node;
+          break;
+        case 'raw_imu':
+          rawImu = appendCapped(rawImu, event.sample, MAX_SENSOR_RAW);
+          break;
+        case 'raw_mag':
+          rawMag = appendCapped(rawMag, event.sample, MAX_SENSOR_RAW);
+          break;
+        case 'raw_yaw_imu':
+          rawYawImu = appendCapped(rawYawImu, event.sample, MAX_SENSOR_RAW);
+          break;
+        case 'active_drag':
+          if (latest) latest = { ...latest, ...event.data };
+          break;
+      }
+    }
+
+    return {
+      latest,
+      history,
+      antenna,
+      groundImu,
+      ahrsStatus,
+      nodes,
+      connected,
+      flightStart,
+      logLines,
+      rawMessages,
+      rawImu,
+      rawMag,
+      rawYawImu,
+      ahrsHistory,
+      calibrationEvents,
+    } satisfies Partial<TelemetryState>;
+  });
 }
 
 function payloadToString(payload: string | Uint8Array): string {
@@ -125,6 +230,22 @@ export function useMQTT(enabled = true): MQTTHandle {
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
     let cancelled = false;
+    let flushTimer: number | null = null;
+    const pendingEvents: TelemetryEvent[] = [];
+
+    const flushEvents = () => {
+      flushTimer = null;
+      if (pendingEvents.length === 0) return;
+      const events = pendingEvents.splice(0, pendingEvents.length);
+      applyEvents(events);
+    };
+
+    const enqueueEvent = (event: TelemetryEvent) => {
+      pendingEvents.push(event);
+      if (flushTimer == null) {
+        flushTimer = window.setTimeout(flushEvents, UI_FLUSH_INTERVAL_MS);
+      }
+    };
 
     invoke<TelemetrySnapshot>('get_telemetry_snapshot')
       .then((snapshot) => {
@@ -135,7 +256,7 @@ export function useMQTT(enabled = true): MQTTHandle {
       });
 
     listen<TelemetryEvent>(EVENT_NAME, ({ payload }) => {
-      if (enabledRef.current) applyEvent(payload);
+      if (enabledRef.current) enqueueEvent(payload);
     })
       .then((fn) => {
         if (cancelled) fn();
@@ -147,6 +268,8 @@ export function useMQTT(enabled = true): MQTTHandle {
 
     return () => {
       cancelled = true;
+      if (flushTimer != null) window.clearTimeout(flushTimer);
+      pendingEvents.length = 0;
       unlisten?.();
     };
   }, []);

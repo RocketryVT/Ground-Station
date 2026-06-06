@@ -9,6 +9,8 @@ groundstation.GroundImu.m max_count:3
 groundstation.GroundImu.bar_q max_count:4
 groundstation.GroundImu.yaw_q max_count:4
 groundstation.GroundImu.bar_rel_q max_count:4
+groundstation.MagCalibrationCommand.hard_iron max_count:3
+groundstation.MagCalibrationCommand.soft_iron max_count:9
 groundstation.StarlinkProxyStatus.hardware_version max_size:64
 groundstation.StarlinkProxyStatus.software_version max_size:64
 groundstation.StarlinkProxyStatus.error max_size:160

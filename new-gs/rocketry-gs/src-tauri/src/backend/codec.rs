@@ -10,6 +10,7 @@ pub const ROCKET_INTER_PICO: &str = "rocket/inter_pico";
 pub const ANTENNA_STATE: &str = "antenna/state";
 pub const GROUND_IMU: &str = "gs/pico/primary/imu";
 pub const AHRS_STATUS: &str = "gs/pico/primary/ahrs/status";
+pub const CALIBRATION_EVENT: &str = "antenna/calibration/event";
 pub const RAW_IMU: &str = "gs/pico/primary/raw/imu";
 pub const RAW_MAG: &str = "gs/pico/primary/raw/mag";
 pub const RAW_YAW_IMU: &str = "gs/pico/primary/raw/yaw_imu";
@@ -19,6 +20,7 @@ pub const STEPPER_EL_CMD: &str = "gs/cmd/zen";
 pub const STEPPER_JOG_CMD: &str = "gs/cmd/jog";
 pub const RAW_SENSORS_CMD: &str = "gs/cmd/raw_sensors";
 pub const DECLINATION_CMD: &str = "gs/cmd/declination";
+pub const MAG_CAL_CMD: &str = "gs/cmd/mag_cal";
 pub const CALIBRATION_CMD: &str = "gs/cmd/calibration";
 pub const TRACKER_MODE_CMD: &str = "gs/cmd/tracker/mode";
 pub const TRACKER_ARM_CMD: &str = "gs/cmd/tracker/arm";
@@ -93,6 +95,11 @@ pub fn encode_command_payload(topic: &str, payload: &str) -> Vec<u8> {
         }),
         DECLINATION_CMD => encode_message(proto::DeclinationCommand {
             declination_deg: f32_field(&data, "declination_deg"),
+        }),
+        MAG_CAL_CMD => encode_message(proto::MagCalibrationCommand {
+            yaw: bool_field(&data, "yaw"),
+            hard_iron: f32_array_field(&data, "hard_iron"),
+            soft_iron: f32_array_field(&data, "soft_iron"),
         }),
         CALIBRATION_CMD => encode_message(proto::CalibrationCommand {
             action: calibration_action_field(&data, "action"),
@@ -495,6 +502,20 @@ fn u32_field(data: &Value, key: &str) -> Option<u32> {
 
 fn string_field(data: &Value, key: &str) -> Option<String> {
     data.get(key).and_then(Value::as_str).map(str::to_owned)
+}
+
+fn f32_array_field(data: &Value, key: &str) -> Vec<f32> {
+    data.get(key)
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_f64)
+                .filter(|value| value.is_finite())
+                .map(|value| value as f32)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn tracker_mode_field(data: &Value, key: &str) -> Option<i32> {

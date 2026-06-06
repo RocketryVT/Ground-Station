@@ -304,6 +304,20 @@ typedef struct _groundstation_DeclinationCommand {
     float declination_deg;
 } groundstation_DeclinationCommand;
 
+/* Magnetometer hard/soft-iron calibration for one sensor.  The app fits an
+ ellipsoid from raw samples and pushes the result to the Pico, which applies it
+ in the AHRS via FusionModelMagnetic before the sensor remap.  hard_iron is the
+ ellipsoid centre (µT, sensor native frame); soft_iron is a 3x3 row-major matrix
+ that maps the ellipsoid to a sphere. */
+typedef struct _groundstation_MagCalibrationCommand {
+    bool has_yaw;
+    bool yaw; /* true = yaw-platform LIS3MDL, false = bar/zenith LIS3MDL */
+    pb_size_t hard_iron_count;
+    float hard_iron[3]; /* [hx, hy, hz] */
+    pb_size_t soft_iron_count;
+    float soft_iron[9]; /* 9 elements, row-major 3x3 */
+} groundstation_MagCalibrationCommand;
+
 typedef struct _groundstation_TrackerModeCommand {
     bool has_mode;
     groundstation_TrackerMode mode;
@@ -452,6 +466,7 @@ extern "C" {
 #define groundstation_JogCommand_axis_ENUMTYPE groundstation_JogAxis
 
 
+
 #define groundstation_TrackerModeCommand_mode_ENUMTYPE groundstation_TrackerMode
 
 
@@ -474,6 +489,7 @@ extern "C" {
 #define groundstation_AxisCommand_init_default   {false, 0, false, 0, false, 0}
 #define groundstation_JogCommand_init_default    {false, _groundstation_JogAxis_MIN, false, 0, false, 0}
 #define groundstation_DeclinationCommand_init_default {false, 0}
+#define groundstation_MagCalibrationCommand_init_default {false, 0, 0, {0, 0, 0}, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0}}
 #define groundstation_TrackerModeCommand_init_default {false, _groundstation_TrackerMode_MIN}
 #define groundstation_TrackerArmCommand_init_default {false, 0}
 #define groundstation_TrackerConfigCommand_init_default {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
@@ -492,6 +508,7 @@ extern "C" {
 #define groundstation_AxisCommand_init_zero      {false, 0, false, 0, false, 0}
 #define groundstation_JogCommand_init_zero       {false, _groundstation_JogAxis_MIN, false, 0, false, 0}
 #define groundstation_DeclinationCommand_init_zero {false, 0}
+#define groundstation_MagCalibrationCommand_init_zero {false, 0, 0, {0, 0, 0}, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0}}
 #define groundstation_TrackerModeCommand_init_zero {false, _groundstation_TrackerMode_MIN}
 #define groundstation_TrackerArmCommand_init_zero {false, 0}
 #define groundstation_TrackerConfigCommand_init_zero {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
@@ -610,6 +627,9 @@ extern "C" {
 #define groundstation_JogCommand_delta_deg_tag   2
 #define groundstation_JogCommand_speed_dps_tag   3
 #define groundstation_DeclinationCommand_declination_deg_tag 1
+#define groundstation_MagCalibrationCommand_yaw_tag 1
+#define groundstation_MagCalibrationCommand_hard_iron_tag 2
+#define groundstation_MagCalibrationCommand_soft_iron_tag 3
 #define groundstation_TrackerModeCommand_mode_tag 1
 #define groundstation_TrackerArmCommand_armed_tag 1
 #define groundstation_TrackerConfigCommand_yaw_trim_deg_tag 1
@@ -817,6 +837,13 @@ X(a, STATIC,   OPTIONAL, FLOAT,    declination_deg,   1)
 #define groundstation_DeclinationCommand_CALLBACK NULL
 #define groundstation_DeclinationCommand_DEFAULT NULL
 
+#define groundstation_MagCalibrationCommand_FIELDLIST(X, a) \
+X(a, STATIC,   OPTIONAL, BOOL,     yaw,               1) \
+X(a, STATIC,   REPEATED, FLOAT,    hard_iron,         2) \
+X(a, STATIC,   REPEATED, FLOAT,    soft_iron,         3)
+#define groundstation_MagCalibrationCommand_CALLBACK NULL
+#define groundstation_MagCalibrationCommand_DEFAULT NULL
+
 #define groundstation_TrackerModeCommand_FIELDLIST(X, a) \
 X(a, STATIC,   OPTIONAL, UENUM,    mode,              1)
 #define groundstation_TrackerModeCommand_CALLBACK NULL
@@ -900,6 +927,7 @@ extern const pb_msgdesc_t groundstation_RawSensorsCommand_msg;
 extern const pb_msgdesc_t groundstation_AxisCommand_msg;
 extern const pb_msgdesc_t groundstation_JogCommand_msg;
 extern const pb_msgdesc_t groundstation_DeclinationCommand_msg;
+extern const pb_msgdesc_t groundstation_MagCalibrationCommand_msg;
 extern const pb_msgdesc_t groundstation_TrackerModeCommand_msg;
 extern const pb_msgdesc_t groundstation_TrackerArmCommand_msg;
 extern const pb_msgdesc_t groundstation_TrackerConfigCommand_msg;
@@ -920,6 +948,7 @@ extern const pb_msgdesc_t groundstation_StarlinkProxyStatus_msg;
 #define groundstation_AxisCommand_fields &groundstation_AxisCommand_msg
 #define groundstation_JogCommand_fields &groundstation_JogCommand_msg
 #define groundstation_DeclinationCommand_fields &groundstation_DeclinationCommand_msg
+#define groundstation_MagCalibrationCommand_fields &groundstation_MagCalibrationCommand_msg
 #define groundstation_TrackerModeCommand_fields &groundstation_TrackerModeCommand_msg
 #define groundstation_TrackerArmCommand_fields &groundstation_TrackerArmCommand_msg
 #define groundstation_TrackerConfigCommand_fields &groundstation_TrackerConfigCommand_msg
@@ -938,6 +967,7 @@ extern const pb_msgdesc_t groundstation_StarlinkProxyStatus_msg;
 #define groundstation_JogCommand_size            12
 #define groundstation_LocationCommand_size       27
 #define groundstation_Lora1Rf69Packet_size       268
+#define groundstation_MagCalibrationCommand_size 62
 #define groundstation_RawImuSample_size          46
 #define groundstation_RawMagSample_size          26
 #define groundstation_RawSensorsCommand_size     6

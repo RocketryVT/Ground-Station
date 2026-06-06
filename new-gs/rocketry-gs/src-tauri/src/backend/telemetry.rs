@@ -9,6 +9,7 @@ const MAX_LOG: usize = 500;
 const MAX_RAW_PER_TOPIC: usize = 500;
 const MAX_SENSOR_RAW: usize = 500;
 const MAX_AHRS: usize = 500;
+const MAX_CALIBRATION_EVENTS: usize = 25;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,6 +35,7 @@ pub struct TelemetrySnapshot {
     pub history: Vec<Value>,
     pub antenna: Option<Value>,
     pub ground_imu: Option<Value>,
+    pub ahrs_status: Option<Value>,
     pub nodes: HashMap<String, Value>,
     pub connected: bool,
     pub flight_start: Option<i64>,
@@ -43,6 +45,7 @@ pub struct TelemetrySnapshot {
     pub raw_mag: Vec<Value>,
     pub raw_yaw_imu: Vec<Value>,
     pub ahrs_history: Vec<Value>,
+    pub calibration_events: Vec<Value>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -50,16 +53,16 @@ pub struct TelemetrySnapshot {
 pub enum UiEvent {
     Connected { connected: bool },
     LogLine { line: LogLine },
-    RawMessage { message: RawMessage },
     Telemetry { telemetry: Value },
     Antenna { antenna: Value },
     GroundImu { imu: Value },
+    AhrsStatus { status: Value },
+    CalibrationEvent { event: Value },
     Node { node: Value },
     RawImu { sample: Value },
     RawMag { sample: Value },
     RawYawImu { sample: Value },
     ActiveDrag { data: Value },
-    Snapshot { snapshot: TelemetrySnapshot },
 }
 
 #[derive(Default)]
@@ -68,6 +71,7 @@ struct RuntimeState {
     history: VecDeque<Value>,
     antenna: Option<Value>,
     ground_imu: Option<Value>,
+    ahrs_status: Option<Value>,
     nodes: HashMap<String, Value>,
     connected: bool,
     flight_start: Option<i64>,
@@ -77,6 +81,7 @@ struct RuntimeState {
     raw_mag: VecDeque<Value>,
     raw_yaw_imu: VecDeque<Value>,
     ahrs_history: VecDeque<Value>,
+    calibration_events: VecDeque<Value>,
     seq: u64,
 }
 
@@ -93,6 +98,7 @@ impl TelemetryState {
             history: state.history.iter().cloned().collect(),
             antenna: state.antenna.clone(),
             ground_imu: state.ground_imu.clone(),
+            ahrs_status: state.ahrs_status.clone(),
             nodes: state.nodes.clone(),
             connected: state.connected,
             flight_start: state.flight_start,
@@ -102,6 +108,7 @@ impl TelemetryState {
             raw_mag: state.raw_mag.iter().cloned().collect(),
             raw_yaw_imu: state.raw_yaw_imu.iter().cloned().collect(),
             ahrs_history: state.ahrs_history.iter().cloned().collect(),
+            calibration_events: state.calibration_events.iter().cloned().collect(),
         }
     }
 
@@ -148,19 +155,39 @@ impl TelemetryState {
         push_capped(&mut state.history, telemetry, MAX_HISTORY);
     }
 
-    pub fn set_antenna(&self, antenna: Value) {
-        self.inner.lock().expect("telemetry state").antenna = Some(antenna);
+    pub fn set_antenna(&self, mut antenna: Value) -> Value {
+        stamp_received_time(&mut antenna);
+        self.inner.lock().expect("telemetry state").antenna = Some(antenna.clone());
+        antenna
     }
 
-    pub fn set_ground_imu(&self, mut imu: Value) {
-        if imu.get("timestamp").is_none() {
-            if let Value::Object(fields) = &mut imu {
-                fields.insert("timestamp".to_string(), json!(now_ms()));
-            }
-        }
+    pub fn set_ground_imu(&self, mut imu: Value) -> Value {
+        stamp_received_time(&mut imu);
         let mut state = self.inner.lock().expect("telemetry state");
         state.ground_imu = Some(imu.clone());
-        push_capped(&mut state.ahrs_history, imu, MAX_AHRS);
+        push_capped(&mut state.ahrs_history, imu.clone(), MAX_AHRS);
+        imu
+    }
+
+    pub fn set_ahrs_status(&self, status: Value) -> Value {
+        let mut status = status;
+        stamp_received_time(&mut status);
+        self.inner.lock().expect("telemetry state").ahrs_status = Some(status.clone());
+        status
+    }
+
+    pub fn add_calibration_event(&self, mut event: Value) -> Value {
+        stamp_received_time(&mut event);
+        push_capped(
+            &mut self
+                .inner
+                .lock()
+                .expect("telemetry state")
+                .calibration_events,
+            event.clone(),
+            MAX_CALIBRATION_EVENTS,
+        );
+        event
     }
 
     pub fn update_node(&self, id: &str, mut node: Value) {
@@ -222,6 +249,7 @@ impl TelemetryState {
         let mut state = self.inner.lock().expect("telemetry state");
         state.log_lines.clear();
         state.raw_messages.clear();
+        state.calibration_events.clear();
     }
 
     pub fn clear_raw_sensors(&self) {
@@ -268,6 +296,15 @@ fn push_topic_capped(items: &mut VecDeque<RawMessage>, value: RawMessage, limit:
         });
     }
     items.push_back(value);
+}
+
+fn stamp_received_time(value: &mut Value) {
+    if let Value::Object(fields) = value {
+        if let Some(timestamp) = fields.get("timestamp").cloned() {
+            fields.insert("fw_timestamp".to_string(), timestamp);
+        }
+        fields.insert("timestamp".to_string(), json!(now_ms()));
+    }
 }
 
 pub fn object(entries: impl IntoIterator<Item = (&'static str, Value)>) -> Value {

@@ -154,6 +154,7 @@ static void imu_task( void* )
 
     TickType_t last_tick = xTaskGetTickCount();
     TickType_t last_raw_mqtt = xTaskGetTickCount();
+    TickType_t last_read_fail_log = 0;
 
     for ( ;; ) {
         IcmMsg m = {};
@@ -184,7 +185,8 @@ static void imu_task( void* )
                                         groundstation_RawImuSample_fields, &pb ) )
                     xQueueSend( g_mqtt_queue, &msg, 0 );
             }
-        } else {
+        } else if ( xTaskGetTickCount() - last_read_fail_log >= pdMS_TO_TICKS(1000) ) {
+            last_read_fail_log = xTaskGetTickCount();
             log_print( "[imu] read fail\n" );
         }
 

@@ -78,7 +78,7 @@ static bool read_ahrs_actual( const TrackerConfig& cfg,
     }
 
     if ( cfg.use_ahrs_el ) {
-        *actual_el = imu.euler[1];
+        *actual_el = imu.bar_rel_pitch;
         *el_used = true;
     }
 
@@ -135,6 +135,62 @@ static void apply_ahrs_feedback( const TrackerConfig& cfg,
                                              cfg.ahrs_max_correction_deg );
         *cmd_el = el_st.angle_deg + correction;
     }
+}
+
+// Manual closed-loop: nudge one axis so the AHRS-measured angle approaches the
+// operator's last manual target.  Mirrors the Auto feedback but is axis-selective
+// and only runs for axes the operator actually commanded.  The open-loop manual
+// command seeds the initial move; these corrections refine and then hold it.  A
+// small deadband avoids dithering once on target.
+//
+// NOTE: this only converges if the open-loop direction (e.g. EL_MOTOR_SCALE in
+// axis_task.cpp) is physically correct.  If an axis creeps away to its travel
+// limit instead of settling, that sign is inverted and must be flipped.
+static void manual_servo_axis( const TrackerConfig& cfg, bool is_az,
+                               TrackerControlStatus* status )
+{
+    float desired = 0.0f;
+    if ( !tracker_get_manual_target( is_az, &desired ) ) return;
+
+    QueueHandle_t status_q = is_az ? g_stepper_az_status_q : g_stepper_zen_status_q;
+    QueueHandle_t cmd_q    = is_az ? g_stepper_az_cmd_q    : g_stepper_zen_cmd_q;
+    if ( !status_q || !cmd_q ) return;
+
+    StepperStatus st = {};
+    if ( xQueuePeek( status_q, &st, 0 ) != pdTRUE ) return;
+
+    if ( !g_imu_q ) return;
+    ImuMsg imu = {};
+    if ( xQueuePeek( g_imu_q, &imu, 0 ) != pdTRUE || !imu.valid ) return;
+
+    const uint64_t now_us = time_us_64();
+    if ( imu.timestamp_us == 0 ||
+         now_us - imu.timestamp_us > (uint64_t)cfg.ahrs_max_age_ms * 1000ull ) return;
+
+    float error;
+    if ( is_az ) {
+        if ( !imu.have_yaw_frame ) return;
+        error = normalize_delta_180( desired - imu.yaw_frame_yaw360 );
+        status->pointing_error_az = error;
+        status->ahrs_az_used = true;
+    } else {
+        error = desired - imu.bar_rel_pitch;
+        status->pointing_error_el = error;
+        status->ahrs_el_used = true;
+    }
+
+    static constexpr float kDeadbandDeg = 0.5f;
+    if ( fabsf( error ) <= kDeadbandDeg ) return;
+
+    const float correction = clamp_float( error * cfg.ahrs_feedback_gain,
+                                          -cfg.ahrs_max_correction_deg,
+                                          cfg.ahrs_max_correction_deg );
+    StepperCmd cmd = {};
+    cmd.target_angle_deg = is_az ? wrap_360( st.angle_deg + correction )
+                                 : st.angle_deg + correction;
+    cmd.speed_dps = cfg.default_speed_dps;
+    cmd.stop = false;
+    xQueueOverwrite( cmd_q, &cmd );
 }
 
 static void update_scan( float dt_s, const TrackerConfig& cfg, float* scan_az,
@@ -197,6 +253,13 @@ static void stepper_ctrl_task( void* )
         }
 
         if ( mode == TrackerMode::Manual || mode == TrackerMode::ServoTest ) {
+            // ServoTest stays raw open-loop.  Manual optionally closes the loop on
+            // the AHRS (per-axis, gated by use_ahrs_*) so a commanded az/el reaches
+            // its true angle and is held there.  Requires the axes to be calibrated.
+            if ( mode == TrackerMode::Manual && tracker_axes_calibrated() ) {
+                if ( cfg.use_ahrs_az ) manual_servo_axis( cfg, true,  &status );
+                if ( cfg.use_ahrs_el ) manual_servo_axis( cfg, false, &status );
+            }
             tracker_set_control_status( status );
             vTaskDelay( kControlPeriodTicks );
             continue;

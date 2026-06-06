@@ -166,6 +166,7 @@ static void baro_task( void* )
     BaroMsg  msg        = {};
 
     TickType_t last_tick = xTaskGetTickCount();
+    TickType_t last_read_fail_log = 0;
 
     for ( ;; ) {
         // Read the ADC result that was triggered last cycle
@@ -204,7 +205,10 @@ static void baro_task( void* )
             // ADC read failed — re-trigger whichever conversion is pending
             i2c_cmd( MS5611_ADDR, d2_pending ? MS5611_CMD_CONVERT_D2
                                               : MS5611_CMD_CONVERT_D1 );
-            log_print( "[baro] ADC read fail\n" );
+            if ( xTaskGetTickCount() - last_read_fail_log >= pdMS_TO_TICKS(1000) ) {
+                last_read_fail_log = xTaskGetTickCount();
+                log_print( "[baro] ADC read fail\n" );
+            }
         }
 
         vTaskDelayUntil( &last_tick, pdMS_TO_TICKS(BARO_PERIOD_MS) );

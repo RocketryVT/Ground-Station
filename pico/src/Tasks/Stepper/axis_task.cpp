@@ -16,7 +16,11 @@ namespace StepHw {
     static constexpr float AZ_GEAR_RATIO = 50.0f;
     static constexpr float EL_GEAR_RATIO = 30.0f;
     static constexpr float EL_MOTOR_AT_HORIZON_DEG = 90.0f;
-    static constexpr float EL_MOTOR_SCALE = -1.0f;
+    // +1: increasing command elevation (toward zenith) drives the antenna up.
+    // Verified 2026-06-05: with -1 the closed loop drove command to the +el rail
+    // while the antenna physically went DOWN (command/physical anti-correlated),
+    // confirming the direction was inverted.
+    static constexpr float EL_MOTOR_SCALE = +1.0f;
 }
 
 static float wrap_360( float deg )
