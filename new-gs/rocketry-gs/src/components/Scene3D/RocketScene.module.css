@@ -2,36 +2,40 @@
   position: relative;
   width: 100%;
   height: 100%;
-  background: #ffffff;
+  background:
+    radial-gradient(circle at top right, rgba(243, 154, 74, 0.08), transparent 20%),
+    linear-gradient(180deg, rgba(9, 18, 27, 0.96), rgba(5, 10, 16, 0.98));
 }
 
 .panelLabel {
   position: absolute;
-  top: 8px;
-  left: 10px;
+  top: 12px;
+  left: 12px;
   z-index: 10;
-  font-family: 'Courier New', monospace;
+  font-family: "SFMono-Regular", Menlo, monospace;
   font-size: 10px;
-  letter-spacing: 2px;
-  color: #75787B;
+  letter-spacing: 0.16em;
+  color: rgba(233, 240, 245, 0.6);
   pointer-events: none;
+  text-transform: uppercase;
 }
 
 .readout {
   position: absolute;
-  top: 8px;
-  right: 10px;
+  top: 12px;
+  right: 12px;
   z-index: 10;
-  font-family: 'Courier New', monospace;
+  font-family: "SFMono-Regular", Menlo, monospace;
   font-size: 11px;
   display: flex;
   flex-direction: column;
   gap: 2px;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid #D7D2CB;
-  border-radius: 2px;
-  padding: 4px 8px;
+  background: rgba(10, 18, 27, 0.84);
+  border: 1px solid rgba(215, 228, 239, 0.12);
+  border-radius: 12px;
+  padding: 8px 10px;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
 }
 
 .row {
@@ -41,13 +45,15 @@
 }
 
 .row span:first-child {
-  color: #75787B;
+  color: rgba(223, 231, 239, 0.52);
   font-size: 10px;
   width: 54px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .row span:last-child {
-  color: #1a1a1a;
+  color: #f4f7fb;
   text-align: right;
   min-width: 64px;
 }

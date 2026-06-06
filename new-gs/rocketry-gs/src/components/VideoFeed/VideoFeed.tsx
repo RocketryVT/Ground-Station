@@ -11,15 +11,43 @@ export function VideoFeed() {
   const [deviceId, setDeviceId] = useState<string>('');
   const [error, setError] = useState('');
 
+  async function refreshDevices() {
+    const listed = await navigator.mediaDevices.enumerateDevices();
+    const vids = listed.filter((device) => device.kind === 'videoinput');
+    setDevices(vids);
+    setDeviceId((current) => current || vids[0]?.deviceId || '');
+  }
+
+  // Trigger macOS camera/microphone permission prompts once at startup.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function requestMediaAccess() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+        if (!cancelled) {
+          await refreshDevices();
+          setError('');
+        }
+      } catch (e) {
+        if (!cancelled) {
+          await refreshDevices().catch(() => undefined);
+          setError(`Media permission: ${String(e)}`);
+        }
+      }
+    }
+
+    void requestMediaAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Enumerate video capture devices on mount.
   useEffect(() => {
-    navigator.mediaDevices
-      .enumerateDevices()
-      .then((d) => {
-        const vids = d.filter((x) => x.kind === 'videoinput');
-        setDevices(vids);
-      })
-      .catch(() => setError('Cannot enumerate devices'));
+    refreshDevices().catch(() => setError('Cannot enumerate devices'));
   }, []);
 
   // Start camera/capture device stream.

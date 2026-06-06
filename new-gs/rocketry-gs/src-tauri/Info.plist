@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSCameraUsageDescription</key>
+  <string>Rocketry Ground Station needs camera access for live video feeds and capture devices.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Rocketry Ground Station needs microphone access for video streams and audio monitoring.</string>
+</dict>
+</plist>

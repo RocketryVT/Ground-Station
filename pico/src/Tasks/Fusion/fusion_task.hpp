@@ -9,3 +9,5 @@
 void  fusion_task_init();
 void  fusion_set_declination( float deg );
 float fusion_get_declination();
+void  fusion_adjust_heading_offset( float delta_deg );
+float fusion_get_heading_offset();

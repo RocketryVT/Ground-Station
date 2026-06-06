@@ -1,4 +1,5 @@
 import { useTelemetryStore } from '../../store/telemetryStore';
+import { formatFeet } from '../../utils/units';
 import styles from './AntennaPanel.module.css';
 
 // -- Compass rose — needle points to azimuth -----------------------------------
@@ -135,7 +136,7 @@ export function AntennaPanel() {
         <div className={styles.stats}>
           <div className={styles.stat}><span>SNR</span><span>{latest.snr?.toFixed(1) ?? '--'} dB</span></div>
           <div className={styles.stat}><span>RSSI</span><span>{latest.rssi} dBm</span></div>
-          <div className={styles.stat}><span>ALT</span><span>{latest.alt_m.toFixed(0)} m</span></div>
+          <div className={styles.stat}><span>ALT</span><span>{formatFeet(latest.alt_m)}</span></div>
         </div>
       )}
     </div>

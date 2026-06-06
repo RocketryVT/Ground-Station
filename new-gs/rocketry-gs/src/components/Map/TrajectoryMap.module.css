@@ -3,7 +3,9 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #040408;
+  background:
+    radial-gradient(circle at top, rgba(255, 183, 103, 0.06), transparent 24%),
+    linear-gradient(180deg, #03070b, #091019);
 }
 
 /* -- Cesium widget overrides ------------------------------------------------ */
@@ -15,8 +17,21 @@
 
 /* Tuck the zoom/tilt toolbar into the corner */
 .wrapper :global(.cesium-viewer-toolbar) {
-  top: 4px;
-  right: 4px;
+  top: 12px;
+  right: 12px;
+}
+
+.wrapper :global(.cesium-button) {
+  border-radius: 14px;
+  border: 1px solid rgba(215, 228, 239, 0.14);
+  background: rgba(7, 16, 23, 0.8);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.wrapper :global(.cesium-button:hover) {
+  background: rgba(15, 29, 40, 0.96);
+  border-color: rgba(255, 190, 114, 0.24);
 }
 
 /* Remove the bottom status bar */
@@ -27,14 +42,16 @@
 /* -- Coordinate overlay ----------------------------------------------------- */
 .coords {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: 12px;
+  left: 12px;
   z-index: 10;
-  font-family: 'Courier New', monospace;
+  font-family: "SFMono-Regular", Menlo, monospace;
   font-size: 11px;
   color: #ffffff;
-  background: rgba(134, 31, 65, 0.8);
-  padding: 2px 8px;
-  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(139, 35, 72, 0.9), rgba(106, 23, 54, 0.78));
+  border: 1px solid rgba(255, 214, 168, 0.16);
+  padding: 6px 10px;
+  border-radius: 12px;
   pointer-events: none;
+  box-shadow: 0 12px 28px rgba(7, 16, 23, 0.32);
 }

@@ -100,6 +100,10 @@ namespace Pins {
     static constexpr uint LORA0_NSS  = 21;  // GPIO 21, phys 27 (CS)
     static constexpr uint LORA0_RST  = 22;  // GPIO 22, phys 29
 
+    // -- GPS (u-blox M10, UART0) -----------------------------------------------
+    static constexpr uint GPS_TX  = 12;  // GPIO 12, phys 16 — UART0 TX → GPS RX
+    static constexpr uint GPS_RX  = 13;  // GPIO 13, phys 17 — UART0 RX ← GPS TX
+
     // Legacy aliases for code that still refers to the second radio as LORA2.
     static constexpr uint LORA2_MISO = LORA1_MISO;
     static constexpr uint LORA2_NSS  = LORA1_NSS;

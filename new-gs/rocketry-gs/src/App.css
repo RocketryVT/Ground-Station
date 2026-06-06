@@ -1,6 +1,44 @@
 /* -- Reset ------------------------------------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+:root {
+  --bg-0: #071017;
+  --bg-1: #0d1a24;
+  --bg-2: #142533;
+  --panel-0: rgba(12, 22, 31, 0.8);
+  --panel-1: rgba(18, 32, 44, 0.92);
+  --panel-stroke: rgba(199, 226, 255, 0.12);
+  --panel-highlight: rgba(255, 255, 255, 0.07);
+  --text-strong: #f4f7fb;
+  --text-soft: rgba(228, 236, 245, 0.72);
+  --accent: #f39a4a;
+  --accent-strong: #ffbe72;
+  --accent-deep: #8b2348;
+  --shadow-lg: 0 28px 60px rgba(2, 8, 14, 0.42);
+  --shadow-md: 0 18px 34px rgba(2, 8, 14, 0.28);
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  color: var(--text-strong);
+  background:
+    radial-gradient(circle at top left, rgba(243, 154, 74, 0.18), transparent 26%),
+    radial-gradient(circle at top right, rgba(139, 35, 72, 0.22), transparent 24%),
+    linear-gradient(180deg, var(--bg-1) 0%, var(--bg-0) 100%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 /* -- Root -------------------------------------------------------------------- */
 .root {
   display: flex;
@@ -8,22 +46,25 @@
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #f2f4f7;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(243, 154, 74, 0.2), transparent 22%),
+    radial-gradient(circle at 88% 10%, rgba(139, 35, 72, 0.28), transparent 24%),
+    linear-gradient(180deg, #10202c 0%, #071017 100%);
 }
 
 /* -- Status bar -------------------------------------------------------------- */
 .status-bar {
-  flex: 0 0 64px;
-  background: #101216;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex: 0 0 86px;
+  padding: 14px 16px 0;
+  background: transparent;
 }
 
 /* -- Content area below status bar ------------------------------------------ */
 .content {
   flex: 1 1 0;
   min-height: 0;       /* critical — lets flex child shrink below content size */
-  padding: 10px;
-  background: #f2f4f7;
+  padding: 14px 16px 16px;
+  background: transparent;
 }
 
 /* react-resizable-panels Group already sets height:100%/width:100%,
@@ -34,16 +75,38 @@
 .fill {
   height: 100%;
   overflow: hidden;
+  padding: 6px;
 }
 
 /* -- Leaf panel wrapper ------------------------------------------------------ */
 .panel {
+  position: relative;
   height: 100%;
   overflow: hidden;
-  background: #ffffff;
-  border: 1px solid rgba(16, 18, 22, 0.1);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(16, 18, 22, 0.06);
+  border: 1px solid var(--panel-stroke);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
+    linear-gradient(180deg, var(--panel-1) 0%, var(--panel-0) 100%);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(14px);
+  isolation: isolate;
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, var(--panel-highlight), transparent 24%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.04), transparent 30%);
+  pointer-events: none;
+}
+
+.panel > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* -- Resize handle ----------------------------------------------------------- */
@@ -57,18 +120,31 @@
 }
 
 /* Horizontal separator (between vertical panels -> horizontal bar) */
-[data-group][data-orientation="vertical"]   > .handle { height: 5px; cursor: row-resize;    width: 100%; }
+[data-group][data-orientation="vertical"]   > .handle { height: 10px; cursor: row-resize;    width: 100%; }
 /* Vertical separator (between horizontal panels -> vertical bar)   */
-[data-group][data-orientation="horizontal"] > .handle { width:  5px; cursor: col-resize; height: 100%; }
+[data-group][data-orientation="horizontal"] > .handle { width:  10px; cursor: col-resize; height: 100%; }
 
-.handle__bar {
-  background: rgba(16, 18, 22, 0.16);
-  border-radius: 999px;
-  transition: background 0.15s;
+[data-group][data-orientation="vertical"] > .handle {
+  margin: 2px 10px;
 }
 
-[data-group][data-orientation="vertical"]   > .handle .handle__bar { width: 40px; height: 2px; }
-[data-group][data-orientation="horizontal"] > .handle .handle__bar { width: 2px; height: 40px; }
+[data-group][data-orientation="horizontal"] > .handle {
+  margin: 10px 2px;
+}
+
+.handle__bar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(190, 212, 233, 0.18));
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+[data-group][data-orientation="vertical"]   > .handle .handle__bar { width: 52px; height: 3px; }
+[data-group][data-orientation="horizontal"] > .handle .handle__bar { width: 3px; height: 52px; }
 
 .handle:hover  .handle__bar,
-.handle:active .handle__bar { background: #861F41; }
+.handle:active .handle__bar {
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent-deep));
+  box-shadow: 0 0 18px rgba(243, 154, 74, 0.22);
+  transform: scale(1.04);
+}

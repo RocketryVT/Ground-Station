@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { useTelemetryStore } from '../../store/telemetryStore';
+import { formatFeet } from '../../utils/units';
 import styles from './RocketScene.module.css';
 
 const FLAP_MAX_ANGLE_DEG = 60;
@@ -165,10 +166,10 @@ function AttitudeReadout() {
       <div className={styles.row}><span>YAW</span><span>{latest.yaw.toFixed(1)}°</span></div>
       <div className={styles.row}><span>FLAP</span><span>{flapAngle.toFixed(1)}°</span></div>
       {latest.predicted_apogee_m != null && (
-        <div className={styles.row}><span>APOGEE</span><span>{latest.predicted_apogee_m.toFixed(0)} m</span></div>
+        <div className={styles.row}><span>APOGEE</span><span>{formatFeet(latest.predicted_apogee_m)}</span></div>
       )}
       {latest.target_apogee_m != null && (
-        <div className={styles.row}><span>TARGET</span><span>{latest.target_apogee_m.toFixed(0)} m</span></div>
+        <div className={styles.row}><span>TARGET</span><span>{formatFeet(latest.target_apogee_m)}</span></div>
       )}
     </div>
   );

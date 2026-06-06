@@ -1,0 +1,458 @@
+/* CalibrationWizard.module.css */
+
+/* ── Root ── */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #333;
+  background: #f5f3f0;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Status pill row ── */
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.statusPill {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: #e0ddd8;
+  color: #333;
+  font-weight: 600;
+}
+
+.pillGreen  { background: #d4edda; color: #155724; }
+.pillAmber  { background: #fff3cd; color: #856404; }
+.pillRed    { background: #f8d7da; color: #721c24; }
+
+/* ── Result banner ── */
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.bannerOk   { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.bannerFail { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+.bannerDismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.6;
+  line-height: 1;
+  padding: 0 2px;
+  color: inherit;
+}
+.bannerDismiss:hover { opacity: 1; }
+
+/* ── Cards ── */
+.card {
+  background: #fff;
+  border: 1px solid #d7d2cb;
+  border-radius: 4px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardTitle {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #861F41;
+  font-weight: 700;
+  border-bottom: 1px solid #eae6e0;
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+}
+
+/* ── Stepper ── */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #d7d2cb;
+  border-radius: 4px;
+}
+
+.stepperItem {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 8px;
+}
+
+.stepDot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: #e0ddd8;
+  color: #75787b;
+  border: 2px solid #c8c5c0;
+}
+
+.stepDotActive {
+  background: #861F41;
+  color: #fff;
+  border-color: #861F41;
+}
+
+.stepDotDone {
+  background: #d4edda;
+  color: #155724;
+  border-color: #c3e6cb;
+}
+
+.stepLabel {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #75787b;
+  white-space: nowrap;
+}
+
+.stepLabelActive { color: #861F41; font-weight: 700; }
+.stepLabelDone   { color: #155724; }
+
+.stepLine {
+  flex: 1;
+  height: 2px;
+  background: #e0ddd8;
+  margin: 0 8px;
+}
+.stepLineDone { background: #c3e6cb; }
+
+/* ── Phase wrapper ── */
+.phaseWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 12px;
+  align-items: start;
+}
+
+/* ── Checks ── */
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.check {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.checkOk      { background: #f0faf2; color: #155724; }
+.checkFail    { background: #fdf3f4; color: #721c24; border: 1px solid #f5c6cb; }
+.checkPending { background: #fafaf8; color: #75787b; }
+
+.checkIcon  { font-size: 14px; flex-shrink: 0; width: 16px; text-align: center; }
+.checkLabel { font-weight: 600; }
+.checkDetail {
+  font-size: 11px;
+  opacity: 0.75;
+  margin-left: auto;
+  text-align: right;
+}
+
+/* ── Intro text ── */
+.introText {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #4a4a4a;
+}
+.introText p { margin: 0 0 8px; }
+.introText p:last-child { margin-bottom: 0; }
+
+/* ── Instructions list ── */
+.instructions {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.7;
+  color: #333;
+}
+.instructions li { margin-bottom: 4px; }
+
+/* ── Input group ── */
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inputLabel {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #75787b;
+  font-weight: 700;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bearingInput {
+  font-family: 'Courier New', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  width: 120px;
+  padding: 6px 10px;
+  border: 2px solid #d7d2cb;
+  border-radius: 3px;
+  background: #fafaf8;
+  color: #333;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.bearingInput:focus { border-color: #861F41; }
+
+.degLabel {
+  font-size: 22px;
+  color: #75787b;
+}
+
+.inputHint {
+  font-size: 11px;
+  color: #75787b;
+}
+
+/* ── Offset box ── */
+.offsetBox {
+  background: #f5f3f0;
+  border: 1px solid #d7d2cb;
+  border-radius: 3px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.offsetRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.offsetVal {
+  color: #861F41;
+  font-size: 14px;
+}
+
+/* ── Stability bar ── */
+.stabilityWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stabilityBar {
+  height: 6px;
+  background: #e0ddd8;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.stabilityFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.stabilitySigma {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* ── Action row ── */
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.primaryBtn {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 8px 16px;
+  background: #861F41;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.primaryBtn:hover:not(:disabled) { background: #6e1935; }
+.primaryBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.secondaryBtn {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  padding: 7px 14px;
+  background: none;
+  color: #861F41;
+  border: 1px solid #861F41;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.secondaryBtn:hover { background: rgba(134, 31, 65, 0.06); }
+
+.disableReason {
+  font-size: 11px;
+  color: #856404;
+  background: #fff3cd;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+
+/* ── Sensor card ── */
+.sensorCard {
+  background: #fff;
+  border: 1px solid #d7d2cb;
+  border-radius: 4px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.sensorCardTitle {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #75787b;
+  font-weight: 700;
+  border-bottom: 1px solid #eae6e0;
+  padding-bottom: 6px;
+}
+
+.sensorRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.sensorRow span { color: #75787b; }
+.sensorRow strong { font-size: 13px; }
+
+.valStable   { color: #155724; }
+.valUnstable { color: #856404; }
+
+/* ── Existing calibration box ── */
+.existingCal {
+  background: #f5f3f0;
+  border: 1px solid #d7d2cb;
+  border-radius: 3px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.existingCalTitle {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #75787b;
+  margin-bottom: 4px;
+}
+
+.kvRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.kvRow span { color: #75787b; }
+
+/* ── Summary ── */
+.summary {
+  background: #f5f3f0;
+  border: 1px solid #d7d2cb;
+  border-radius: 3px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+}
+.summaryRow span:first-child { color: #75787b; flex: 1; }
+
+/* ── Badge ── */
+.badge {
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-weight: 700;
+}
+.badgeGreen { background: #d4edda; color: #155724; }
+.badgeAmber { background: #fff3cd; color: #856404; }
+
+/* ── Done block ── */
+.doneBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  text-align: center;
+}
+
+.doneIcon {
+  font-size: 48px;
+  color: #28a745;
+  line-height: 1;
+}

@@ -6,6 +6,7 @@ import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { CESIUM_ION_TOKEN, BEAM_HALF_ANGLE_DEG, BEAM_RANGE_M } from '../../config';
 import { useTelemetryStore } from '../../store/telemetryStore';
 import type { RocketTelemetry } from '../../types/telemetry';
+import { formatFeet } from '../../utils/units';
 import styles from './TrajectoryMap.module.css';
 
 Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN;
@@ -295,7 +296,7 @@ export function TrajectoryMap() {
           const displayAlt = clampToTerrainHeight(viewer, l.lon, l.lat, l.alt_m + offset);
           const pos = Cesium.Cartesian3.fromDegrees(l.lon, l.lat, displayAlt, undefined, posScratch.current);
           rpp.setValue(pos, Cesium.ReferenceFrame.FIXED);
-          rtp.setValue(`${l.alt_m.toFixed(0)} m`);
+          rtp.setValue(formatFeet(l.alt_m));
           rocket.show = true;
           if (!trackedRef.current) {
             viewer.trackedEntity = rocket;
@@ -465,7 +466,7 @@ export function TrajectoryMap() {
       {latest && (
         <div className={styles.coords}>
           {latest.lat.toFixed(6)},&nbsp;{latest.lon.toFixed(6)}
-          &nbsp;&nbsp;↑&nbsp;{latest.alt_m.toFixed(0)}&nbsp;m
+          &nbsp;&nbsp;↑&nbsp;{formatFeet(latest.alt_m)}
         </div>
       )}
     </div>

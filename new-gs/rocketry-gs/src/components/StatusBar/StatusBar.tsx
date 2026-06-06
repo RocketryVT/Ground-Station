@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTelemetryStore } from '../../store/telemetryStore';
 import type { AppTab } from '../../App';
+import { formatFeet } from '../../utils/units';
 import styles from './StatusBar.module.css';
 
 function formatElapsed(startMs: number): string {
@@ -61,7 +62,7 @@ export function StatusBar({ demo, tab, onToggleDemo, onSetTab }: Props) {
       <div className={styles.metrics}>
         <div className={styles.metricBlock}>
           <span className={styles.metric}>Altitude</span>
-          <strong className={styles.value}>{latest ? `${latest.alt_m.toFixed(0)} m` : '--'}</strong>
+          <strong className={styles.value}>{formatFeet(latest?.alt_m)}</strong>
         </div>
         <div className={styles.metricBlock}>
           <span className={styles.metric}>Speed</span>

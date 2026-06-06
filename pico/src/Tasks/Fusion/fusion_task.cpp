@@ -69,6 +69,7 @@ static const FusionVector k_yaw_mag_hard_iron  = {-12.71f, -59.22f, -92.24f};
 // Magnetic declination: true_heading = magnetic_heading + declination_deg.
 // Negative = west (Blacksburg VA ≈ -8.53°).  Updated at runtime via gs/cmd/declination.
 static volatile float s_declination_deg = -8.53f;
+static volatile float s_heading_offset_deg = 0.0f;
 
 void fusion_set_declination( float deg ) { s_declination_deg = deg; }
 float fusion_get_declination()           { return s_declination_deg; }
@@ -104,6 +105,13 @@ static float wrap_180( float deg )
     while ( deg <= -180.0f ) deg += 360.0f;
     return deg;
 }
+
+void fusion_adjust_heading_offset( float delta_deg )
+{
+    s_heading_offset_deg = wrap_180( s_heading_offset_deg + delta_deg );
+}
+
+float fusion_get_heading_offset() { return s_heading_offset_deg; }
 
 static FusionQuaternion quat_conjugate( FusionQuaternion q )
 {
@@ -306,10 +314,12 @@ static void fusion_task( void* )
         const FusionVector truth_forward = quat_forward_in_reference( q_truth );
         const FusionVector yaw_forward = quat_forward_in_reference( q_yaw );
         const FusionVector relative_forward = quat_forward_in_reference( q_yaw_to_bar );
+        const float heading_correction =
+            s_declination_deg + s_heading_offset_deg;
         const float truth_heading_signed =
-            wrap_180( heading_from_forward_ned( truth_forward ) + s_declination_deg );
+            wrap_180( heading_from_forward_ned( truth_forward ) + heading_correction );
         const float yaw_heading_signed =
-            wrap_180( heading_from_forward_ned( yaw_forward ) + s_declination_deg );
+            wrap_180( heading_from_forward_ned( yaw_forward ) + heading_correction );
         const float relative_heading_signed =
             wrap_180( heading_from_forward_ned( relative_forward ) );
         const float truth_pitch = elevation_from_forward_ned( truth_forward );

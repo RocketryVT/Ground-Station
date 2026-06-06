@@ -70,11 +70,11 @@ export default function App() {
             {/* -- Right column: video + charts --------------------------- */}
             <Panel defaultSize={50} minSize={20} className="fill">
               <Group orientation="vertical">
-                <Panel defaultSize={66} minSize={15} className="fill">
+                <Panel defaultSize={54} minSize={15} className="fill">
                   <div className="panel"><VideoFeed /></div>
                 </Panel>
                 <Handle />
-                <Panel defaultSize={40} minSize={12} className="fill">
+                <Panel defaultSize={46} minSize={20} className="fill">
                   <div className="panel"><TelemetryCharts /></div>
                 </Panel>
               </Group>

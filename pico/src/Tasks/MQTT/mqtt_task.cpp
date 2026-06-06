@@ -15,6 +15,15 @@
 #include <string.h>
 #include <stdio.h>
 
+static constexpr uint32_t kCalibrationAhrsMaxAgeMs = 500;
+
+static float wrap_180( float deg )
+{
+    while ( deg > 180.0f )   deg -= 360.0f;
+    while ( deg <= -180.0f ) deg += 360.0f;
+    return deg;
+}
+
 static mqtt_client_t*  s_mqtt           = nullptr;
 static volatile bool   s_mqtt_connected = false;
 static volatile bool   s_raw_imu_enabled     = false;
@@ -215,6 +224,36 @@ static void publish_calibration_event( const char* action,
     }
 }
 
+static bool apply_yaw_heading_reference( float reference_deg,
+                                         float* delta_deg,
+                                         float* total_offset_deg )
+{
+    if ( delta_deg ) *delta_deg = 0.0f;
+    if ( total_offset_deg ) *total_offset_deg = fusion_get_heading_offset();
+
+    if ( !g_imu_q ) return false;
+
+    ImuMsg imu = {};
+    if ( xQueuePeek( g_imu_q, &imu, 0 ) != pdTRUE ||
+         !imu.valid ||
+         !imu.have_yaw_frame ) {
+        return false;
+    }
+
+    const uint64_t now_us = time_us_64();
+    if ( imu.timestamp_us == 0 ||
+         now_us - imu.timestamp_us > (uint64_t)kCalibrationAhrsMaxAgeMs * 1000ull ) {
+        return false;
+    }
+
+    const float delta = wrap_180( reference_deg - imu.yaw_frame_yaw360 );
+    fusion_adjust_heading_offset( delta );
+
+    if ( delta_deg ) *delta_deg = delta;
+    if ( total_offset_deg ) *total_offset_deg = fusion_get_heading_offset();
+    return true;
+}
+
 static bool take_pending_axis_cmd( volatile PendingAxisCmd* pending,
                                    PendingAxisCmd* out )
 {
@@ -378,19 +417,32 @@ static void process_pending_commands()
             tracker_set_mode( TrackerMode::Manual );
             tracker_set_armed( true );
             tracker_clear_calibration( "guided calibration started" );
-            publish_calibration_event( "begin_guided", "manual armed", ref, note );
+            fusion_adjust_heading_offset( -fusion_get_heading_offset() );
+            publish_calibration_event( "begin_guided", "ok", ref, note );
             log_print( "[cal] guided calibration started\n" );
             break;
 
         case groundstation_CalibrationAction_CAL_ACTION_SET_AZ_REFERENCE:
             if ( cmd.has_reference_deg && g_stepper_az_cal_q ) {
+                float yaw_delta = 0.0f;
+                float yaw_offset = 0.0f;
+                const bool yaw_adjusted =
+                    apply_yaw_heading_reference( ref, &yaw_delta, &yaw_offset );
+
                 StepperCalibrationCmd axis_cal = {};
                 axis_cal.set_current_angle = true;
                 axis_cal.current_angle_deg = ref;
                 xQueueOverwrite( g_stepper_az_cal_q, &axis_cal );
-                publish_calibration_event( "set_az_reference", "queued", ref, note );
+                publish_calibration_event( "set_az_reference", "ok", ref, note );
+                if ( yaw_adjusted ) {
+                    log_print( "[cal] az reference %.2f; yaw offset delta=%.2f total=%.2f\n",
+                               (double)ref, (double)yaw_delta, (double)yaw_offset );
+                } else {
+                    log_print( "[cal] az reference %.2f; yaw AHRS offset unchanged\n",
+                               (double)ref );
+                }
             } else {
-                publish_calibration_event( "set_az_reference", "missing reference", ref, note );
+                publish_calibration_event( "set_az_reference", "rejected", ref, note );
             }
             break;
 
@@ -400,9 +452,9 @@ static void process_pending_commands()
                 axis_cal.set_current_angle = true;
                 axis_cal.current_angle_deg = ref;
                 xQueueOverwrite( g_stepper_zen_cal_q, &axis_cal );
-                publish_calibration_event( "set_el_reference", "queued", ref, note );
+                publish_calibration_event( "set_el_reference", "ok", ref, note );
             } else {
-                publish_calibration_event( "set_el_reference", "missing reference", ref, note );
+                publish_calibration_event( "set_el_reference", "rejected", ref, note );
             }
             break;
 
@@ -413,9 +465,10 @@ static void process_pending_commands()
             if ( g_stepper_az_cal_q ) xQueueOverwrite( g_stepper_az_cal_q, &axis_cal );
             if ( g_stepper_zen_cal_q ) xQueueOverwrite( g_stepper_zen_cal_q, &axis_cal );
             tracker_clear_calibration( "calibration cleared" );
+            fusion_adjust_heading_offset( -fusion_get_heading_offset() );
             tracker_set_mode( TrackerMode::Manual );
             tracker_set_armed( false );
-            publish_calibration_event( "clear", "cleared", ref, note );
+            publish_calibration_event( "clear", "ok", ref, note );
             log_print( "[cal] calibration cleared\n" );
             break;
         }
@@ -424,17 +477,17 @@ static void process_pending_commands()
             if ( tracker_axes_calibrated() ) {
                 tracker_set_mode( TrackerMode::Auto );
                 tracker_set_armed( true );
-                publish_calibration_event( "enable_tracking", "auto armed", ref, note );
+                publish_calibration_event( "enable_tracking", "ok", ref, note );
                 log_print( "[cal] tracking enabled after calibration\n" );
             } else {
                 tracker_set_mode( TrackerMode::Manual );
-                publish_calibration_event( "enable_tracking", "blocked: axes not calibrated", ref, note );
+                publish_calibration_event( "enable_tracking", "rejected", ref, note );
                 log_print( "[cal] tracking enable blocked: axes not calibrated\n" );
             }
             break;
 
         default:
-            publish_calibration_event( "unknown", "ignored", ref, note );
+            publish_calibration_event( "unknown", "rejected", ref, note );
             break;
         }
     }

@@ -8,6 +8,7 @@ import type { MQTTHandle } from '../../hooks/useMQTT';
 import { decodeStarlinkProxyStatus } from '../../proto/groundStationCodec';
 import type { AntennaState, GroundImuState, RawImuSample, RawMagSample, RawYawImuSample } from '../../types/telemetry';
 import { SimTab } from './SimTab';
+import { CalibrationWizard } from '../CalibrationWizard/CalibrationWizard';
 import styles from './DebugPanel.module.css';
 
 interface Props {
@@ -61,7 +62,7 @@ interface CalibrationEvent {
   note?: string;
 }
 
-type DebugTab = 'log' | 'topics' | 'orientation' | 'ahrs' | 'raw' | 'starlink' | 'sim';
+type DebugTab = 'log' | 'topics' | 'orientation' | 'ahrs' | 'raw' | 'starlink' | 'sim' | 'calibration';
 
 const DEBUG_TABS: Array<{ id: DebugTab; label: string; section: string }> = [
   { id: 'log',         label: 'Console',     section: 'Streams' },
@@ -71,6 +72,7 @@ const DEBUG_TABS: Array<{ id: DebugTab; label: string; section: string }> = [
   { id: 'raw',         label: 'Raw Sensors', section: 'Avionics' },
   { id: 'starlink',    label: 'Starlink',    section: 'Network' },
   { id: 'sim',         label: 'Simulation',  section: 'Tools' },
+  { id: 'calibration', label: 'Calibration', section: 'Setup' },
 ];
 
 // -- Starlink tab component ---------------------------------------------------
@@ -1203,7 +1205,7 @@ export function DebugPanel({ mqtt }: Props) {
           <span>Systems</span>
           <strong>Diagnostics</strong>
         </div>
-        {['Streams', 'Avionics', 'Network', 'Tools'].map((section) => (
+        {['Setup', 'Streams', 'Avionics', 'Network', 'Tools'].map((section) => (
           <div key={section} className={styles.navSection}>
             <div className={styles.navSectionLabel}>{section}</div>
             {DEBUG_TABS.filter((item) => item.section === section).map((item) => (
@@ -1319,6 +1321,15 @@ export function DebugPanel({ mqtt }: Props) {
             />
           )}
           {subTab === 'sim' && <SimTab />}
+          {subTab === 'calibration' && (
+            <CalibrationWizard
+              mqtt={mqtt}
+              antenna={antenna}
+              imu={orientationImu}
+              connected={connected}
+              calibrationEvents={calibrationEvents}
+            />
+          )}
         </div>
       </main>
 
