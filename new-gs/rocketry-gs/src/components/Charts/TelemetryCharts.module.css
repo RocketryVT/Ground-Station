@@ -102,6 +102,20 @@
   font-size: 11px;
 }
 
+.altRefNote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: -2px 2px 6px;
+  font-size: 11px;
+  color: rgba(219, 230, 239, 0.5);
+}
+
+.altRefNote strong {
+  color: #fff4df;
+  font-weight: 700;
+}
+
 .legendRow {
   display: flex;
   gap: 12px;

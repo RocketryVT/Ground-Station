@@ -70,25 +70,41 @@ function sectionHeader(title: string, value: string, detail: string) {
 function AltitudeChart() {
   const history = useTelemetryStore((s) => s.history);
   const latest = history.at(-1) ?? null;
+  // Ground/base altitude reference: the first sample of the flight. The chart
+  // plots altitude GAINED above this baseline, so it starts at 0 (the ground).
+  const groundRefM = history[0]?.alt_m ?? null;
   const data = useMemo(
     () => {
       const sampled = downsample(history, CHART_POINTS);
       const start = sampled[0]?.timestamp ?? 0;
+      const base = sampled[0]?.alt_m ?? 0;
       return sampled.map((t) => ({
         t: (t.timestamp - start) / 1000,
-        alt_ft: parseFloat(metersToFeet(t.alt_m).toFixed(1)),
+        alt_ft: parseFloat(metersToFeet(t.alt_m - base).toFixed(1)),
       }));
     },
     [history],
   );
 
+  const gainM = latest && groundRefM != null ? latest.alt_m - groundRefM : null;
+
   return (
     <section className={styles.section}>
       {sectionHeader(
         'Altitude Envelope',
-        formatFeet(latest?.alt_m),
-        latest ? 'Current altitude' : 'Awaiting telemetry',
+        formatFeet(gainM),
+        latest ? 'Gained above ground' : 'Awaiting telemetry',
       )}
+      {/* Absolute reference note: the graph is ground-relative, so call out the
+          true (MSL) altitude and what altitude the 0 baseline corresponds to. */}
+      <div className={styles.altRefNote}>
+        <span>
+          Absolute / true alt (MSL): <strong>{formatFeet(latest?.alt_m)}</strong>
+        </span>
+        <span>
+          Ground ref (0): <strong>{formatFeet(groundRefM)}</strong>
+        </span>
+      </div>
       <div className={styles.chartFrame}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: -8 }}>

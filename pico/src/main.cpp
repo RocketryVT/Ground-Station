@@ -1,6 +1,6 @@
 // Ground Station — Primary Pico
-// Azimuth:  STEP1 GPIO 4/5, 10:1 gearbox × 3:1 belt = 30:1 total
-// Elevation: STEP2 GPIO 6/7, 10:1 gearbox × 5:1 belt = 50:1 total
+// Azimuth:  STEP1 GPIO 4/5, 10:1 gearbox × 32T:14T = 22.857:1 total
+// Elevation: STEP2 GPIO 6/7, 10:1 gearbox × 20T:14T = 14.286:1 total
 
 #include "shared.hpp"
 

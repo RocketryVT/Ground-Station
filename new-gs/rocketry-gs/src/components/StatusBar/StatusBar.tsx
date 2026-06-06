@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useTelemetryStore } from '../../store/telemetryStore';
 import type { AppTab } from '../../App';
 import { formatFeet } from '../../utils/units';
+import { phaseFromState, PHASE_LABEL, PHASE_COLOR } from '../../utils/flightPhase';
 import styles from './StatusBar.module.css';
 
 function formatElapsed(startMs: number): string {
@@ -51,11 +52,21 @@ export function StatusBar({ demo, tab, onToggleDemo, onSetTab }: Props) {
     ? Math.sqrt(latest.vel_n ** 2 + latest.vel_e ** 2 + latest.vel_d ** 2).toFixed(1)
     : '--';
 
+  const phase = phaseFromState(latest?.state);
+
   return (
     <div className={styles.bar}>
       <div className={styles.brand}>
         <span className={styles.title}>Ground Station</span>
         <span className={styles.subtitle}>{flightStart ? elapsed : 'Standby'}</span>
+      </div>
+
+      <div
+        className={styles.phaseField}
+        style={{ color: PHASE_COLOR[phase], borderColor: PHASE_COLOR[phase] }}
+      >
+        <span className={styles.phaseEyebrow}>PHASE</span>
+        <strong className={styles.phaseValue}>{PHASE_LABEL[phase]}</strong>
       </div>
 
       <div className={`${styles.linkPill} ${connected ? styles.linkPillConnected : styles.linkPillOffline}`}>

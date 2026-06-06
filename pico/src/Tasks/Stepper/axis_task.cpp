@@ -13,8 +13,11 @@
 
 namespace StepHw {
     static constexpr uint32_t PULSES_PER_REV = 800;
-    static constexpr float AZ_GEAR_RATIO = 50.0f;
-    static constexpr float EL_GEAR_RATIO = 30.0f;
+    // Total reduction = motor revs per output (axis) rev = 10:1 gearbox × final gear pair.
+    //   Azimuth:   10:1 × 32T/14T = 22.857:1
+    //   Elevation: 10:1 × 20T/14T = 14.286:1
+    static constexpr float AZ_GEAR_RATIO = 10.0f * 32.0f / 14.0f;
+    static constexpr float EL_GEAR_RATIO = 10.0f * 20.0f / 14.0f;
     static constexpr float EL_MOTOR_AT_HORIZON_DEG = 90.0f;
     // +1: increasing command elevation (toward zenith) drives the antenna up.
     // Verified 2026-06-05: with -1 the closed loop drove command to the +el rail

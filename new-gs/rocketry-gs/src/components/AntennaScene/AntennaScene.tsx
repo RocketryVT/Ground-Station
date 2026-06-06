@@ -1,25 +1,27 @@
-import { useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, Line, Html } from '@react-three/drei';
-import * as THREE from 'three';
 
 import { useTelemetryStore } from '../../store/telemetryStore';
 import { BEAM_HALF_ANGLE_DEG } from '../../config';
+import { GROUND_STATION } from '../AhrsFrameScene/groundStationModel';
+import { GroundStationModelView } from '../AhrsFrameScene/GroundStationModelView';
 import styles from './AntennaScene.module.css';
 
 const DEG = Math.PI / 180;
 
+// Elevation pivot height from the model chain: az_platform (0.06) + el_bar (0.21).
+const EL_PIVOT_Y = 0.27;
+
 // -- Beam cone geometry (constant, based on config half-angle) ------------------
-// Matches the Cesium cone: N spokes from apex + N ring segments.
-// CONE_RANGE is the visual reach of the beam line in Three.js scene units.
+// CONE_RANGE is the visual reach of the beam line in Three.js scene units; the
+// boom/boresight is local +Z, so the cone extends past the antenna tip.
 const N_CONE     = 16;
-const CONE_RANGE = 2.05;  // same end-point as the pointing ray (z = 1.15 + 2.05 ≈ 3.2)
+const CONE_RANGE = 2.05;
 const CONE_HA    = BEAM_HALF_ANGLE_DEG * DEG;
 const CONE_H     = CONE_RANGE * Math.cos(CONE_HA);
 const CONE_R     = CONE_RANGE * Math.sin(CONE_HA);
 const CONE_APEX: [number, number, number] = [0, 0, 1.15];
 
-// Pre-built flat segment list: each consecutive pair = one segment (for <Line segments>)
 const CONE_PTS = (() => {
   const ring = Array.from({ length: N_CONE }, (_, i) => {
     const phi = (i * 2 * Math.PI) / N_CONE;
@@ -34,104 +36,26 @@ const CONE_PTS = (() => {
 })();
 
 // -- Azimuth/elevation maths ----------------------------------------------------
-// Three.js: Y-up, +X east, +Z south (toward viewer), -Z north.
-// Boom extends in +Z local space.
+// Three.js: Y-up, +X east, +Z south (toward viewer), -Z north. Boom = local +Z.
 // rotation.y = π - az·DEG  -> az=0 points -Z (north), az=90 points +X (east)
 // rotation.x = -el·DEG     -> el=0 horizontal, el=90 points +Y (zenith)
+// These match the joint rotations in GroundStationModelView, so the beam stays
+// aligned with the physical model's boom.
 
-function Tracker() {
-  const azRef       = useRef<THREE.Group>(null);
-  const elRef       = useRef<THREE.Group>(null);
-  const targetAzRef = useRef<THREE.Group>(null);
-  const targetElRef = useRef<THREE.Group>(null);
-
-  useFrame(() => {
-    const antenna = useTelemetryStore.getState().antenna;
-    const az = antenna?.actual_az ?? 0;
-    const el = antenna?.actual_el ?? 0;
-    if (azRef.current) azRef.current.rotation.y = Math.PI - az * DEG;
-    if (elRef.current) elRef.current.rotation.x = -el * DEG;
-
-    // Target direction — shown only when target az/el are present
-    const hasTarget = antenna?.target_az != null && antenna?.target_el != null;
-    if (targetAzRef.current) {
-      targetAzRef.current.visible    = hasTarget;
-      targetAzRef.current.rotation.y = Math.PI - (antenna?.target_az ?? az) * DEG;
-    }
-    if (targetElRef.current) {
-      targetElRef.current.rotation.x = -(antenna?.target_el ?? el) * DEG;
-    }
-  });
-
+function Tracker({ az, el, targetAz, targetEl }: {
+  az: number;
+  el: number;
+  targetAz?: number;
+  targetEl?: number;
+}) {
+  const hasTarget = targetAz != null && targetEl != null;
   return (
     <group>
-      {/* -- Tripod legs --------------------------------------------------- */}
-      {[0, 120, 240].map((a) => (
-        <group key={a} rotation={[0, a * DEG, 0]}>
-          <mesh position={[0, -0.435, 0.18]} rotation={[2.28, 0, 0]}>
-            <cylinderGeometry args={[0.022, 0.014, 0.48, 8]} />
-            <meshStandardMaterial color="#2a2a2a" />
-          </mesh>
-        </group>
-      ))}
+      <GroundStationModelView model={GROUND_STATION} az={az} el={el} showBoards={false} />
 
-      {/* -- Vertical mast ------------------------------------------------ */}
-      <mesh position={[0, 0.12, 0]}>
-        <cylinderGeometry args={[0.028, 0.034, 0.84, 12]} />
-        <meshStandardMaterial color="#1a1a1a" />
-      </mesh>
-
-      {/* -- Azimuth group (actual direction) ----------------------------- */}
-      <group ref={azRef} position={[0, 0.56, 0]}>
-        {/* Bearing disk */}
-        <mesh>
-          <cylinderGeometry args={[0.1, 0.1, 0.06, 20]} />
-          <meshStandardMaterial color="#861F41" />
-        </mesh>
-
-        {/* Fork arms */}
-        {([-0.12, 0.12] as const).map((x) => (
-          <mesh key={x} position={[x, 0.18, 0]}>
-            <boxGeometry args={[0.034, 0.34, 0.034]} />
-            <meshStandardMaterial color="#861F41" />
-          </mesh>
-        ))}
-
-        {/* Elevation axle — polished metal */}
-        <mesh position={[0, 0.35, 0]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.29, 12]} />
-          <meshStandardMaterial color="#bbbbbb" metalness={0.9} roughness={0.1} />
-        </mesh>
-
-        {/* -- Elevation group ------------------------------------------- */}
-        <group ref={elRef} position={[0, 0.35, 0]}>
-          {/* Boom — extends in +Z */}
-          <mesh position={[0, 0, 0.55]}>
-            <boxGeometry args={[0.02, 0.02, 1.1]} />
-            <meshStandardMaterial color="#111111" />
-          </mesh>
-
-          {/* Reflector — longest, behind driven element */}
-          <mesh position={[0, 0, 0.02]}>
-            <boxGeometry args={[0.5, 0.012, 0.012]} />
-            <meshStandardMaterial color="#333333" />
-          </mesh>
-
-          {/* Driven element — orange accent */}
-          <mesh position={[0, 0, 0.17]}>
-            <boxGeometry args={[0.45, 0.018, 0.018]} />
-            <meshStandardMaterial color="#CA4F00" emissive="#CA4F00" emissiveIntensity={0.2} />
-          </mesh>
-
-          {/* Directors — progressively shorter toward the front */}
-          {[0.33, 0.49, 0.65, 0.79, 0.93, 1.06].map((z, i) => (
-            <mesh key={z} position={[0, 0, z]}>
-              <boxGeometry args={[Math.max(0.18, 0.41 - i * 0.026), 0.012, 0.012]} />
-              <meshStandardMaterial color="#2a2a2a" />
-            </mesh>
-          ))}
-
-          {/* Pointing direction ray */}
+      {/* Actual pointing — beam cone + ray, pivoting at the elevation axis */}
+      <group position={[0, EL_PIVOT_Y, 0]} rotation={[0, Math.PI - az * DEG, 0]}>
+        <group rotation={[-el * DEG, 0, 0]}>
           <Line
             points={[[0, 0, 1.15], [0, 0, 3.2]]}
             color="#CA4F00"
@@ -140,33 +64,33 @@ function Tracker() {
             dashSize={0.11}
             gapSize={0.08}
           />
-
-          {/* Beam cone — spokes + ring matching the Cesium visualization */}
           <Line points={CONE_PTS} color="#CA4F00" lineWidth={0.8} segments />
         </group>
       </group>
 
-      {/* -- Target direction (maroon dashed) — mirrors actual az/el pivot - */}
-      <group ref={targetAzRef} position={[0, 0.56, 0]}>
-        <group ref={targetElRef} position={[0, 0.35, 0]}>
-          <Line
-            points={[[0, 0, 1.15], [0, 0, 3.2]]}
-            color="#861F41"
-            lineWidth={2}
-            dashed
-            dashSize={0.15}
-            gapSize={0.1}
-          />
+      {/* Target pointing — maroon dashed ray */}
+      {hasTarget && (
+        <group position={[0, EL_PIVOT_Y, 0]} rotation={[0, Math.PI - targetAz * DEG, 0]}>
+          <group rotation={[-targetEl * DEG, 0, 0]}>
+            <Line
+              points={[[0, 0, 1.15], [0, 0, 3.2]]}
+              color="#861F41"
+              lineWidth={2}
+              dashed
+              dashSize={0.15}
+              gapSize={0.1}
+            />
+          </group>
         </group>
-      </group>
+      )}
     </group>
   );
 }
 
-// -- Compass rose on the ground plane ------------------------------------------
+// -- Compass rose at the assembly level ----------------------------------------
 function Compass() {
-  const y = -0.59;
-  const r = 1.0;
+  const y = -0.08;
+  const r = 1.6;
   const dirs: [string, number, number, number][] = [
     ['N', 0,  y, -r],
     ['E', r,  y,  0],
@@ -175,19 +99,16 @@ function Compass() {
   ];
   return (
     <group>
-      {/* North indicator — maroon, starts 0.3 m from centre to avoid looking like a tripod leg */}
-      <Line points={[[0, y, -0.3], [0, y, -0.78]]} color="#861F41" lineWidth={2} />
-      <mesh position={[0, y, -0.88]} rotation={[Math.PI / 2, 0, Math.PI]}>
-        <coneGeometry args={[0.045, 0.18, 6]} />
+      <Line points={[[0, y, -0.5], [0, y, -r + 0.1]]} color="#861F41" lineWidth={2} />
+      <mesh position={[0, y, -r]} rotation={[Math.PI / 2, 0, Math.PI]}>
+        <coneGeometry args={[0.06, 0.22, 6]} />
         <meshStandardMaterial color="#861F41" />
       </mesh>
-
-      {/* Cardinal labels */}
       {dirs.map(([label, x, ly, z]) => (
-        <Html key={label} position={[x, ly + 0.08, z]} center>
+        <Html key={label} position={[x, ly + 0.1, z]} center>
           <span style={{
             fontFamily: 'Courier New, monospace',
-            fontSize: '11px',
+            fontSize: '12px',
             fontWeight: 'bold',
             color: label === 'N' ? '#861F41' : '#75787B',
             userSelect: 'none',
@@ -210,31 +131,31 @@ export function AntennaScene() {
   return (
     <div className={styles.wrapper}>
       <Canvas
-        camera={{ position: [2.4, 1.8, 3.2], fov: 45 }}
+        camera={{ position: [3.9, 2.3, 4.7], fov: 46 }}
         style={{ background: 'white' }}
       >
-        <ambientLight intensity={0.85} />
+        <ambientLight intensity={0.9} />
         <directionalLight position={[5, 8, 4]} intensity={1.0} castShadow />
         <directionalLight position={[-4, 3, -4]} intensity={0.3} />
 
         <Grid
-          args={[8, 8]}
+          args={[12, 12]}
           cellSize={0.5}
           cellColor="#d8d8d8"
           sectionSize={1}
           sectionColor="#bbbbbb"
-          position={[0, -0.59, 0]}
-          fadeDistance={8}
+          position={[0, -2.42, 0]}
+          fadeDistance={20}
           infiniteGrid
         />
 
-        <Tracker />
+        <Tracker az={az} el={el} targetAz={antenna?.target_az} targetEl={antenna?.target_el} />
         <Compass />
 
         <OrbitControls
           enablePan={false}
-          minDistance={2}
-          maxDistance={9}
+          minDistance={1.5}
+          maxDistance={20}
           target={[0, 0.3, 0]}
         />
       </Canvas>

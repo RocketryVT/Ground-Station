@@ -4,7 +4,7 @@
  * Flight profile (repeats every CYCLE_S seconds):
  *   0 –  3 s  motor burn   fast climb, high acceleration
  *   3 – 12 s  coast        deceleration, rotation slows
- *  12 – 14 s  apogee       ~3 000 m, near-zero velocity
+ *  12 – 14 s  apogee       10,000 ft above pad, near-zero velocity
  *  14 – 28 s  descent      drogue -> main chute, slow fall
  *  28 – 30 s  landed       stationary on ground
  */
@@ -17,7 +17,9 @@ const LAT0 =  32.9503;
 const LON0 = -106.9750;
 const ALT0 =  1220;   // m MSL (pad elevation)
 
-const MAX_ALT   = 3200;   // m MSL at apogee
+// Apogee = pad + 10,000 ft (3048 m), so the ground-relative altitude chart
+// climbs from 0 to exactly 10,000 ft.
+const MAX_ALT   = ALT0 + 3048;   // m MSL at apogee (10,000 ft above the pad)
 const CYCLE_S   = 30;     // seconds per simulated flight
 const HZ        = 10;
 const DT        = 1 / HZ;
@@ -46,6 +48,18 @@ function altProfile(t: number): number {
 // -- Chase-car offset from pad (degrees) ------------------------------------
 const CHASE_DLAT =  0.0012;
 const CHASE_DLON = -0.0008;
+
+// Firmware-style flight state across the demo timeline (matches codec
+// flight_state_name, mapped to display phases by flightPhase.ts).
+function demoState(t: number): string {
+  if (t < 0.4)  return 'GROUND_IDLE';     // PAD (brief, at the start of each cycle)
+  if (t < 3)    return 'POWERED_ASCENT';  // BOOST
+  if (t < 12.5) return 'COAST_ASCENT';    // COAST
+  if (t < 14.5) return 'APOGEE';
+  if (t < 21)   return 'DESCENT_DROGUE';  // drogue out, body separated
+  if (t < 28)   return 'DESCENT_MAIN';    // main out
+  return 'LANDED';
+}
 
 export function useDemoMode(enabled: boolean) {
   const { addTelemetry, setAntenna, updateNode, setConnected, clearFlight } =
@@ -140,6 +154,7 @@ export function useDemoMode(enabled: boolean) {
         flap_deployment_percent: deploymentPercent,
         predicted_apogee_m: predictedApogee,
         target_apogee_m: targetApogee,
+        state: demoState(t),
       });
 
       // -- Antenna tracking (az/el from GS node position, not pad) ---------

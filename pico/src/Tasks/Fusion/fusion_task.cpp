@@ -76,14 +76,15 @@ void fusion_set_mag_calibration( bool yaw, const float hard_iron[3], const float
 // Change these remaps to match the physical mounting of each sensor.
 //
 // Fusion remap names list the sensor axes which become body [X,Y,Z].
-// Both boards (yaw LSM6DSOX+LIS3MDL and bar ISM330DLC+LIS3MDL) are now mounted
-// with sensor +Y facing body-forward and sensor +X facing body-right.
-//   Sensor frames are right-handed, so with +Y = X_fwd and +X = Y_right the body
-//   Z (down) is forced to -sensor Z (the board is flipped about the forward axis
-//   relative to the old component-side-down mounting, so +Z now points up).
-//   → body X (fwd) = +sensor Y, body Y (right) = +sensor X, body Z (down) = -sensor Z
+//
+// Yaw board (LSM6DSOX + LIS3MDL): sensor +Y faces body-forward, +X faces
+// body-right → body X(fwd)=+sensorY, Y(right)=+sensorX, Z(down)=-sensorZ = PYPXNZ.
+//
+// Bar/zenith board (ISM330DLC + LIS3MDL), reoriented 2026-06-06: sensor +X faces
+// body-forward, +Y faces body-left → body X(fwd)=+sensorX, Y(right)=-sensorY,
+// Z(down)=-sensorZ = PXNYNZ. Applies to the ISM accel/gyro and the LIS3MDL mag.
 
-#define BAR_SENSOR_REMAP  FusionRemapAlignmentPYPXNZ  // body [X,Y,Z] = sensor [+Y,+X,-Z]
+#define BAR_SENSOR_REMAP  FusionRemapAlignmentPXNYNZ  // body [X,Y,Z] = sensor [+X,-Y,-Z]
 #define YAW_SENSOR_REMAP  FusionRemapAlignmentPYPXNZ  // body [X,Y,Z] = sensor [+Y,+X,-Z]
 
 // Magnetic declination: true_heading = magnetic_heading + declination_deg.

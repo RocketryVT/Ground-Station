@@ -18,6 +18,7 @@ export interface RocketTelemetry {
   flap_deployment_percent?: number;   // 0..100, when angle is not sent directly
   target_apogee_m?: number;
   predicted_apogee_m?: number;
+  state?: string;                     // firmware flight state (codec flight_state_name)
 }
 
 export interface AntennaState {
