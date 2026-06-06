@@ -17,6 +17,7 @@ import type {
 import { SimTab } from './SimTab';
 import { CalibrationWizard } from '../CalibrationWizard/CalibrationWizard';
 import { MagCalibrationWizard } from '../MagCalibrationWizard/MagCalibrationWizard';
+import { AhrsFrameScene } from '../AhrsFrameScene/AhrsFrameScene';
 import styles from './DebugPanel.module.css';
 
 interface Props {
@@ -918,6 +919,8 @@ function AhrsTab({
           ]}
         />
       </div>
+
+      <AhrsFrameScene imu={latest} />
 
       <div className={styles.orientationGrid}>
         <div className={styles.orientationCard}>

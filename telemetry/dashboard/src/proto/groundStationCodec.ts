@@ -221,6 +221,9 @@ function decodeGroundImu(payload: Uint8Array): PlainObject {
   const reader = new Reader(payload);
   const out: PlainObject = {};
   const q: number[] = [];
+  const barQ: number[] = [];
+  const yawQ: number[] = [];
+  const barRelQ: number[] = [];
   const a: number[] = [];
   const m: number[] = [];
 
@@ -251,10 +254,16 @@ function decodeGroundImu(payload: Uint8Array): PlainObject {
     else if (field === 20) out.bar_rel_roll = reader.float();
     else if (field === 21) out.bar_rel_pitch = reader.float();
     else if (field === 22) out.bar_rel_yaw = reader.float();
+    else if (field === 23) barQ.push(...readFloatRepeated(reader, wire));
+    else if (field === 24) yawQ.push(...readFloatRepeated(reader, wire));
+    else if (field === 25) barRelQ.push(...readFloatRepeated(reader, wire));
     else reader.skip(wire);
   }
 
   if (q.length > 0) out.q = q;
+  if (barQ.length > 0) out.bar_q = barQ;
+  if (yawQ.length > 0) out.yaw_q = yawQ;
+  if (barRelQ.length > 0) out.bar_rel_q = barRelQ;
   if (a.length > 0) out.a = a;
   if (m.length > 0) out.m = m;
   return out;

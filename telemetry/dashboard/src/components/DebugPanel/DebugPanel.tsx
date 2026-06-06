@@ -7,6 +7,7 @@ import { TOPICS, KNOWN_MQTT_TOPICS, STARLINK_PROXY_URL } from '../../config';
 import type { MQTTHandle } from '../../hooks/useMQTT';
 import { decodeStarlinkProxyStatus } from '../../proto/groundStationCodec';
 import type { AntennaState, GroundImuState, RawImuSample, RawMagSample, RawYawImuSample } from '../../types/telemetry';
+import { AhrsFrameScene } from '../AhrsFrameScene/AhrsFrameScene';
 import { SimTab } from './SimTab';
 import styles from './DebugPanel.module.css';
 
@@ -607,6 +608,7 @@ function RawSensorsTab({
   const [isRecording,   setIsRecording]   = useState(false);
   const [elapsedSec,    setElapsedSec]    = useState(0);
   const [hasRecording,  setHasRecording]  = useState(false);
+  const [recordingCounts, setRecordingCounts] = useState({ az: 0, zenImu: 0, zenMag: 0 });
   const recStartRef   = useRef<number>(0);
   const recAzRef      = useRef<RecAz[]>([]);
   const recZenImuRef  = useRef<RecZenImu[]>([]);
@@ -633,6 +635,7 @@ function RawSensorsTab({
         recAzRef.current.push({ ...s, rec_ms });
       }
     }
+    setRecordingCounts((counts) => ({ ...counts, az: recAzRef.current.length }));
   }, [rawYawImu, isRecording]);
 
   useEffect(() => {
@@ -645,6 +648,7 @@ function RawSensorsTab({
         recZenImuRef.current.push({ ...s, rec_ms });
       }
     }
+    setRecordingCounts((counts) => ({ ...counts, zenImu: recZenImuRef.current.length }));
   }, [rawImu, isRecording]);
 
   useEffect(() => {
@@ -657,6 +661,7 @@ function RawSensorsTab({
         recZenMagRef.current.push({ ...s, rec_ms });
       }
     }
+    setRecordingCounts((counts) => ({ ...counts, zenMag: recZenMagRef.current.length }));
   }, [rawMag, isRecording]);
 
   function startRecording() {
@@ -669,6 +674,7 @@ function RawSensorsTab({
     recStartRef.current  = Date.now();
     setElapsedSec(0);
     setHasRecording(false);
+    setRecordingCounts({ az: 0, zenImu: 0, zenMag: 0 });
     setIsRecording(true);
   }
 
@@ -679,6 +685,11 @@ function RawSensorsTab({
       recZenImuRef.current.length > 0 ||
       recZenMagRef.current.length > 0,
     );
+    setRecordingCounts({
+      az: recAzRef.current.length,
+      zenImu: recZenImuRef.current.length,
+      zenMag: recZenMagRef.current.length,
+    });
   }
 
   function exportCsv() {
@@ -704,9 +715,9 @@ function RawSensorsTab({
     publish(false, false, false);
   }
 
-  const recAzCount     = isRecording ? recAzRef.current.length     : (hasRecording ? recAzRef.current.length     : 0);
-  const recZenImuCount = isRecording ? recZenImuRef.current.length  : (hasRecording ? recZenImuRef.current.length  : 0);
-  const recZenMagCount = isRecording ? recZenMagRef.current.length  : (hasRecording ? recZenMagRef.current.length  : 0);
+  const recAzCount = isRecording || hasRecording ? recordingCounts.az : 0;
+  const recZenImuCount = isRecording || hasRecording ? recordingCounts.zenImu : 0;
+  const recZenMagCount = isRecording || hasRecording ? recordingCounts.zenMag : 0;
 
   const zenithImuData = useMemo(
     () => rawImu.map((s, i) => ({ i, ax: s.ax, ay: s.ay, az: s.az, gx: s.gx, gy: s.gy, gz: s.gz })),
@@ -903,6 +914,8 @@ function AhrsTab({
         />
       </div>
 
+      <AhrsFrameScene imu={latest} />
+
       <div className={styles.orientationGrid}>
         <div className={styles.orientationCard}>
           <div className={styles.cardTitle}>LATEST AHRS</div>
@@ -927,6 +940,12 @@ function AhrsTab({
           <div className={styles.vectorBlock}>
             <span>q[w,x,y,z]</span>
             <code>{latest?.q ? latest.q.map(v => v.toFixed(5)).join(', ') : '--'}</code>
+            <span>yaw_q[w,x,y,z]</span>
+            <code>{latest?.yaw_q ? latest.yaw_q.map(v => v.toFixed(5)).join(', ') : '--'}</code>
+            <span>bar_q[w,x,y,z]</span>
+            <code>{latest?.bar_q ? latest.bar_q.map(v => v.toFixed(5)).join(', ') : '--'}</code>
+            <span>bar_rel_q[w,x,y,z]</span>
+            <code>{latest?.bar_rel_q ? latest.bar_rel_q.map(v => v.toFixed(5)).join(', ') : '--'}</code>
           </div>
         </div>
       </div>
