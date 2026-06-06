@@ -1,7 +1,0 @@
-paho-mqtt>=2.0.0
-fastapi>=0.115.0
-grpcio>=1.80.0
-grpcio-tools>=1.80.0
-protobuf>=6.33.6
-uvicorn[standard]>=0.32.0
-textual>=0.80.0
