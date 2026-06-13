@@ -24,12 +24,25 @@ pub fn start(
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(1883);
+    let username = std::env::var("ROCKETRY_GS_MQTT_USER").ok();
+    let password = std::env::var("ROCKETRY_GS_MQTT_PASSWORD").ok();
 
     let (publish_tx, publish_rx) = mpsc::channel::<PublishRequest>(128);
     app.manage(publish_tx);
 
     tauri::async_runtime::spawn(async move {
-        run_mqtt(app, state, logger, diagnostic_csv, host, port, publish_rx).await;
+        run_mqtt(
+            app,
+            state,
+            logger,
+            diagnostic_csv,
+            host,
+            port,
+            username,
+            password,
+            publish_rx,
+        )
+        .await;
     });
 }
 
@@ -40,12 +53,17 @@ async fn run_mqtt(
     diagnostic_csv: DiagnosticCsv,
     host: String,
     port: u16,
+    username: Option<String>,
+    password: Option<String>,
     mut publish_rx: mpsc::Receiver<PublishRequest>,
 ) {
     let client_id = format!("rocketry-gs-{}", std::process::id());
     let mut options = MqttOptions::new(client_id, host.clone(), port);
     options.set_keep_alive(Duration::from_secs(30));
     options.set_clean_session(true);
+    if let Some(username) = username {
+        options.set_credentials(username, password.unwrap_or_default());
+    }
 
     let (client, mut eventloop) = AsyncClient::new(options, 64);
     if let Err(error) = client.subscribe("#", QoS::AtMostOnce).await {

@@ -1,5 +1,6 @@
 #include "ntp_task.hpp"
 #include "shared.hpp"
+#include "Tasks/RTC/rtc.hpp"
 
 #include "FreeRTOS.h"
 
@@ -11,75 +12,50 @@
 // Starlink does NOT run NTP on 192.168.100.1.
 // Use Cloudflare's public NTP — reachable via Starlink's internet connection.
 #define NTP_SERVER              "time.cloudflare.com"
-#define NTP_RESYNC_INTERVAL_MS  60000
+#define NTP_POLL_INTERVAL_MS    60000
 #define NTP_TIMEOUT_MS          8000
 
-// -- UTC epoch state -----------------------------------------------------------
-// s_epoch_offset_ms:  UTC_ms = s_epoch_offset_ms + time_us_64() / 1000
-//
-// Written only by the NTP task (single writer); read from any task.
-// uint64_t writes on Cortex-M33 are not atomic, so we guard reads/writes
-// with a lightweight critical section via a FreeRTOS mutex.
-
-static volatile uint64_t s_epoch_offset_ms = 0;
-static volatile bool     s_synced          = false;
-
-// -- SNTP callback (called from lwIP IRQ context) ------------------------------
-// lwIP calls SNTP_SET_SYSTEM_TIME_US(sec, us) when a valid response arrives.
-// We define that macro below to call this function.
-
-static void on_ntp_response(uint32_t sec, uint32_t us)
-{
-    // Compute offset so that:  utc_ms = offset + time_us_64()/1000
-    uint64_t utc_ms    = (uint64_t)sec * 1000ULL + us / 1000ULL;
-    uint64_t pico_ms   = time_us_64() / 1000ULL;
-    uint64_t new_offset = utc_ms - pico_ms;
-
-    // Write from IRQ — no FreeRTOS API allowed.  Write high word then low word
-    // so a reader that sees both words consistent gets a valid value.
-    // (On CM33 unaligned 64-bit stores are not guaranteed atomic, but writing
-    // in two 32-bit halves with the high word first is safe for this use case:
-    // a torn read at worst gives a value that is off by up to 2^32 ms ~49 days,
-    // which utc_now_ms() callers handle by checking ntp_is_synced() first.)
-    volatile uint32_t* p = (volatile uint32_t*)&s_epoch_offset_ms;
-    p[1] = (uint32_t)(new_offset >> 32);
-    p[0] = (uint32_t)(new_offset & 0xFFFFFFFFULL);
-    s_synced = true;
-}
-
-// -- lwIP SNTP hook — must be defined at compile unit scope --------------------
-// sntp.h declares SNTP_SET_SYSTEM_TIME_US as a macro that the user overrides
-// in lwipopts.h.  Since we can't easily put a function call in a macro that
-// references our static, we use the callback approach via sntp_set_time_sync_notification_cb
-// where available, and fall back to a module-level C function named for the macro.
-
-// The cleanest approach for NO_SYS=1: define the callback function the macro
-// expands to.  sntp_opts.h defaults SNTP_SET_SYSTEM_TIME_US to a no-op;
-// we override it in lwipopts.h (see CMakeLists note).
+// -- SNTP response handoff (lwIP callback -> task) -----------------------------
+// SNTP_SET_SYSTEM_TIME_US (see lwipopts.h) calls sntp_set_system_time_us() from
+// lwIP context, which on this NO_SYS=1 / SMP build may run on either core and
+// must not touch FreeRTOS APIs.  We hand the timestamp to ntp_task via a
+// seqlock: the callback captures time_us_64() at the instant of the response and
+// the task forwards it to the RTC service (where log_print + aon_timer are safe).
+static volatile uint32_t s_seq        = 0;   // even = stable, odd = write in progress
+static volatile uint64_t s_ntp_utc_ms = 0;   // Unix-epoch ms from the server
+static volatile uint64_t s_ntp_cap_us = 0;   // time_us_64() when it arrived
+static volatile bool     s_ntp_have   = false;
 
 extern "C" void sntp_set_system_time_us(uint32_t sec, uint32_t us)
 {
-    on_ntp_response(sec, us);
+    const uint64_t cap_us = time_us_64();
+    const uint64_t utc_ms = static_cast<uint64_t>(sec) * 1000ULL + us / 1000ULL;
+
+    s_seq = s_seq + 1;             // -> odd: write in progress
+    __sync_synchronize();
+    s_ntp_utc_ms = utc_ms;
+    s_ntp_cap_us = cap_us;
+    __sync_synchronize();
+    s_seq = s_seq + 1;             // -> even: stable
+    s_ntp_have = true;
 }
 
-// -- Public API ----------------------------------------------------------------
-
-uint64_t utc_now_ms()
+// Read the latest deposited sample.  Returns false if none has arrived yet.
+static bool ntp_read_latest(uint64_t* utc_ms, uint64_t* cap_us)
 {
-    if (!s_synced) return 0;
-    // Read the two halves.  If high word changed between reads, re-read.
-    // This gives a consistent 64-bit value without disabling interrupts.
-    const volatile uint32_t* p = (const volatile uint32_t*)&s_epoch_offset_ms;
-    uint32_t hi, lo;
+    if (!s_ntp_have) return false;
+    uint32_t s1, s2;
     do {
-        hi = p[1];
-        lo = p[0];
-    } while (p[1] != hi);
-    uint64_t offset = ((uint64_t)hi << 32) | lo;
-    return offset + time_us_64() / 1000ULL;
+        s1 = s_seq;
+        if (s1 & 1u) continue;     // a write is in progress — retry
+        __sync_synchronize();
+        *utc_ms = s_ntp_utc_ms;
+        *cap_us = s_ntp_cap_us;
+        __sync_synchronize();
+        s2 = s_seq;
+    } while (s1 != s2);
+    return true;
 }
-
-bool ntp_is_synced() { return s_synced; }
 
 // -- Task ----------------------------------------------------------------------
 
@@ -96,16 +72,22 @@ static void ntp_task(void*)
     sntp_init();
     cyw43_arch_lwip_end();
 
-    log_print("[ntp] SNTP started, waiting for first sync...\n");
+    log_print("[ntp] SNTP started, waiting for first response...\n");
+
+    uint64_t last_cap_us = 0;
 
     for (;;) {
-        uint32_t wait_ms = s_synced ? NTP_RESYNC_INTERVAL_MS : NTP_TIMEOUT_MS;
+        const uint32_t wait_ms = s_ntp_have ? NTP_POLL_INTERVAL_MS : NTP_TIMEOUT_MS;
         vTaskDelay(pdMS_TO_TICKS(wait_ms));
 
-        if (!s_synced) {
-            log_print("[ntp] no sync yet, retrying...\n");
-        } else {
-            log_print("[ntp] UTC: %llu ms\n", (unsigned long long)utc_now_ms());
+        uint64_t utc_ms, cap_us;
+        if (ntp_read_latest(&utc_ms, &cap_us) && cap_us != last_cap_us) {
+            // New response since last loop — forward to the RTC (it decides
+            // whether to apply it; ignored while GPS is live).
+            last_cap_us = cap_us;
+            rtc_submit_ntp_time(utc_ms, cap_us);
+        } else if (!s_ntp_have) {
+            log_print("[ntp] no response yet, retrying...\n");
         }
 
         EventBits_t bits = xEventGroupGetBits(g_net_events);

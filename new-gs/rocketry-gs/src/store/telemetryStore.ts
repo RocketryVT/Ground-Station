@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type {
   RocketTelemetry, AntennaState, MobileNode, GroundImuState, AhrsStatus, CalibrationEvent,
-  RawImuSample, RawMagSample, RawYawImuSample,
+  RawImuSample, RawMagSample, RawYawImuSample, TxId, TxTelemetry,
 } from '../types/telemetry';
 import { MAX_HISTORY } from '../config';
 
@@ -46,6 +46,7 @@ function capTail<T>(items: T[], limit: number): T[] {
 export interface TelemetryState {
   latest:      RocketTelemetry | null;
   history:     RocketTelemetry[];
+  tx:          Record<TxId, TxTelemetry | null>;
   antenna:     AntennaState | null;
   groundImu:   GroundImuState | null;
   ahrsStatus:  AhrsStatus | null;
@@ -61,6 +62,7 @@ export interface TelemetryState {
   calibrationEvents: CalibrationEvent[];
 
   addTelemetry: (t: RocketTelemetry) => void;
+  setTx:        (t: TxTelemetry) => void;
   setAntenna:   (a: AntennaState) => void;
   setGroundImu: (i: GroundImuState) => void;
   setAhrsStatus: (s: AhrsStatus) => void;
@@ -85,6 +87,7 @@ export interface TelemetryState {
 export const useTelemetryStore = create<TelemetryState>((set) => ({
   latest:      null,
   history:     [],
+  tx:          { nose: null, ads: null },
   antenna:     null,
   groundImu:   null,
   ahrsStatus:  null,
@@ -105,6 +108,8 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
       history:     appendCapped(s.history, t, MAX_HISTORY),
       flightStart: s.flightStart ?? t.timestamp,
     })),
+
+  setTx: (t) => set((s) => ({ tx: { ...s.tx, [t.id]: t } })),
 
   setAntenna: (a) => set({ antenna: a }),
 
@@ -127,7 +132,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   setConnected: (v) => set({ connected: v }),
 
   clearFlight: () =>
-    set({ history: [], latest: null, flightStart: null }),
+    set({ history: [], latest: null, flightStart: null, tx: { nose: null, ads: null } }),
 
   loadHistory: (rows) =>
     set(() => {

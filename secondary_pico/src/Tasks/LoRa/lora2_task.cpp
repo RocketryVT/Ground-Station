@@ -26,21 +26,21 @@ static const radio::rf69::Config s_cfg = [] {
 }();
 
 static radio::rf69::RF69 s_radio( spi1,
-                                  Pins::LORA2_SCK,
-                                  Pins::LORA2_MOSI,
-                                  Pins::LORA2_MISO,
-                                  Pins::LORA2_NSS,
-                                  Pins::LORA2_DIO0,
-                                  Pins::LORA2_RST,
+                                  Pins::LORA1_SCK,
+                                  Pins::LORA1_MOSI,
+                                  Pins::LORA1_MISO,
+                                  Pins::LORA1_NSS,
+                                  Pins::LORA1_DIO0,
+                                  Pins::LORA1_RST,
                                   s_cfg );
 
 // -- Task ----------------------------------------------------------------------
 static void lora2_task( void* )
 {
     // Assert power-enable pin
-    gpio_init( Pins::LORA2_EN );
-    gpio_set_dir( Pins::LORA2_EN, GPIO_OUT );
-    gpio_put( Pins::LORA2_EN, 1 );
+    gpio_init( Pins::LORA1_EN );
+    gpio_set_dir( Pins::LORA1_EN, GPIO_OUT );
+    gpio_put( Pins::LORA1_EN, 1 );
 
     vTaskDelay( pdMS_TO_TICKS( 500 ) );
 

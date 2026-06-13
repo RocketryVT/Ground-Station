@@ -65,28 +65,12 @@ extern QueueHandle_t g_udp_queue;
 #define PRIMARY_PICO_IP   "192.168.100.2"   // set to primary Pico's static IP
 #define INTER_PICO_PORT   5005
 
-// -- Pin assignments (GPIO number, Pico 2W) ------------------------------------
-namespace Pins {
-
-    // -- LoRa 1 (SX1276 / 915 MHz) – SPI0 ------------------------------------
-    static constexpr uint LORA1_RST  =  8;   // GPIO 8,  phys 11
-    static constexpr uint LORA1_DIO0 =  9;   // GPIO 9,  phys 12  (G0 / IRQ)
-    static constexpr uint LORA1_EN   = 10;   // GPIO 10, phys 14  (power enable)
-    static constexpr uint LORA1_SCK  = 18;   // GPIO 18, phys 24
-    static constexpr uint LORA1_MOSI = 19;   // GPIO 19, phys 25
-    static constexpr uint LORA1_MISO = 20;   // GPIO 20, phys 26
-    static constexpr uint LORA1_NSS  = 21;   // GPIO 21, phys 27  (CS)
-
-    // -- LoRa 2 (RFM69HCW / 433 MHz) – SPI1 ----------------------------------
-    static constexpr uint LORA2_RST  = 11;   // GPIO 11, phys 15
-    static constexpr uint LORA2_MISO = 12;   // GPIO 12, phys 16
-    static constexpr uint LORA2_NSS  = 13;   // GPIO 13, phys 17  (CS)
-    static constexpr uint LORA2_SCK  = 14;   // GPIO 14, phys 19
-    static constexpr uint LORA2_MOSI = 15;   // GPIO 15, phys 20
-    static constexpr uint LORA2_DIO0 = 22;   // GPIO 22, phys 29  (G0 / IRQ)
-    static constexpr uint LORA2_EN   = 28;   // GPIO 28, phys 34  (power enable)
-
-} // namespace Pins
+// -- Pin assignments -----------------------------------------------------------
+// Single source of truth for the Ground Station PCB rev 1 (Pico 2 W). This
+// secondary Pico runs on the same GSPCB layout as the primary:
+//   915 MHz LoRa (SX1276, SPI0) -> Pins::LORA0_*   (this project's lora1_task)
+//   433 MHz GFSK (RFM69, SPI1)  -> Pins::LORA1_*   (this project's lora2_task)
+#include "boards/gs_pcb_v1_pins.hpp"
 
 // -- LoRa radio parameters (must match rocket transmitter settings) -------------
 namespace LoRa1Cfg {

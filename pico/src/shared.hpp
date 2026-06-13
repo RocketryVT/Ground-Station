@@ -59,61 +59,11 @@ struct MqttMessage {
 #define MQTT_QUEUE_DEPTH  64
 extern QueueHandle_t g_mqtt_queue;
 
-// -- Pin assignments (GPIO number, Pico 2W) ------------------------------------
-namespace Pins {
-
-    // -- I2C0 (ISM330DLC IMU + LIS3MDL magnetometer) ---------------------------
-    static constexpr uint I2C0_SDA   =  0;  // GPIO 0,  phys  1
-    static constexpr uint I2C0_SCL   =  1;  // GPIO 1,  phys  2
-
-    // -- I2C1 (reserved / expansion) -------------------------------------------
-    static constexpr uint I2C1_SDA   =  2;  // GPIO 2,  phys  4
-    static constexpr uint I2C1_SCL   =  3;  // GPIO 3,  phys  5
-
-    // -- Servo 1 / TOP ---------------------------------------------------------
-    // CL57TE PUL+ / DIR+ are held high by the PCB; Pico drives the active-low
-    // opto inputs only.
-    static constexpr uint STEP1_PUL_N = 4;  // GPIO 4, phys 6 — Servo1 PUL-
-    static constexpr uint STEP1_DIR_N = 5;  // GPIO 5, phys 7 — Servo1 DIR-
-
-    // -- Servo 2 / BOTTOM ------------------------------------------------------
-    // CL57TE PUL+ / DIR+ are held high by the PCB; Pico drives the active-low
-    // opto inputs only.
-    static constexpr uint STEP2_PUL_N = 6;  // GPIO 6, phys 9 — Servo2 PUL-
-    static constexpr uint STEP2_DIR_N = 7;  // GPIO 7, phys 10 — Servo2 DIR-
-
-    // -- LoRa 1 / LEFT SPI – SPI1 ---------------------------------------------
-    static constexpr uint LORA1_MISO =  8;  // GPIO  8, phys 11
-    static constexpr uint LORA1_NSS  =  9;  // GPIO  9, phys 12  (CS)
-    static constexpr uint LORA1_SCK  = 10;  // GPIO 10, phys 14
-    static constexpr uint LORA1_MOSI = 11;  // GPIO 11, phys 15
-    static constexpr uint LORA1_RST  = 26;  // GPIO 26, phys 31
-    static constexpr uint LORA1_DIO0 = 27;  // GPIO 27, phys 32  (G0 / IRQ)
-    static constexpr uint LORA1_EN   = 28;  // GPIO 28, phys 34  (power enable)
-
-    // -- LoRa 0 / RIGHT SPI – SPI0 --------------------------------------------
-    static constexpr uint LORA0_EN   = 16;  // GPIO 16, phys 21 (power enable)
-    static constexpr uint LORA0_DIO0 = 17;  // GPIO 17, phys 22 (G0 / IRQ)
-    static constexpr uint LORA0_SCK  = 18;  // GPIO 18, phys 24
-    static constexpr uint LORA0_MOSI = 19;  // GPIO 19, phys 25
-    static constexpr uint LORA0_MISO = 20;  // GPIO 20, phys 26
-    static constexpr uint LORA0_NSS  = 21;  // GPIO 21, phys 27 (CS)
-    static constexpr uint LORA0_RST  = 22;  // GPIO 22, phys 29
-
-    // -- GPS (u-blox M10, UART0) -----------------------------------------------
-    static constexpr uint GPS_TX  = 12;  // GPIO 12, phys 16 — UART0 TX → GPS RX
-    static constexpr uint GPS_RX  = 13;  // GPIO 13, phys 17 — UART0 RX ← GPS TX
-
-    // Legacy aliases for code that still refers to the second radio as LORA2.
-    static constexpr uint LORA2_MISO = LORA1_MISO;
-    static constexpr uint LORA2_NSS  = LORA1_NSS;
-    static constexpr uint LORA2_SCK  = LORA1_SCK;
-    static constexpr uint LORA2_MOSI = LORA1_MOSI;
-    static constexpr uint LORA2_RST  = LORA1_RST;
-    static constexpr uint LORA2_DIO0 = LORA1_DIO0;
-    static constexpr uint LORA2_EN   = LORA1_EN;
-
-} // namespace Pins
+// -- Pin assignments -----------------------------------------------------------
+// Single source of truth for the Ground Station PCB rev 1 (Pico 2 W) lives in
+// the shared board pin map. LORA0 = 915 MHz LoRa (SX1276, SPI0); LORA1 = 433 MHz
+// GFSK (RFM69, SPI1); GPS on UART0 (TX=12, RX=13).
+#include "boards/gs_pcb_v1_pins.hpp"
 
 // -- LoRa radio parameters -----------------------------------------------------
 namespace LoRa0Cfg {

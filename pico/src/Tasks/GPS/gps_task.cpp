@@ -1,5 +1,6 @@
 #include "gps_task.hpp"
 #include "shared.hpp"
+#include "Tasks/RTC/rtc.hpp"
 
 // Pico SDK headers before gps_driver.hpp (see gps_driver.hpp transport section).
 #include "hardware/uart.h"
@@ -59,7 +60,7 @@ static void gps_task( void* )
     driver.send_ubx( gps::Ubx::valset_uart1_outprot_nmea( false ) );
     driver.send_ubx( gps::Ubx::valset_nav_pvt_uart1( 1 ) );
     driver.send_ubx( gps::Ubx::valset_rate_meas( 1000 ) );   // 1 Hz
-    driver.send_ubx( gps::Ubx::valset_dyn_model( 2 ) );      // stationary
+    driver.send_ubx( gps::Ubx::valset_dyn_model( gps::Ubx::DynModel::Stationary ) );
     vTaskDelay( pdMS_TO_TICKS( 200 ) );
 
     Welford lat_w, lon_w, alt_w;
@@ -84,6 +85,14 @@ static void gps_task( void* )
         }
 
         const auto&  c       = driver.coordinate();
+
+        // Discipline the software RTC on every resolved fix.  The RTC service
+        // handles its own warm-up + 60 s resync gating, so feed unconditionally
+        // (this also runs after position convergence, where the loop below may
+        // continue early).
+        rtc_submit_gps_time( c.utc_year, c.utc_month, c.utc_day,
+                             c.utc_ms, time_us_64() );
+
         const double sigma_m = c.h_acc_mm / 1000.0;
 
         if ( sigma_m <= 0.0 ) continue;

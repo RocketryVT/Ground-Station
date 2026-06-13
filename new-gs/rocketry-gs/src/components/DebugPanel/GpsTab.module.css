@@ -1,0 +1,115 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  max-width: 640px;
+}
+
+.intro {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.intro code {
+  color: #ffc56b;
+  font-family: 'Courier New', monospace;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.field select {
+  min-width: 220px;
+  padding: 7px 9px;
+  background: rgba(8, 18, 27, 0.9);
+  color: #fff;
+  border: 1px solid rgba(198, 226, 255, 0.18);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.primary, .danger, .ghost {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.primary { background: #1f6f43; color: #eafff2; }
+.danger  { background: #6f1f2a; color: #ffeaee; }
+.ghost   { background: rgba(255, 255, 255, 0.06); color: #cfe; border-color: rgba(198, 226, 255, 0.18); }
+.primary:disabled, .danger:disabled, .ghost:disabled { opacity: 0.5; cursor: default; }
+
+.statusCard {
+  border: 1px solid rgba(198, 226, 255, 0.12);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: rgba(8, 18, 27, 0.55);
+}
+
+.statusHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.statusHead strong { color: #fff; font-size: 14px; }
+
+.fixBadge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #ffc56b;
+}
+
+.dotOk, .dotWarn, .dotOff {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.dotOk   { background: #4dff9a; box-shadow: 0 0 8px #4dff9a88; }
+.dotWarn { background: #e0a040; box-shadow: 0 0 8px #e0a04088; }
+.dotOff  { background: #555; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 24px;
+}
+.grid div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.grid span { color: rgba(255, 255, 255, 0.5); }
+.grid b { color: #fff; font-family: 'Courier New', monospace; }
+
+.error {
+  color: #ff8a95;
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 90, 110, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 90, 110, 0.08);
+}

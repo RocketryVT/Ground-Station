@@ -21,6 +21,7 @@ lora/lr11xx_driver/CMakeFiles/lr11xx_driver.dir/Users/gregory/Downloads/Rocketry
  /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/generated/pico_base/pico/version.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/common/pico_base_headers/include/pico/config.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/generated/pico_base/pico/config_autogen.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/boards/gs_pcb_v1.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/boards/include/boards/pico2_w.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/rp2_common/cmsis/include/cmsis/rename_exceptions.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/rp2350/pico_platform/include/pico/platform.h \

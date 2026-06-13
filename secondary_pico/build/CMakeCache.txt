@@ -352,13 +352,13 @@ FreeRTOS-Kernel_SOURCE_DIR:STATIC=/Users/gregory/Downloads/Rocketry/Avionics/pro
 GPS_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/gps
 
 //Path to ICM-40609-D driver
-ICM40609D_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/icm40609d
+ICM40609D_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/imus/icm40609d
 
 //Path to ISM330DHCX driver
 ISM330DHCX_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/imus/ism330dhcx
 
 //Path to ISM330DLC driver
-ISM330DLC_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/ism330dlc
+ISM330DLC_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/imus/ism330dlc
 
 //Path to libfixkalman
 LIBFIXKALMAN_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/libfixkalman
@@ -373,7 +373,10 @@ LIBFIXMATRIX_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/
 LIBS_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs
 
 //Path to LIS3MDL driver
-LIS3MDL_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/lis3mdl
+LIS3MDL_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/mags/lis3mdl
+
+//Path to littlefs
+LITTLEFS_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/littlefs
 
 //Path to LoRa drivers
 LORA_ROOT:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/lora
@@ -412,10 +415,10 @@ PACKETS_PROTOBUF_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/l
 PICOTOOL_FETCH_FROM_GIT_PATH:FILEPATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/picotool/fetch_from_git.cmake
 
 //PICO target board (e.g. pico, pico2)
-PICO_BOARD:STRING=pico2_w
+PICO_BOARD:STRING=gs_pcb_v1
 
 //PICO board header directories
-PICO_BOARD_HEADER_DIRS:STRING=
+PICO_BOARD_HEADER_DIRS:STRING=/Users/gregory/Downloads/Rocketry/Avionics/boards
 
 //Build HTML Doxygen docs
 PICO_BUILD_DOCS:BOOL=OFF
@@ -484,8 +487,8 @@ RADIOLIB_BUILD_EXAMPLES:BOOL=OFF
 
 RADIOLIB_BUILD_TESTS:BOOL=OFF
 
-//No help, variable specified on the command line.
-RADIOLIB_PATH:UNINITIALIZED=/Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1
+//Path to local RadioLib 7.x source
+RADIOLIB_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1
 
 //Path to ubxlib
 UBXLIB_PATH:PATH=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/ubxlib

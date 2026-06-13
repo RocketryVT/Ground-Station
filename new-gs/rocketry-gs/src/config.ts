@@ -5,6 +5,8 @@ export const CESIUM_ION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOi
 // The Rust backend connects to a plain-TCP MQTT broker.
 // Override via env vars: ROCKETRY_GS_MQTT_HOST (default: localhost)
 //                        ROCKETRY_GS_MQTT_PORT (default: 1883)
+//                        ROCKETRY_GS_MQTT_USER
+//                        ROCKETRY_GS_MQTT_PASSWORD
 
 export const TOPICS = {
   ROCKET_TELEMETRY:  'rocket/telemetry',

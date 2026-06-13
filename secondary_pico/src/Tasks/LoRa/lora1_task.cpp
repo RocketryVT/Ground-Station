@@ -28,21 +28,21 @@ static const radio::sx1276::Config s_cfg = [] {
 }();
 
 static radio::sx1276::SX1276 s_radio( spi0,
-                                       Pins::LORA1_SCK,
-                                       Pins::LORA1_MOSI,
-                                       Pins::LORA1_MISO,
-                                       Pins::LORA1_NSS,
-                                       Pins::LORA1_DIO0,
-                                       Pins::LORA1_RST,
+                                       Pins::LORA0_SCK,
+                                       Pins::LORA0_MOSI,
+                                       Pins::LORA0_MISO,
+                                       Pins::LORA0_NSS,
+                                       Pins::LORA0_DIO0,
+                                       Pins::LORA0_RST,
                                        s_cfg );
 
 // -- Task ----------------------------------------------------------------------
 static void lora1_task( void* )
 {
     // Assert power-enable pin
-    gpio_init( Pins::LORA1_EN );
-    gpio_set_dir( Pins::LORA1_EN, GPIO_OUT );
-    gpio_put( Pins::LORA1_EN, 1 );
+    gpio_init( Pins::LORA0_EN );
+    gpio_set_dir( Pins::LORA0_EN, GPIO_OUT );
+    gpio_put( Pins::LORA0_EN, 1 );
 
     vTaskDelay( pdMS_TO_TICKS( 500 ) );
 

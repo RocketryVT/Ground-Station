@@ -29,3 +29,5 @@ rumqttc = "0.24"
 rumqttd = { version = "0.20", default-features = false }
 rusqlite = { version = "0.32", features = ["bundled"] }
 tokio = { version = "1", features = ["macros", "rt", "time", "sync"] }
+serialport = "4.9"
+ublox = { version = "0.10", default-features = false, features = ["std", "ubx_proto23"] }

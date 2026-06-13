@@ -15,6 +15,7 @@ import type {
   RawYawImuSample,
 } from '../../types/telemetry';
 import { SimTab } from './SimTab';
+import { GpsTab } from './GpsTab';
 import { CalibrationWizard } from '../CalibrationWizard/CalibrationWizard';
 import { MagCalibrationWizard } from '../MagCalibrationWizard/MagCalibrationWizard';
 import { AhrsFrameScene } from '../AhrsFrameScene/AhrsFrameScene';
@@ -50,7 +51,7 @@ interface StarlinkData {
   last_ok:        number | null;
 }
 
-type DebugTab = 'log' | 'orientation' | 'ahrs' | 'raw' | 'starlink' | 'sim' | 'magcal' | 'calibration';
+type DebugTab = 'log' | 'orientation' | 'ahrs' | 'raw' | 'starlink' | 'gps' | 'sim' | 'magcal' | 'calibration';
 
 const DEBUG_TABS: Array<{ id: DebugTab; label: string; section: string }> = [
   { id: 'log',         label: 'Console',     section: 'Streams' },
@@ -58,6 +59,7 @@ const DEBUG_TABS: Array<{ id: DebugTab; label: string; section: string }> = [
   { id: 'ahrs',        label: 'AHRS',        section: 'Avionics' },
   { id: 'raw',         label: 'Raw Sensors', section: 'Avionics' },
   { id: 'starlink',    label: 'Starlink',    section: 'Network' },
+  { id: 'gps',         label: 'GPS Source',  section: 'Network' },
   { id: 'sim',         label: 'Simulation',  section: 'Tools' },
   { id: 'calibration', label: 'Simple Calibration',    section: 'Setup' },
   { id: 'magcal',      label: 'Full Axis Calibration', section: 'Setup' },
@@ -1203,6 +1205,7 @@ export function DebugPanel({ mqtt }: Props) {
           )}
 
           {subTab === 'starlink' && <StarlinkTab />}
+          {subTab === 'gps' && <GpsTab />}
           {subTab === 'orientation' && (
             <OrientationTab
               antenna={orientationAntenna}

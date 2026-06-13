@@ -69,7 +69,7 @@ set(CMAKE_TARGET_DEFINITIONS_ASM
   "LIB_PICO_TIME_ADAPTER=1"
   "LIB_PICO_UTIL=1"
   "PICO_32BIT=1"
-  "PICO_BOARD=\"pico2_w\""
+  "PICO_BOARD=\"gs_pcb_v1\""
   "PICO_BUILD=1"
   "PICO_CMAKE_BUILD_TYPE=\"Release\""
   "PICO_CONFIG_RTOS_ADAPTER_HEADER=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/FreeRTOS-Kernel/portable/ThirdParty/GCC/RP2350_ARM_NTZ/non_secure/freertos_sdk_config.h"

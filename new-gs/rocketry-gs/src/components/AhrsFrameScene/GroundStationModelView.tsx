@@ -48,6 +48,7 @@ function GeoMesh({ geo }: { geo: Geo }) {
 
 function YagiMesh({ yagi }: { yagi: Yagi }) {
   const t = yagi.boomThickness ?? 0.02;
+  const elementT = yagi.elementThickness ?? t * 0.8;
   return (
     <group position={yagi.position ?? [0, 0, 0]} rotation={eulerToRad(yagi.rotation)}>
       <mesh position={[0, 0, yagi.boomLength / 2]}>
@@ -58,7 +59,7 @@ function YagiMesh({ yagi }: { yagi: Yagi }) {
         const driven = el.role === 'driven';
         return (
           <mesh key={i} position={[0, 0, el.z]}>
-            <boxGeometry args={[el.length, t * 0.8, t * 0.8]} />
+            <boxGeometry args={[el.length, elementT, elementT]} />
             <meshStandardMaterial
               color={driven ? yagi.accent : yagi.color}
               emissive={driven ? yagi.accent : '#000000'}

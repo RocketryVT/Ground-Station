@@ -10,7 +10,9 @@
  */
 
 import { useEffect, useRef } from 'react';
+import * as THREE from 'three';
 import { useTelemetryStore } from '../store/telemetryStore';
+import { displayToNedQuat } from '../utils/attitude';
 
 // -- Launch-pad coordinates (White Sands, NM) --------------------------------
 const LAT0 =  32.9503;
@@ -61,8 +63,25 @@ function demoState(t: number): string {
   return 'LANDED';
 }
 
+// Display-frame attitude of one separated half hanging under canopy: a gentle
+// pendulum swing + slow spin, optionally flipped nose-down. Each half is given a
+// different `seed` so the two transmitters report visibly independent motion.
+function hangDisplayQuat(noseDown: boolean, t: number, seed: number): THREE.Quaternion {
+  const amp = 0.16;
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+    Math.sin(t * 1.1 + seed) * amp,   // swing about X
+    (t * 0.5 + seed) % (Math.PI * 2), // slow spin about vertical
+    Math.cos(t * 0.9 + seed) * amp,   // swing about Z
+    'YXZ',
+  ));
+  if (noseDown) {
+    q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI));
+  }
+  return q;
+}
+
 export function useDemoMode(enabled: boolean) {
-  const { addTelemetry, setAntenna, updateNode, setConnected, clearFlight } =
+  const { addTelemetry, setTx, setAntenna, updateNode, setConnected, clearFlight } =
     useTelemetryStore();
 
   const tRef       = useRef(0);
@@ -157,6 +176,34 @@ export function useDemoMode(enabled: boolean) {
         state: demoState(t),
       });
 
+      // -- Onboard transmitters (915 on nose, 433 on ADS) -----------------
+      // On ascent both radios ride the same airframe, so they report the same
+      // attitude. After separation each half swings under its own canopy: the
+      // nose section falls nose-down, the aft/ADS section motor-down (nose-up).
+      const state = demoState(t);
+      const separated = state === 'DESCENT_DROGUE' || state === 'DESCENT_MAIN' || state === 'LANDED';
+      const rocketQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        (pitch * Math.PI) / 180, (yaw * Math.PI) / 180, (roll * Math.PI) / 180, 'XYZ',
+      ));
+      const noseDisp = separated ? hangDisplayQuat(true,  t, 0.0) : rocketQuat;
+      const adsDisp  = separated ? hangDisplayQuat(false, t, 2.3) : rocketQuat;
+      const split = separated ? 0.00003 : 0; // ~3 m between the two halves once apart
+
+      setTx({
+        id: 'nose', freq_mhz: 915, timestamp: Date.now(),
+        quat: displayToNedQuat(noseDisp), have_gps: true,
+        lat: lat + split, lon: lon + split, alt_m: alt + (separated ? 6 : 0),
+        vel_n, vel_e, vel_d: vel_d + (separated ? -0.6 : 0),
+        rssi: rssi + 3, snr,
+      });
+      setTx({
+        id: 'ads', freq_mhz: 433, timestamp: Date.now(),
+        quat: displayToNedQuat(adsDisp), have_gps: true,
+        lat: lat - split, lon: lon - split, alt_m: alt - (separated ? 6 : 0),
+        vel_n, vel_e, vel_d: vel_d + (separated ? 0.6 : 0),
+        rssi: rssi - 2, snr: snr - 1,
+      });
+
       // -- Antenna tracking (az/el from GS node position, not pad) ---------
       // The beam is drawn from the GS node, so angles must be referenced there.
       const gsLat = LAT0 + CHASE_DLAT;
@@ -194,5 +241,5 @@ export function useDemoMode(enabled: boolean) {
       clearInterval(id);
       setConnected(false);
     };
-  }, [enabled, addTelemetry, setAntenna, updateNode, setConnected, clearFlight]);
+  }, [enabled, addTelemetry, setTx, setAntenna, updateNode, setConnected, clearFlight]);
 }

@@ -21,6 +21,30 @@ export interface RocketTelemetry {
   state?: string;                     // firmware flight state (codec flight_state_name)
 }
 
+// -- Onboard transmitters -------------------------------------------------------
+// The rocket carries two independent radios, each running its own AHRS + GPS:
+//   915 MHz on the nosecone        (id 'nose')
+//   433 MHz on the ADS / aft body  (id 'ads')
+// After separation each half is tracked by its own transmitter, so the nosecone
+// and the aft section are oriented independently from these two streams.
+export type TxId = 'nose' | 'ads';
+
+export interface TxTelemetry {
+  id:         TxId;
+  freq_mhz:   number;                               // 915 (nose) or 433 (ads)
+  timestamp:  number;                               // Unix ms
+  quat:       [number, number, number, number];     // estimated attitude [w,x,y,z], body->NED
+  have_gps:   boolean;
+  lat?:       number;                               // decimal degrees (when have_gps)
+  lon?:       number;
+  alt_m?:     number;                               // meters MSL
+  vel_n?:     number;                               // m/s north (NED)
+  vel_e?:     number;                               // m/s east
+  vel_d?:     number;                               // m/s down
+  rssi?:      number;                               // dBm
+  snr?:       number;                               // dB
+}
+
 export interface AntennaState {
   timestamp:        number;
   actual_az:        number;   // actual azimuth (0 = north, clockwise)

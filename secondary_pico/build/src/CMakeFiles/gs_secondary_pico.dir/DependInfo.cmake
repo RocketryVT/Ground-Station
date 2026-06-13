@@ -78,7 +78,7 @@ set(CMAKE_TARGET_DEFINITIONS_ASM
   "LIB_PICO_UNIQUE_ID=1"
   "LIB_PICO_UTIL=1"
   "PICO_32BIT=1"
-  "PICO_BOARD=\"pico2_w\""
+  "PICO_BOARD=\"gs_pcb_v1\""
   "PICO_BUILD=1"
   "PICO_CMAKE_BUILD_TYPE=\"Release\""
   "PICO_CONFIG_RTOS_ADAPTER_HEADER=/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/FreeRTOS-Kernel/portable/ThirdParty/GCC/RP2350_ARM_NTZ/non_secure/freertos_sdk_config.h"
@@ -98,6 +98,7 @@ set(CMAKE_TARGET_DEFINITIONS_ASM
 
 # The include file search paths:
 set(CMAKE_ASM_TARGET_INCLUDE_PATH
+  "/Users/gregory/Downloads/Rocketry/Avionics"
   "/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/src/../include"
   "/Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/src"
   "/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/packets"

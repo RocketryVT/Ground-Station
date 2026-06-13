@@ -7,6 +7,7 @@ add_executable(gs_pico
     Tasks/LoRa/lora_task.cpp
     Tasks/LoRa/lora1_task.cpp
     Tasks/GPS/gps_task.cpp
+    Tasks/RTC/rtc.cpp
     Tasks/Starlink/starlink.cpp
     Tasks/UDP/udp_recv_task.cpp
     Tasks/I2C/i2c_task.cpp
@@ -29,6 +30,7 @@ add_executable(gs_pico
 )
 
 target_include_directories(gs_pico PRIVATE
+    ${AVIONICS_ROOT}                        # boards/gs_pcb_v1_pins.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../include   # FreeRTOSConfig.h  lwipopts.h
     ${CMAKE_CURRENT_SOURCE_DIR}             # shared.hpp
     ${LIBS_ROOT}/packets                    # SIGMA.hpp
@@ -41,6 +43,7 @@ target_include_directories(gs_pico PRIVATE
 
 target_link_libraries(gs_pico
     pico_stdlib
+    pico_aon_timer                          # always-on timer RTC backing (rtc.cpp)
     hardware_spi
     hardware_i2c
     hardware_gpio

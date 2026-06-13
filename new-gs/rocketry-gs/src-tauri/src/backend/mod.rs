@@ -1,6 +1,7 @@
 pub mod broker;
 pub mod codec;
 pub mod commands;
+pub mod gps;
 pub mod logger;
 pub mod mqtt;
 pub mod proto;

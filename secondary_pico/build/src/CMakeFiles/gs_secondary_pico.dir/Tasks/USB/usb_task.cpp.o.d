@@ -33,6 +33,7 @@ src/CMakeFiles/gs_secondary_pico.dir/Tasks/USB/usb_task.cpp.o: \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/generated/pico_base/pico/version.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/common/pico_base_headers/include/pico/config.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/build/generated/pico_base/pico/config_autogen.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/boards/gs_pcb_v1.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/boards/include/boards/pico2_w.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/rp2_common/cmsis/include/cmsis/rename_exceptions.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/FreeRTOS-Kernel/portable/ThirdParty/GCC/RP2350_ARM_NTZ/non_secure/freertos_sdk_config.h \
@@ -69,6 +70,7 @@ src/CMakeFiles/gs_secondary_pico.dir/Tasks/USB/usb_task.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/machine/_types.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/lock.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/stdio.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/boards/gs_pcb_v1_pins.hpp \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/string.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_locale.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/strings.h \

@@ -3,6 +3,7 @@ mod backend;
 use backend::{
     broker::Broker,
     commands,
+    gps::GpsManager,
     logger::{start_diagnostic_csv, PacketLogger},
     mqtt,
     telemetry::TelemetryState,
@@ -74,6 +75,7 @@ pub fn run() {
             app.manage(diagnostic_csv);
             app.manage(tile_cache);
             app.manage(broker);
+            app.manage(GpsManager::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -86,11 +88,15 @@ pub fn run() {
             commands::get_tile_cache_info,
             commands::save_mag_cal,
             commands::load_mag_cal,
+            commands::gps_list_ports,
+            commands::gps_connect,
+            commands::gps_disconnect,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
             if let RunEvent::Exit = event {
+                app.state::<GpsManager>().disconnect(app);
                 app.state::<Broker>().stop();
                 app.state::<TileCache>().stop();
             }

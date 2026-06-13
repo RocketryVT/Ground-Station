@@ -65,6 +65,7 @@ export interface Yagi {
   rotation?: EulerDeg;
   boomLength: number;
   boomThickness?: number;
+  elementThickness?: number;
   elements: YagiElement[];
   color: string;            // boom / director colour
   accent: string;           // driven-element colour
@@ -187,8 +188,10 @@ const FRAME_H = 7.575 * IN;     // 0.19240 m
 const EXT = 0.02;               // 20 mm extrusion bar
 const BAR_LEN = 3 * FT;         // 0.9144 m (left-right, X)
 const BAR_HALF = BAR_LEN / 2;   // 0.4572 m
-const YAGI_915_LEN = 30 * IN;   // 0.762 m
-const YAGI_433_LEN = 51.5 * IN; // 1.30810 m
+const YAGI_BOOM_DIA = 1 * IN;
+const YAGI_ELEMENT_DIA = 0.5 * IN;
+const YAGI_915_LEN = (15 + 31 / 32) * IN;
+const YAGI_433_LEN = (33 + 3 / 16) * IN;
 
 // Aluminium-extrusion cube frame (12 edges), origin at the frame's bottom centre.
 function frameExtrusions(): Geo[] {
@@ -261,7 +264,7 @@ export const GROUND_STATION: GroundStationModel = {
               { kind: 'cylinder', radiusTop: 0.032, radiusBottom: 0.032, height: 0.018, radialSegments: 24, position: [0.085, 0, 0], rotation: [0, 0, 90], color: STEEL, metalness: 0.8, roughness: 0.25 },
             ],
             yagis: [
-              // 915 MHz on the LEFT edge (+X). 30", 8 elements, ~15 dBi.
+              // 915 MHz on the LEFT edge (+X). DL6WU 7-element Yagi, ~12 dBi.
               // Mounted at the boom centre on the bar (z = −L/2 → spans ∓L/2).
               {
                 id: 'yagi_915',
@@ -269,39 +272,39 @@ export const GROUND_STATION: GroundStationModel = {
                 band: '915 MHz',
                 position: [BAR_HALF, 0.045, -YAGI_915_LEN / 2],
                 boomLength: YAGI_915_LEN,
-                boomThickness: 0.014,
+                boomThickness: YAGI_BOOM_DIA,
+                elementThickness: YAGI_ELEMENT_DIA,
                 color: '#3a3f48',
                 accent: BLUE,
                 elements: [
-                  { z: 0.04, length: 0.170, role: 'reflector' },
-                  { z: 0.13, length: 0.160, role: 'driven' },
-                  { z: 0.24, length: 0.150, role: 'director' },
-                  { z: 0.35, length: 0.145, role: 'director' },
-                  { z: 0.46, length: 0.140, role: 'director' },
-                  { z: 0.57, length: 0.135, role: 'director' },
-                  { z: 0.66, length: 0.130, role: 'director' },
-                  { z: 0.74, length: 0.125, role: 'director' },
+                  { z: 0, length: (6 + 1 / 8) * IN, role: 'reflector' },
+                  { z: (2 + 19 / 32) * IN, length: (5 + 3 / 4) * IN, role: 'driven' },
+                  { z: (3 + 9 / 16) * IN, length: (5 + 9 / 32) * IN, role: 'director' },
+                  { z: (5 + 7 / 8) * IN, length: (5 + 3 / 16) * IN, role: 'director' },
+                  { z: (8 + 21 / 32) * IN, length: (5 + 1 / 8) * IN, role: 'director' },
+                  { z: (11 + 7 / 8) * IN, length: (5 + 1 / 32) * IN, role: 'director' },
+                  { z: (15 + 15 / 32) * IN, length: (4 + 31 / 32) * IN, role: 'director' },
                 ],
               },
-              // 433 MHz on the RIGHT edge (−X). 51.5", 8 elements, ~15 dBi.
+              // 433 MHz on the RIGHT edge (−X). DL6WU 7-element Yagi, ~12 dBi.
               {
                 id: 'yagi_433',
                 label: 'Yagi 433 MHz',
                 band: '433 MHz',
                 position: [-BAR_HALF, 0.045, -YAGI_433_LEN / 2],
                 boomLength: YAGI_433_LEN,
-                boomThickness: 0.018,
+                boomThickness: YAGI_BOOM_DIA,
+                elementThickness: YAGI_ELEMENT_DIA,
                 color: '#2a2e35',
                 accent: ORANGE,
                 elements: [
-                  { z: 0.05, length: 0.360, role: 'reflector' },
-                  { z: 0.20, length: 0.345, role: 'driven' },
-                  { z: 0.40, length: 0.330, role: 'director' },
-                  { z: 0.60, length: 0.320, role: 'director' },
-                  { z: 0.80, length: 0.310, role: 'director' },
-                  { z: 0.98, length: 0.300, role: 'director' },
-                  { z: 1.14, length: 0.290, role: 'director' },
-                  { z: 1.27, length: 0.280, role: 'director' },
+                  { z: 0, length: (13 + 1 / 8) * IN, role: 'reflector' },
+                  { z: (5 + 7 / 16) * IN, length: (12 + 1 / 2) * IN, role: 'driven' },
+                  { z: (7 + 1 / 2) * IN, length: (11 + 1 / 4) * IN, role: 'director' },
+                  { z: (12 + 3 / 8) * IN, length: (11 + 1 / 16) * IN, role: 'director' },
+                  { z: (18 + 1 / 4) * IN, length: (10 + 7 / 8) * IN, role: 'director' },
+                  { z: (25 + 1 / 16) * IN, length: (10 + 11 / 16) * IN, role: 'director' },
+                  { z: (32 + 11 / 16) * IN, length: (10 + 9 / 16) * IN, role: 'director' },
                 ],
               },
             ],

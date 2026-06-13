@@ -4,7 +4,7 @@
 
 // based on PICO_CONFIG_HEADER_FILES:
 
-#include "/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/boards/include/boards/pico2_w.h"
+#include "/Users/gregory/Downloads/Rocketry/Avionics/boards/gs_pcb_v1.h"
 #include "/Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/rp2_common/cmsis/include/cmsis/rename_exceptions.h"
 
 // based on PICO_RP2350_ARM_S_CONFIG_HEADER_FILES:

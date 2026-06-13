@@ -8,6 +8,7 @@ add_executable(gs_secondary_pico
 )
 
 target_include_directories(gs_secondary_pico PRIVATE
+    ${AVIONICS_ROOT}                        # boards/gs_pcb_v1_pins.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../include   # FreeRTOSConfig.h  lwipopts.h
     ${CMAKE_CURRENT_SOURCE_DIR}             # shared.hpp
     ${LIBS_ROOT}/packets                    # SIGMA.hpp

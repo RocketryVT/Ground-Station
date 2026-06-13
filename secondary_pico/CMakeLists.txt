@@ -15,11 +15,14 @@ endif()
 cmake_minimum_required(VERSION 3.13)
 
 set(PICO_PLATFORM rp2350-arm-s)
-set(PICO_BOARD pico2_w)
+set(PICO_BOARD gs_pcb_v1)
 
 # Locate the avionics root (3 levels up from this file)
 get_filename_component(AVIONICS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 include(${AVIONICS_ROOT}/cmake/deps.cmake)
+
+# Custom GSPCB board definition lives in boards/gs_pcb_v1.h (layers on pico2_w).
+set(PICO_BOARD_HEADER_DIRS ${AVIONICS_ROOT}/boards)
 
 # Pull in Pico SDK (must be before project())
 set(PICO_SDK_ROOT ${PICO_SDK_PATH})

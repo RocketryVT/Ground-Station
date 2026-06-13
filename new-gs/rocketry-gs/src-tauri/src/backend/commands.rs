@@ -1,8 +1,9 @@
+use super::gps::{GpsManager, SerialPortInfo};
 use super::mqtt::PublishRequest;
 use super::telemetry::{TelemetrySnapshot, TelemetryState};
 use super::tile_cache::{TileCache, TileCacheInfo};
 use std::path::PathBuf;
-use tauri::State;
+use tauri::{AppHandle, State};
 use tokio::sync::mpsc;
 
 /// Path of the magnetometer calibration store, kept next to the running binary
@@ -45,6 +46,28 @@ pub async fn publish_mqtt(
     tx.send(PublishRequest { topic, payload })
         .await
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn gps_list_ports() -> Result<Vec<SerialPortInfo>, String> {
+    super::gps::list_ports()
+}
+
+#[tauri::command]
+pub fn gps_connect(
+    app: AppHandle,
+    gps: State<'_, GpsManager>,
+    state: State<'_, TelemetryState>,
+    publish_tx: State<'_, mpsc::Sender<PublishRequest>>,
+    port: String,
+    baud: u32,
+) -> Result<(), String> {
+    gps.connect(app, state.inner().clone(), publish_tx.inner().clone(), port, baud)
+}
+
+#[tauri::command]
+pub fn gps_disconnect(app: AppHandle, gps: State<'_, GpsManager>) {
+    gps.disconnect(&app);
 }
 
 #[tauri::command]
