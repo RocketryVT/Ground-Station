@@ -47,7 +47,8 @@ static void lora2_task( void* )
 
     int state = s_radio.begin();
     if ( state != RADIOLIB_ERR_NONE ) {
-        log_print( "[lora2] init failed %d — task halting\n", state );
+        log_print( "[lora2] init failed %d at %s — task halting\n",
+                   state, s_radio.init_stage() );
         for ( ;; ) vTaskDelay( portMAX_DELAY );
     }
     log_print( "[lora2] RFM69 ready — %.1f MHz  %.1f kbps\n",
