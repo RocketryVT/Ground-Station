@@ -70,12 +70,12 @@ static void stepper_state_task( void* )
             xQueuePeek( g_stepper_zen_status_q, &el_st, 0 ) == pdTRUE;
 
         if ( have_az && have_el && mqtt_is_connected() ) {
-            if ( g_stepper_az_cmd_q ) {
-                xQueuePeek( g_stepper_az_cmd_q, &az_cmd, 0 );
-            }
-            if ( g_stepper_zen_cmd_q ) {
-                xQueuePeek( g_stepper_zen_cmd_q, &el_cmd, 0 );
-            }
+            bool have_az_cmd = g_stepper_az_cmd_q &&
+                xQueuePeek( g_stepper_az_cmd_q, &az_cmd, 0 ) == pdTRUE;
+            bool have_el_cmd = g_stepper_zen_cmd_q &&
+                xQueuePeek( g_stepper_zen_cmd_q, &el_cmd, 0 ) == pdTRUE;
+            have_az_cmd = have_az_cmd && !az_cmd.stop;
+            have_el_cmd = have_el_cmd && !el_cmd.stop;
 
             const TrackerConfig cfg = tracker_config_snapshot();
             const TrackerControlStatus control = tracker_control_status_snapshot();
@@ -87,13 +87,34 @@ static void stepper_state_task( void* )
             float actual_el = el_st.angle_deg;
             read_ahrs_display( cfg, &actual_az, &actual_el, control );
 
+            float target_az = wrap_360( az_cmd.target_angle_deg );
+            float target_el = el_cmd.target_angle_deg;
+            float manual_target = 0.0f;
+            bool manual_absolute_ahrs = false;
+            const bool have_manual_az =
+                mode == TrackerMode::Manual &&
+                tracker_get_manual_target_info( true, &manual_target, &manual_absolute_ahrs );
+            if ( have_manual_az && manual_absolute_ahrs ) {
+                target_az = wrap_360( manual_target );
+            } else if ( mode == TrackerMode::Manual && !have_manual_az && !have_az_cmd ) {
+                target_az = actual_az;
+            }
+            const bool have_manual_el =
+                mode == TrackerMode::Manual &&
+                tracker_get_manual_target_info( false, &manual_target, &manual_absolute_ahrs );
+            if ( have_manual_el && manual_absolute_ahrs ) {
+                target_el = manual_target;
+            } else if ( mode == TrackerMode::Manual && !have_manual_el && !have_el_cmd ) {
+                target_el = actual_el;
+            }
+
             MqttMessage m = {};
             groundstation_AntennaState pb = groundstation_AntennaState_init_zero;
             pb.has_timestamp = true;        pb.timestamp = time_us_64() / 1000u;
             pb.has_actual_az = true;        pb.actual_az = actual_az;
             pb.has_actual_el = true;        pb.actual_el = actual_el;
-            pb.has_target_az = true;        pb.target_az = wrap_360( az_cmd.target_angle_deg );
-            pb.has_target_el = true;        pb.target_el = el_cmd.target_angle_deg;
+            pb.has_target_az = true;        pb.target_az = target_az;
+            pb.has_target_el = true;        pb.target_el = target_el;
             pb.has_actual_az_mech = true;   pb.actual_az_mech = az_st.angle_deg;
             pb.has_target_az_mech = true;   pb.target_az_mech = az_cmd.target_angle_deg;
             pb.has_az_calibrated = true;    pb.az_calibrated = cal.az_calibrated;

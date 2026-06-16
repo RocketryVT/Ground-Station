@@ -126,7 +126,7 @@ static void apply_ahrs_feedback( const TrackerConfig& cfg,
         const float correction = clamp_float( az_error * cfg.ahrs_feedback_gain,
                                              -cfg.ahrs_max_correction_deg,
                                              cfg.ahrs_max_correction_deg );
-        *cmd_az = wrap_360( az_st.angle_deg + correction );
+        *cmd_az = wrap_360( az_st.angle_deg - correction );
     }
 
     if ( el_used && have_el_st ) {
@@ -150,7 +150,13 @@ static void manual_servo_axis( const TrackerConfig& cfg, bool is_az,
                                TrackerControlStatus* status )
 {
     float desired = 0.0f;
-    if ( !tracker_get_manual_target( is_az, &desired ) ) return;
+    bool absolute_ahrs = false;
+    if ( !tracker_get_manual_target_info( is_az, &desired, &absolute_ahrs ) ) return;
+    if ( !absolute_ahrs ) {
+        if ( is_az && !cfg.use_ahrs_az ) return;
+        if ( !is_az && !cfg.use_ahrs_el ) return;
+        if ( !tracker_axes_calibrated() ) return;
+    }
 
     QueueHandle_t status_q = is_az ? g_stepper_az_status_q : g_stepper_zen_status_q;
     QueueHandle_t cmd_q    = is_az ? g_stepper_az_cmd_q    : g_stepper_zen_cmd_q;
@@ -186,11 +192,28 @@ static void manual_servo_axis( const TrackerConfig& cfg, bool is_az,
                                           -cfg.ahrs_max_correction_deg,
                                           cfg.ahrs_max_correction_deg );
     StepperCmd cmd = {};
-    cmd.target_angle_deg = is_az ? wrap_360( st.angle_deg + correction )
+    cmd.target_angle_deg = is_az ? wrap_360( st.angle_deg - correction )
                                  : st.angle_deg + correction;
     cmd.speed_dps = cfg.default_speed_dps;
     cmd.stop = false;
     xQueueOverwrite( cmd_q, &cmd );
+
+    static TickType_t s_last_manual_log[2] = {};
+    const int log_idx = is_az ? 0 : 1;
+    const TickType_t now_ticks = xTaskGetTickCount();
+    if ( now_ticks - s_last_manual_log[log_idx] >= pdMS_TO_TICKS(500) ) {
+        s_last_manual_log[log_idx] = now_ticks;
+        log_print( "[tracker] manual %s%s desired=%.2f actual=%.2f mech=%.2f err=%.2f corr=%.2f cmd=%.2f moving=%u\n",
+                   is_az ? "az" : "el",
+                   absolute_ahrs ? " ahrs" : "",
+                   (double)desired,
+                   (double)( is_az ? imu.yaw_frame_yaw360 : imu.bar_rel_pitch ),
+                   (double)st.angle_deg,
+                   (double)error,
+                   (double)correction,
+                   (double)cmd.target_angle_deg,
+                   st.moving ? 1u : 0u );
+    }
 }
 
 static void update_scan( float dt_s, const TrackerConfig& cfg, float* scan_az,
@@ -253,12 +276,13 @@ static void stepper_ctrl_task( void* )
         }
 
         if ( mode == TrackerMode::Manual || mode == TrackerMode::ServoTest ) {
-            // ServoTest stays raw open-loop.  Manual optionally closes the loop on
-            // the AHRS (per-axis, gated by use_ahrs_*) so a commanded az/el reaches
-            // its true angle and is held there.  Requires the axes to be calibrated.
-            if ( mode == TrackerMode::Manual && tracker_axes_calibrated() ) {
-                if ( cfg.use_ahrs_az ) manual_servo_axis( cfg, true,  &status );
-                if ( cfg.use_ahrs_el ) manual_servo_axis( cfg, false, &status );
+            // ServoTest stays raw open-loop. Manual optionally closes the loop on
+            // AHRS-reported targets. Stepper-frame manual targets still require
+            // axis calibration; absolute AHRS targets can run from live reported
+            // yaw/elevation plus current stepper status.
+            if ( mode == TrackerMode::Manual ) {
+                manual_servo_axis( cfg, true,  &status );
+                manual_servo_axis( cfg, false, &status );
             }
             tracker_set_control_status( status );
             vTaskDelay( kControlPeriodTicks );

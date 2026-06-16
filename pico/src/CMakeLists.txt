@@ -44,9 +44,11 @@ target_include_directories(gs_pico PRIVATE
 target_link_libraries(gs_pico
     pico_stdlib
     pico_aon_timer                          # always-on timer RTC backing (rtc.cpp)
+    hardware_uart
     hardware_spi
     hardware_i2c
     hardware_gpio
+    hardware_dma                            # gps::PicoGpsDriver DMA-ring RX
     hardware_timer
     pico_cyw43_arch_lwip_threadsafe_background
     pico_lwip_mqtt

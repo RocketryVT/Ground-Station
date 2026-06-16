@@ -174,12 +174,10 @@ impl GpsManager {
             cfg_valset(&[(0x1031_0025, 1)]), // CFG-SIGNAL-GLO_ENA  (GLONASS)
             // Stationary dynamic model (the tracker doesn't move).
             cfg_valset(&[(0x2011_0021, 2)]), // CFG-NAVSPG-DYNMODEL = STATIONARY
-            // Base / survey-in mode (F9P only; NAK'd on M9N/M10).
-            cfg_valset(&[
-                (0x2003_0001, 1),     // CFG-TMODE-MODE = SURVEY_IN
-                (0x4003_0010, 60),    // CFG-TMODE-SVIN_MIN_DUR = 60 s
-                (0x4003_0011, 50000), // CFG-TMODE-SVIN_ACC_LIMIT = 5 m (0.1 mm units)
-            ]),
+            // This app needs a normal navigation fix for gs/location.  Do not
+            // leave F9P receivers in survey-in/fixed-base time mode; that can
+            // produce NAV-PVT TimeOnlyFix packets with satellites but no lat/lon.
+            cfg_valset(&[(0x2003_0001, 0)]), // CFG-TMODE-MODE = DISABLED
         ] {
             let _ = port.write_all(&frame);
         }

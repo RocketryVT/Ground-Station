@@ -26,7 +26,7 @@
 // -- Internal raw-frame queue (IRQ -> task) ------------------------------------
 // The lwIP callback memcpy's the incoming UDP payload here; the task decodes.
 #define RX_QUEUE_DEPTH  8
-#define RX_BUF_SIZE     64   // larger than max InterPico frame (49 B)
+#define RX_BUF_SIZE     96   // larger than max InterPico frame (70 B)
 
 struct RxRawFrame {
     uint8_t  data[ RX_BUF_SIZE ];
@@ -117,7 +117,22 @@ static void udp_recv_task( void* )
 
         // Update rocket location queue (antenna tracker reads this)
         if ( d.flags & SIGMA::FLAG_GPS_VALID ) {
-            LocationMsg loc { d.lat, d.lon, (double)d.alt_gps_m, time_us_64() };
+            LocationMsg loc = {};
+            loc.lat = d.lat;
+            loc.lon = d.lon;
+            loc.alt_m = static_cast<double>( d.alt_gps_m );
+            loc.timestamp_us = time_us_64();
+            loc.vel_n_mps = d.vel_ned_ms[0];
+            loc.vel_e_mps = d.vel_ned_ms[1];
+            loc.vel_d_mps = d.vel_ned_ms[2];
+            loc.h_acc_m = d.h_acc_m;
+            loc.v_acc_m = d.v_acc_m;
+            loc.s_acc_mps = d.s_acc_ms;
+            loc.source_boot_ms = d.boot_ms;
+            loc.have_velocity =
+                d.vel_ned_ms[0] != 0.0f || d.vel_ned_ms[1] != 0.0f || d.vel_ned_ms[2] != 0.0f;
+            loc.have_accuracy =
+                d.h_acc_m > 0.0f || d.v_acc_m > 0.0f || d.s_acc_ms > 0.0f;
             xQueueOverwrite( g_rocket_location_q, &loc );
         }
 

@@ -7,6 +7,7 @@
 
 #include "lora1_task.hpp"
 #include "shared.hpp"
+#include "sigma2_forward.hpp"
 
 #include "sx1276/SX1276.hpp"
 #include "SIGMA.hpp"
@@ -69,7 +70,12 @@ static void lora1_task( void* )
             continue;
         }
 
-        // Decode the SIGMA LoRa frame from the raw radio payload
+        if ( lora_bridge::handle_sigma2_packet( pkt, "lora1" ) ) {
+            s_radio.start_receive();
+            continue;
+        }
+
+        // Decode the legacy SIGMA LoRa frame from the raw radio payload
         SIGMA::LoRaData d;
         if ( !SIGMA::LoRaData::deserialize( pkt.data, pkt.len, d ) ) {
             log_print( "[lora1] rx %u B  RSSI %.0f dBm  SNR %.1f dB — bad frame\n",

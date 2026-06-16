@@ -272,6 +272,7 @@ export function AhrsFrameScene({ imu }: Props) {
   const rawMagArr = useTelemetryStore((s) => s.rawMag);
   const az = antenna?.actual_az ?? 0;
   const el = antenna?.actual_el ?? 0;
+  const visualEl = Math.abs(el);
 
   const [showModel, setShowModel] = useState(true);
   const [showBoards, setShowBoards] = useState(true);
@@ -363,7 +364,7 @@ export function AhrsFrameScene({ imu }: Props) {
         </Html>
 
         {showModel && (
-          <GroundStationModelView model={GROUND_STATION} az={az} el={el} showBoards={showBoards} />
+          <GroundStationModelView model={GROUND_STATION} az={az} el={visualEl} showBoards={showBoards} />
         )}
 
         {frames.filter((f) => visible[f.key]).map((f) => (

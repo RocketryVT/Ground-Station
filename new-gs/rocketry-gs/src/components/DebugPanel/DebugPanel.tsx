@@ -182,6 +182,11 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
 
 // -- Confirmation dialog -------------------------------------------------------
 type DirectAxis = 'az' | 'el';
+type DirectCommandKind = 'stepper' | 'absolute_ahrs' | 'direct_el_ahrs';
+type PendingDirectCommand = {
+  axis: DirectAxis;
+  kind: DirectCommandKind;
+};
 type TrackerMode = 'stop' | 'manual' | 'auto' | 'scan';
 type PendingTrackerCommand = {
   id: 'arm' | 'disarm' | 'stop_all' | TrackerMode;
@@ -191,14 +196,16 @@ type PendingTrackerCommand = {
 
 interface ConfirmDialogProps {
   axis:   DirectAxis;
+  kind:   DirectCommandKind;
   value:  string;
   speed:  string;
   onConfirm: () => void;
   onCancel:  () => void;
 }
 
-function ConfirmDialog({ axis, value, speed, onConfirm, onCancel }: ConfirmDialogProps) {
+function ConfirmDialog({ axis, kind, value, speed, onConfirm, onCancel }: ConfirmDialogProps) {
   const label = axis === 'az' ? 'Azimuth' : 'Elevation';
+  const frame = kind === 'stepper' ? 'Stepper target' : 'AHRS reported angle';
 
   return (
     <div className={styles.overlay}>
@@ -208,6 +215,10 @@ function ConfirmDialog({ axis, value, speed, onConfirm, onCancel }: ConfirmDialo
           <div className={styles.dialogRow}>
             <span className={styles.dialogLabel}>{label}</span>
             <span className={styles.dialogValue}>{value}°</span>
+          </div>
+          <div className={styles.dialogRow}>
+            <span className={styles.dialogLabel}>Frame</span>
+            <span className={styles.dialogValue}>{frame}</span>
           </div>
           <div className={styles.dialogRow}>
             <span className={styles.dialogLabel}>Speed</span>
@@ -982,8 +993,12 @@ export function DebugPanel({ mqtt }: Props) {
   // Antenna command state
   const [az,    setAz]    = useState('0');
   const [el,    setEl]    = useState('0');
+  const [absAz, setAbsAz] = useState('0');
+  const [absEl, setAbsEl] = useState('0');
+  const [absAzEdited, setAbsAzEdited] = useState(false);
+  const [absElEdited, setAbsElEdited] = useState(false);
   const [speed, setSpeed] = useState('10');
-  const [pendingDirectAxis, setPendingDirectAxis] = useState<DirectAxis | null>(null);
+  const [pendingDirectCommand, setPendingDirectCommand] = useState<PendingDirectCommand | null>(null);
   const [jogStep,  setJogStep]  = useState('2');
   const [jogSpeed, setJogSpeed] = useState('10');
   const [pendingTracker, setPendingTracker] = useState<PendingTrackerCommand | null>(null);
@@ -1039,14 +1054,21 @@ export function DebugPanel({ mqtt }: Props) {
     setOscActive(false);
   }
 
-  function handleSendCmd(axis: DirectAxis) {
+  function handleSendCmd(axis: DirectAxis, kind: DirectCommandKind) {
     const speedVal = parseFloat(speed);
-    const targetVal = parseFloat(axis === 'az' ? az : el);
+    const targetVal = parseFloat(kind === 'absolute_ahrs'
+      ? (axis === 'az' ? absAz : absEl)
+      : (axis === 'az' ? az : el));
     if (isNaN(targetVal) || isNaN(speedVal)) return;
 
     const topic = axis === 'az' ? TOPICS.STEPPER_AZ_CMD : TOPICS.STEPPER_EL_CMD;
-    mqtt.publish(topic, JSON.stringify({ target_angle_deg: targetVal, speed_dps: speedVal, stop: false }));
-    setPendingDirectAxis(null);
+    mqtt.publish(topic, JSON.stringify({
+      target_angle_deg: targetVal,
+      speed_dps: speedVal,
+      stop: false,
+      absolute_ahrs: kind !== 'stepper',
+    }));
+    setPendingDirectCommand(null);
   }
 
   function numberOrUndefined(value: string): number | undefined {
@@ -1129,6 +1151,9 @@ export function DebugPanel({ mqtt }: Props) {
   const displayAhrsHistory = ahrsHistory;
   const trackerMode = (antenna?.mode ?? '').toLowerCase();
   const directCommandReady = antenna?.armed === true && trackerMode === 'manual';
+  const magneticAz = groundImu?.yaw_frame_yaw360 ?? null;
+  const absoluteEl = groundImu?.bar_rel_pitch ?? null;
+  const absoluteCommandReady = directCommandReady && magneticAz != null && absoluteEl != null;
   const activeTab = DEBUG_TABS.find((item) => item.id === subTab) ?? DEBUG_TABS[0];
   const tabCounts: Partial<Record<DebugTab, number>> = {
     log: logLines.length,
@@ -1140,15 +1165,30 @@ export function DebugPanel({ mqtt }: Props) {
     return new Date(ts).toISOString().slice(11, 23); // HH:MM:SS.mmm
   }
 
+  useEffect(() => {
+    if (!absAzEdited && magneticAz != null) {
+      setAbsAz(magneticAz.toFixed(1));
+    }
+  }, [absAzEdited, magneticAz]);
+
+  useEffect(() => {
+    if (!absElEdited && absoluteEl != null) {
+      setAbsEl(absoluteEl.toFixed(1));
+    }
+  }, [absElEdited, absoluteEl]);
+
   return (
     <div className={styles.root}>
-      {pendingDirectAxis && (
+      {pendingDirectCommand && (
         <ConfirmDialog
-          axis={pendingDirectAxis}
-          value={pendingDirectAxis === 'az' ? az : el}
+          axis={pendingDirectCommand.axis}
+          kind={pendingDirectCommand.kind}
+          value={pendingDirectCommand.kind === 'absolute_ahrs'
+            ? (pendingDirectCommand.axis === 'az' ? absAz : absEl)
+            : (pendingDirectCommand.axis === 'az' ? az : el)}
           speed={speed}
-          onConfirm={() => handleSendCmd(pendingDirectAxis)}
-          onCancel={() => setPendingDirectAxis(null)}
+          onConfirm={() => handleSendCmd(pendingDirectCommand.axis, pendingDirectCommand.kind)}
+          onCancel={() => setPendingDirectCommand(null)}
         />
       )}
 
@@ -1461,17 +1501,55 @@ export function DebugPanel({ mqtt }: Props) {
             />
             <button
               className={styles.sendBtn}
-              onClick={() => setPendingDirectAxis('az')}
+              onClick={() => setPendingDirectCommand({ axis: 'az', kind: 'stepper' })}
               disabled={!directCommandReady}
             >SEND AZ</button>
             <button
               className={styles.sendBtn}
-              onClick={() => setPendingDirectAxis('el')}
+              onClick={() => setPendingDirectCommand({ axis: 'el', kind: 'direct_el_ahrs' })}
               disabled={!directCommandReady}
             >SEND EL</button>
+
+            <div className={styles.directSection}>
+              <div className={styles.directSectionTitle}>AHRS MANUAL</div>
+              <div className={styles.directReadout}>
+                <span>Now</span>
+                <strong>{fmtDeg(magneticAz)} / {fmtDeg(absoluteEl)}</strong>
+              </div>
+              <label className={styles.cmdLabel}>Reported azimuth (deg)</label>
+              <input
+                className={styles.cmdInput}
+                type="number" step="0.1" min="0" max="360"
+                value={absAz}
+                onChange={e => {
+                  setAbsAzEdited(true);
+                  setAbsAz(e.target.value);
+                }}
+              />
+              <label className={styles.cmdLabel}>Reported elevation (deg)</label>
+              <input
+                className={styles.cmdInput}
+                type="number" step="0.1" min="-10" max="90"
+                value={absEl}
+                onChange={e => {
+                  setAbsElEdited(true);
+                  setAbsEl(e.target.value);
+                }}
+              />
+              <button
+                className={styles.sendBtn}
+                onClick={() => setPendingDirectCommand({ axis: 'az', kind: 'absolute_ahrs' })}
+                disabled={!absoluteCommandReady}
+              >SEND AHRS AZ</button>
+              <button
+                className={styles.sendBtn}
+                onClick={() => setPendingDirectCommand({ axis: 'el', kind: 'absolute_ahrs' })}
+                disabled={!absoluteCommandReady}
+              >SEND AHRS EL</button>
+            </div>
             <div className={styles.cmdNote}>
               {directCommandReady
-                ? 'Each button publishes one axis only.'
+                ? 'Azimuth uses the calibrated/mechanical axis. Elevation uses the live IMU elevation as the target.'
                 : 'Arm the tracker and switch to manual before direct motion.'}
               <br />
               <code>{TOPICS.STEPPER_AZ_CMD}</code><br />

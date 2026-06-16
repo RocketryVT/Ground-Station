@@ -24,6 +24,13 @@ static float wrap_180( float deg )
     return deg;
 }
 
+static float wrap_360( float deg )
+{
+    while ( deg < 0.0f )    deg += 360.0f;
+    while ( deg >= 360.0f ) deg -= 360.0f;
+    return deg;
+}
+
 static mqtt_client_t*  s_mqtt           = nullptr;
 static volatile bool   s_mqtt_connected = false;
 static volatile bool   s_raw_imu_enabled     = false;
@@ -39,6 +46,8 @@ struct PendingAxisCmd {
     float speed_dps;
     bool  has_stop;
     bool  stop;
+    bool  has_absolute_ahrs;
+    bool  absolute_ahrs;
 };
 
 struct PendingJogCmd {
@@ -110,6 +119,8 @@ static void store_axis_cmd( const groundstation_AxisCommand& cmd,
     pending->speed_dps        = cmd.speed_dps;
     pending->has_stop         = cmd.has_stop;
     pending->stop             = cmd.stop;
+    pending->has_absolute_ahrs = cmd.has_absolute_ahrs;
+    pending->absolute_ahrs     = cmd.absolute_ahrs;
     pending->pending          = true;
 }
 
@@ -275,6 +286,51 @@ static bool read_ahrs_elevation( float* el_deg )
     return true;
 }
 
+static bool resolve_absolute_ahrs_target( bool is_az,
+                                          float desired_deg,
+                                          float* stepper_target_deg )
+{
+    if ( !g_imu_q || !stepper_target_deg ) return false;
+
+    QueueHandle_t status_q = is_az ? g_stepper_az_status_q : g_stepper_zen_status_q;
+    if ( !status_q ) return false;
+
+    StepperStatus st = {};
+    if ( xQueuePeek( status_q, &st, 0 ) != pdTRUE ) return false;
+
+    ImuMsg imu = {};
+    if ( xQueuePeek( g_imu_q, &imu, 0 ) != pdTRUE || !imu.valid ) return false;
+
+    const TrackerConfig cfg = tracker_config_snapshot();
+    const uint64_t now_us = time_us_64();
+    if ( imu.timestamp_us == 0 ||
+         now_us - imu.timestamp_us > (uint64_t)cfg.ahrs_max_age_ms * 1000ull ) {
+        return false;
+    }
+
+    if ( is_az ) {
+        if ( !imu.have_yaw_frame ) return false;
+        const float error = wrap_180( wrap_360( desired_deg ) - imu.yaw_frame_yaw360 );
+        *stepper_target_deg = wrap_360( st.angle_deg - error );
+    } else {
+        if ( g_stepper_zen_cal_q ) {
+            const float old_mech = st.angle_deg;
+            StepperCalibrationCmd cal = {};
+            cal.set_current_angle = true;
+            cal.current_angle_deg = imu.bar_rel_pitch;
+            xQueueOverwrite( g_stepper_zen_cal_q, &cal );
+            st.angle_deg = imu.bar_rel_pitch;
+            log_print( "[mqtt] el AHRS anchor current=%.2f old_mech=%.2f\n",
+                       (double)imu.bar_rel_pitch,
+                       (double)old_mech );
+        }
+        const float error = desired_deg - imu.bar_rel_pitch;
+        *stepper_target_deg = st.angle_deg + error;
+    }
+
+    return true;
+}
+
 static bool take_pending_axis_cmd( volatile PendingAxisCmd* pending,
                                    PendingAxisCmd* out )
 {
@@ -288,6 +344,8 @@ static bool take_pending_axis_cmd( volatile PendingAxisCmd* pending,
         out->speed_dps        = pending->speed_dps;
         out->has_stop         = pending->has_stop;
         out->stop             = pending->stop;
+        out->has_absolute_ahrs = pending->has_absolute_ahrs;
+        out->absolute_ahrs     = pending->absolute_ahrs;
         pending->pending      = false;
         have = true;
     }
@@ -321,9 +379,36 @@ static void apply_axis_cmd( QueueHandle_t q,
     StepperCmd cmd = {};
     if ( q ) xQueuePeek( q, &cmd, 0 );
 
-    if ( pending.has_target ) cmd.target_angle_deg = pending.target_angle_deg;
+    const bool is_az = strcmp( axis, "az" ) == 0;
+    float manual_target_deg = pending.target_angle_deg;
+    bool manual_target_absolute_ahrs = false;
+
+    if ( pending.has_target ) {
+        const bool absolute_ahrs =
+            pending.has_absolute_ahrs && pending.absolute_ahrs;
+        if ( absolute_ahrs ) {
+            float resolved_target = 0.0f;
+            if ( !resolve_absolute_ahrs_target( is_az,
+                                                pending.target_angle_deg,
+                                                &resolved_target ) ) {
+                log_print( "[mqtt] %s absolute AHRS command dropped: no fresh AHRS/status\n",
+                           axis );
+                return;
+            }
+            cmd.target_angle_deg = resolved_target;
+            manual_target_deg = is_az ? wrap_360( pending.target_angle_deg )
+                                      : pending.target_angle_deg;
+            manual_target_absolute_ahrs = true;
+        } else {
+            cmd.target_angle_deg = pending.target_angle_deg;
+        }
+    }
     if ( pending.has_speed )  cmd.speed_dps        = pending.speed_dps;
     if ( pending.has_stop )   cmd.stop             = pending.stop;
+
+    if ( pending.has_stop && pending.stop ) {
+        tracker_clear_manual_target( is_az );
+    }
 
     if ( !cmd.stop && !tracker_is_armed() ) {
         log_print( "[mqtt] %s command dropped: tracker disarmed\n", axis );
@@ -332,7 +417,8 @@ static void apply_axis_cmd( QueueHandle_t q,
     if ( !cmd.stop ) {
         tracker_set_mode( TrackerMode::Manual );
         if ( pending.has_target )
-            tracker_set_manual_target( strcmp( axis, "az" ) == 0, cmd.target_angle_deg );
+            tracker_set_manual_target( is_az, manual_target_deg,
+                                       manual_target_absolute_ahrs );
     }
     publish_stepper_cmd( q, cmd, axis );
 }
@@ -362,7 +448,7 @@ static void process_pending_commands()
             log_print( "[mqtt] %s jog dropped: tracker disarmed\n", axis );
         } else {
             tracker_set_mode( TrackerMode::Manual );
-            tracker_set_manual_target( jog.axis_is_az, cmd.target_angle_deg );
+            tracker_set_manual_target( jog.axis_is_az, cmd.target_angle_deg, false );
             publish_stepper_cmd( q, cmd, axis );
         }
     }
@@ -405,6 +491,13 @@ static void process_pending_commands()
 
     if ( mode_cmd.pending ) {
         if ( tracker_set_mode_from_proto( mode_cmd.mode ) ) {
+            if ( mode_cmd.mode == groundstation_TrackerMode_TRACKER_MODE_MANUAL ) {
+                tracker_clear_manual_targets();
+                StepperCmd stop = {};
+                stop.stop = true;
+                if ( g_stepper_az_cmd_q ) xQueueOverwrite( g_stepper_az_cmd_q, &stop );
+                if ( g_stepper_zen_cmd_q ) xQueueOverwrite( g_stepper_zen_cmd_q, &stop );
+            }
             log_print( "[mqtt] tracker mode=%s\n", tracker_mode_name( tracker_mode() ) );
         }
     }
@@ -442,6 +535,7 @@ static void process_pending_commands()
             tracker_set_armed( true );
             tracker_clear_calibration( "guided calibration started" );
             fusion_adjust_heading_offset( -fusion_get_heading_offset() );
+            fusion_reset_heading_alignment();
             publish_calibration_event( "begin_guided", "ok", ref, note );
             log_print( "[cal] guided calibration started\n" );
             break;
@@ -506,6 +600,7 @@ static void process_pending_commands()
             if ( g_stepper_zen_cal_q ) xQueueOverwrite( g_stepper_zen_cal_q, &axis_cal );
             tracker_clear_calibration( "calibration cleared" );
             fusion_adjust_heading_offset( -fusion_get_heading_offset() );
+            fusion_reset_heading_alignment();
             tracker_set_mode( TrackerMode::Manual );
             tracker_set_armed( false );
             publish_calibration_event( "clear", "ok", ref, note );

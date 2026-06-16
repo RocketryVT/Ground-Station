@@ -39,7 +39,8 @@ static FusionVector k_mag_hard_iron  = {0.0f, 0.0f, 0.0f};
 // Seed values from the OLD mounting (PYNXPZ); stale after the +Y-fwd/+X-right
 // remount and meant to be overwritten by a fresh wizard calibration.
 static FusionMatrix k_yaw_mag_soft_iron  = {1,0,0, 0,1,0, 0,0,1};
-static FusionVector k_yaw_mag_hard_iron  = {-12.71f, -59.22f, -92.24f};
+static FusionVector k_yaw_mag_hard_iron  = {0, 0, 0};
+static bool         s_yaw_heading_aligned = false;
 
 void fusion_set_mag_calibration( bool yaw, const float hard_iron[3], const float soft_iron[9] )
 {
@@ -48,6 +49,7 @@ void fusion_set_mag_calibration( bool yaw, const float hard_iron[3], const float
     FusionVector* hard = yaw ? &k_yaw_mag_hard_iron : &k_mag_hard_iron;
     for ( int i = 0; i < 3; ++i ) hard->array[i] = hard_iron[i];
     for ( int i = 0; i < 9; ++i ) soft->array[i] = soft_iron[i];
+    if ( yaw ) s_yaw_heading_aligned = false;
     taskEXIT_CRITICAL();
 }
 
@@ -89,7 +91,7 @@ void fusion_set_mag_calibration( bool yaw, const float hard_iron[3], const float
 
 // Magnetic declination: true_heading = magnetic_heading + declination_deg.
 // Negative = west (Blacksburg VA ≈ -8.53°).  Updated at runtime via gs/cmd/declination.
-static volatile float s_declination_deg = -8.53f;
+static volatile float s_declination_deg = 5.46882f;
 static volatile float s_heading_offset_deg = 0.0f;
 
 void fusion_set_declination( float deg ) { s_declination_deg = deg; }
@@ -117,6 +119,10 @@ float fusion_get_declination()           { return s_declination_deg; }
 #define FUSION_MAG_MAX_FIELD_UT    75.0f
 #define FUSION_MAG_MAX_HEADING_ERR 20.0f
 #define FUSION_MAG_OFFSET_STEP_DEG 0.02f
+// Scalar compass correction for the yaw-board mounting/body convention.  Keep
+// this at zero unless a bench compass check proves the remapped FusionCompass
+// heading is consistently offset.
+#define FUSION_YAW_COMPASS_OFFSET_DEG 0.0f
 
 static StackType_t  s_stack[ 4096 ];
 static StaticTask_t s_tcb;
@@ -185,6 +191,13 @@ void fusion_adjust_heading_offset( float delta_deg )
 }
 
 float fusion_get_heading_offset() { return s_heading_offset_deg; }
+
+void fusion_reset_heading_alignment()
+{
+    taskENTER_CRITICAL();
+    s_yaw_heading_aligned = false;
+    taskEXIT_CRITICAL();
+}
 
 static FusionQuaternion quat_conjugate( FusionQuaternion q )
 {
@@ -322,9 +335,16 @@ static bool update_yaw_frame( const YawImuMsg& yaw_imu,
                   + s_declination_deg + s_heading_offset_deg );
     const float mag_true_heading =
         wrap_180( FusionCompass( accel, mag, FusionConventionNed )
+                  + FUSION_YAW_COMPASS_OFFSET_DEG
                   + s_declination_deg );
     const float heading_error =
         wrap_180( mag_true_heading - estimated_true_heading );
+
+    if ( !s_yaw_heading_aligned ) {
+        fusion_adjust_heading_offset( heading_error );
+        s_yaw_heading_aligned = true;
+        return true;
+    }
 
     if ( fabsf( heading_error ) > FUSION_MAG_MAX_HEADING_ERR ) {
         return false;

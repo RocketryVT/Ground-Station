@@ -2,15 +2,16 @@
 #include "shared.hpp"
 #include "Tasks/RTC/rtc.hpp"
 
-// Pico SDK headers before gps_driver.hpp (see gps_driver.hpp transport section).
+// Pico SDK UART header before gps_driver.hpp (see gps_driver.hpp transport section).
 #include "hardware/uart.h"
-#include "hardware/gpio.h"
-#include "hardware/i2c.h"
+#include "pico/stdlib.h"
 #include "pico/time.h"
 
 #include "gps/gps_driver.hpp"
 
+#include <cstddef>
 #include <math.h>
+#include <new>
 
 // ── Averaging parameters ──────────────────────────────────────────────────────
 // Collect a running Welford average until the estimate stabilises, then freeze
@@ -22,6 +23,14 @@
 #define MIN_SAMPLES      12
 #define MAX_SAMPLES      120
 #define CONVERGE_SIGMA_M 1.5
+
+using Driver = gps::PicoGpsDriver;
+
+alignas( Driver ) static uint8_t s_driver_buf[ sizeof( Driver ) ];
+static Driver* s_driver = nullptr;
+
+static constexpr Board::GpsInstance GPS = Board::Gpses[0];
+static constexpr uint16_t GPS_RATE_MS = static_cast<uint16_t>( 1000u / GPS.nav_hz );
 
 // ── Welford online mean/variance ──────────────────────────────────────────────
 
@@ -47,21 +56,65 @@ struct Welford {
 
 static void gps_task( void* )
 {
-    log_print( "[gps] u-blox M10 — uart0 GPIO%u/%u  38400 baud\n",
-               Pins::GPS_TX, Pins::GPS_RX );
+    s_driver = new( s_driver_buf ) Driver( gps::PicoGpsConfig{
+        .uart = uart0,
+        .tx_pin = Pins::GPS_TX,
+        .rx_pin = Pins::GPS_RX,
+        .desired_baud = GPS.baud,
+        .rx_mode = gps::UartRxMode::DmaRing,
+        .dma_ring_size = gps::DmaRingBufferSize::Bytes2K,
+    } );
 
-    gps::UartTransport uart( uart0, Pins::GPS_TX, Pins::GPS_RX, 38400 );
-    gps::GpsDriver     driver( uart );
+    if ( !s_driver->rx_mode_ok() ) {
+        log_print( "[gps] DMA ring unavailable; falling back to polling RX\n" );
+    }
 
-    // Configure M10 via CFG-VALSET (Gen 9/10 interface).
-    // Send at boot baud (38400 default); module applies immediately.
-    driver.send_ubx( gps::Ubx::valset_uart1_inprot_ubx( true ) );
-    driver.send_ubx( gps::Ubx::valset_uart1_outprot_ubx( true ) );
-    driver.send_ubx( gps::Ubx::valset_uart1_outprot_nmea( false ) );
-    driver.send_ubx( gps::Ubx::valset_nav_pvt_uart1( 1 ) );
-    driver.send_ubx( gps::Ubx::valset_rate_meas( 1000 ) );   // 1 Hz
-    driver.send_ubx( gps::Ubx::valset_dyn_model( gps::Ubx::DynModel::Stationary ) );
-    vTaskDelay( pdMS_TO_TICKS( 200 ) );
+    if ( !s_driver->initialized() ) {
+        log_print( "[gps] autobaud failed; no checksum-valid GPS UART data detected\n" );
+    } else {
+        log_print( "[gps] autobaud detected %lu baud; target %lu baud %s\n",
+                   (unsigned long)s_driver->detected_baud(),
+                   (unsigned long)s_driver->desired_baud(),
+                   s_driver->baud_change_ok() ? "ok" : "failed" );
+    }
+
+    auto drain = [&]( uint32_t ms ) {
+        const uint32_t slices = ms / 10u;
+        for ( uint32_t i = 0; i < slices; ++i ) {
+            uint8_t tmp[ 256 ];
+            const std::size_t n = s_driver->read_raw( tmp, sizeof tmp );
+            s_driver->feed_ubx_only( tmp, n );
+            vTaskDelay( pdMS_TO_TICKS( 10 ) );
+        }
+    };
+
+    auto send = [&]( const gps::UbxFrame& f, uint32_t ms = 100 ) {
+        s_driver->send_ubx( f );
+        drain( ms );
+    };
+
+    // Configure M10/M9-style receivers via CFG-VALSET in RAM. The driver has
+    // already detected the live module baud and switched to the profile target.
+    send( gps::Ubx::valset_uart1_inprot_ubx( true, gps::ValLayer::RAM ) );
+    send( gps::Ubx::valset_uart1_inprot_nmea( true, gps::ValLayer::RAM ) );
+    send( gps::Ubx::valset_uart1_outprot_ubx( true, gps::ValLayer::RAM ) );
+    send( gps::Ubx::valset_uart1_outprot_nmea( false, gps::ValLayer::RAM ) );
+    send( gps::Ubx::valset_rate_meas( GPS_RATE_MS, gps::ValLayer::RAM ) );
+    send( gps::Ubx::valset_rate_nav( 1, gps::ValLayer::RAM ) );
+    send( gps::Ubx::valset_nav_pvt_uart1( 1, gps::ValLayer::RAM ) );
+    send( gps::Ubx::valset_fix_mode( gps::Ubx::FixMode::Auto, gps::ValLayer::RAM ) );
+    send( gps::Ubx::valset_dyn_model( gps::Ubx::DynModel::Stationary,
+                                      gps::ValLayer::RAM ), 500 );
+
+    log_print( "[gps] %s init done - UART0 TX=GPIO%u RX=GPIO%u, %lu baud, %u Hz, UBX NAV-PVT\n",
+               Board::spec_of( GPS.model ).name,
+               Pins::GPS_TX, Pins::GPS_RX,
+               (unsigned long)s_driver->current_baud(),
+               (unsigned)GPS.nav_hz );
+    log_print( "[gps] RX mode=%s dma_ch=%d ring=%luB\n",
+               s_driver->rx_mode() == gps::UartRxMode::DmaRing ? "dma" : "poll",
+               s_driver->dma_channel(),
+               (unsigned long)s_driver->dma_ring_size_bytes() );
 
     Welford lat_w, lon_w, alt_w;
     bool     converged     = false;
@@ -69,22 +122,24 @@ static void gps_task( void* )
     uint64_t last_check_us = 0;
 
     for ( ;; ) {
-        driver.poll_ubx_only();
+        uint8_t rx_buf[ 256 ];
+        const std::size_t n = s_driver->read_raw( rx_buf, sizeof rx_buf );
+        s_driver->feed_ubx_only( rx_buf, n );
 
-        const uint32_t pvt_count = driver.diagnostics().ubx_pvt;
+        const uint32_t pvt_count = s_driver->diagnostics().ubx_pvt;
         if ( pvt_count == last_pvt ) {
             vTaskDelay( pdMS_TO_TICKS( POLL_INTERVAL_MS ) );
             continue;
         }
         last_pvt = pvt_count;
 
-        if ( !driver.has_fix() ) {
+        if ( !s_driver->has_fix() ) {
             log_print( "[gps] waiting for fix (%s)\n",
-                       driver.fix_label().data() );
+                       s_driver->fix_label().data() );
             continue;
         }
 
-        const auto&  c       = driver.coordinate();
+        const auto&  c       = s_driver->coordinate();
 
         // Discipline the software RTC on every resolved fix.  The RTC service
         // handles its own warm-up + 60 s resync gating, so feed unconditionally
@@ -108,7 +163,7 @@ static void gps_task( void* )
                        lat_w.n, MAX_SAMPLES,
                        lat_w.mean, lon_w.mean, alt_w.mean,
                        sigma_m, lat_w.stddev(),
-                       driver.fix_label().data(), c.satellites );
+                       s_driver->fix_label().data(), c.satellites );
 
             if ( lat_w.n >= MIN_SAMPLES &&
                  ( lat_w.stddev() < CONVERGE_SIGMA_M || lat_w.n >= MAX_SAMPLES ) ) {
@@ -152,6 +207,8 @@ static StackType_t  s_gps_stack[ 2048 ];
 
 void gps_task_init()
 {
-    task_create( gps_task, "gps", 2048, nullptr, tskIDLE_PRIORITY + 2,
-                 s_gps_stack, &s_gps_tcb );
+    TaskHandle_t h = task_create( gps_task, "gps", 2048, nullptr,
+                                  tskIDLE_PRIORITY + 3,
+                                  s_gps_stack, &s_gps_tcb );
+    vTaskCoreAffinitySet( h, 1u << 0 );
 }

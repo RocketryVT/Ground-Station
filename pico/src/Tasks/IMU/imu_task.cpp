@@ -90,8 +90,8 @@ static bool imu_init( ism330dlc::Device& device )
 
     // 104 Hz, 16g / 2000 dps — same as before but now explicit and runtime-changeable
     const ism330dlc::Config cfg = {
-        .accel_range = ism330dlc::AccelRange::g16,
-        .gyro_range  = ism330dlc::GyroRange::dps_2000,
+        .accel_range = ism330dlc::AccelRange::g2,
+        .gyro_range  = ism330dlc::GyroRange::dps_125,
         .accel_odr   = ism330dlc::AccelODR::hz_104,
         .gyro_odr    = ism330dlc::GyroODR::hz_104,
         .delay_ms    = []( uint32_t ms ){ vTaskDelay( pdMS_TO_TICKS(ms) ); },

@@ -7,7 +7,7 @@
 #include <string.h>
 
 static TrackerConfig s_config;
-static TrackerMode s_mode = TrackerMode::Auto;
+static TrackerMode s_mode = TrackerMode::Stop;
 static bool s_armed = false;
 static TrackerControlStatus s_control_status;
 static TrackerCalibrationStatus s_cal_status;
@@ -15,6 +15,8 @@ static float s_manual_az_deg = 0.0f;
 static float s_manual_el_deg = 0.0f;
 static bool  s_manual_az_valid = false;
 static bool  s_manual_el_valid = false;
+static bool  s_manual_az_absolute_ahrs = false;
+static bool  s_manual_el_absolute_ahrs = false;
 
 static float sane_float( float value, float fallback )
 {
@@ -145,15 +147,24 @@ void tracker_set_mode( TrackerMode mode )
     if ( mode != TrackerMode::Manual ) {
         s_manual_az_valid = false;
         s_manual_el_valid = false;
+        s_manual_az_absolute_ahrs = false;
+        s_manual_el_absolute_ahrs = false;
     }
     taskEXIT_CRITICAL();
 }
 
-void tracker_set_manual_target( bool is_az, float deg )
+void tracker_set_manual_target( bool is_az, float deg, bool absolute_ahrs )
 {
     taskENTER_CRITICAL();
-    if ( is_az ) { s_manual_az_deg = deg; s_manual_az_valid = true; }
-    else         { s_manual_el_deg = deg; s_manual_el_valid = true; }
+    if ( is_az ) {
+        s_manual_az_deg = deg;
+        s_manual_az_valid = true;
+        s_manual_az_absolute_ahrs = absolute_ahrs;
+    } else {
+        s_manual_el_deg = deg;
+        s_manual_el_valid = true;
+        s_manual_el_absolute_ahrs = absolute_ahrs;
+    }
     taskEXIT_CRITICAL();
 }
 
@@ -167,11 +178,43 @@ bool tracker_get_manual_target( bool is_az, float* deg )
     return valid;
 }
 
+bool tracker_get_manual_target_info( bool is_az, float* deg, bool* absolute_ahrs )
+{
+    bool valid;
+    taskENTER_CRITICAL();
+    if ( is_az ) {
+        valid = s_manual_az_valid;
+        if ( deg ) *deg = s_manual_az_deg;
+        if ( absolute_ahrs ) *absolute_ahrs = s_manual_az_absolute_ahrs;
+    } else {
+        valid = s_manual_el_valid;
+        if ( deg ) *deg = s_manual_el_deg;
+        if ( absolute_ahrs ) *absolute_ahrs = s_manual_el_absolute_ahrs;
+    }
+    taskEXIT_CRITICAL();
+    return valid;
+}
+
+void tracker_clear_manual_target( bool is_az )
+{
+    taskENTER_CRITICAL();
+    if ( is_az ) {
+        s_manual_az_valid = false;
+        s_manual_az_absolute_ahrs = false;
+    } else {
+        s_manual_el_valid = false;
+        s_manual_el_absolute_ahrs = false;
+    }
+    taskEXIT_CRITICAL();
+}
+
 void tracker_clear_manual_targets()
 {
     taskENTER_CRITICAL();
     s_manual_az_valid = false;
     s_manual_el_valid = false;
+    s_manual_az_absolute_ahrs = false;
+    s_manual_el_absolute_ahrs = false;
     taskEXIT_CRITICAL();
 }
 

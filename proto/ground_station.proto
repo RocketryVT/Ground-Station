@@ -172,6 +172,9 @@ message AxisCommand {
   optional float target_angle_deg = 1;
   optional float speed_dps = 2;
   optional bool stop = 3;
+  // Interpret target_angle_deg as an AHRS/world-frame target. For azimuth this
+  // is magnetic heading; for elevation this is the bar-relative pitch angle.
+  optional bool absolute_ahrs = 4;
 }
 
 message JogCommand {

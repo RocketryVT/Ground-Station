@@ -5,6 +5,8 @@
 
 #include "sx1276/SX1276.hpp"
 #include "SIGMA.hpp"
+#include "SIGMA2/SIGMA2.hpp"
+#include "SIGMA2/packets/gps_packets.hpp"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -12,6 +14,7 @@
 #include "hardware/spi.h"
 #include "pico/time.h"
 
+#include <math.h>
 #include <string.h>
 
 static const radio::sx1276::Config s_lora0_cfg {
@@ -48,6 +51,227 @@ static const char* state_name( FlightState s )
         case FlightState::FAULT:          return "FAULT";
         default:                          return "UNKNOWN";
     }
+}
+
+static groundstation_FlightState map_sigma2_state( SIGMA2::FLIGHT_STATE state )
+{
+    switch ( state ) {
+        case SIGMA2::FLIGHT_STATE::PAD:
+        case SIGMA2::FLIGHT_STATE::UNKOWN:
+            return groundstation_FlightState_FLIGHT_STATE_GROUND_IDLE;
+        case SIGMA2::FLIGHT_STATE::BOOST:
+            return groundstation_FlightState_FLIGHT_STATE_POWERED_ASCENT;
+        case SIGMA2::FLIGHT_STATE::COAST:
+            return groundstation_FlightState_FLIGHT_STATE_COAST_ASCENT;
+        case SIGMA2::FLIGHT_STATE::APOGEE:
+            return groundstation_FlightState_FLIGHT_STATE_APOGEE;
+        case SIGMA2::FLIGHT_STATE::DESCENT:
+            return groundstation_FlightState_FLIGHT_STATE_DESCENT_DROGUE;
+        case SIGMA2::FLIGHT_STATE::LANDED:
+            return groundstation_FlightState_FLIGHT_STATE_LANDED;
+        default:
+            return groundstation_FlightState_FLIGHT_STATE_FAULT;
+    }
+}
+
+static float speed_from_cms( int16_t vn_cms, int16_t ve_cms, int16_t vd_cms )
+{
+    const float vn = static_cast<float>( vn_cms ) * 0.01f;
+    const float ve = static_cast<float>( ve_cms ) * 0.01f;
+    const float vd = static_cast<float>( vd_cms ) * 0.01f;
+    return sqrtf( vn * vn + ve * ve + vd * vd );
+}
+
+static float cms_to_mps( int16_t cms )
+{
+    return static_cast<float>( cms ) * 0.01f;
+}
+
+static float cm_to_m( uint16_t cm )
+{
+    return static_cast<float>( cm ) * 0.01f;
+}
+
+static float q15_to_float( int16_t q )
+{
+    return static_cast<float>( q ) / 32768.0f;
+}
+
+static void publish_lora_sample( const groundstation_RocketLoRaSample& pb )
+{
+    if ( !mqtt_is_connected() ) return;
+
+    MqttMessage m = {};
+    if ( mqtt_encode_proto( m, "rocket/lora0",
+                            groundstation_RocketLoRaSample_fields, &pb ) )
+        xQueueSend( g_mqtt_queue, &m, 0 );
+}
+
+static void update_rocket_location( double lat,
+                                    double lon,
+                                    double alt_m,
+                                    uint32_t boot_ms,
+                                    float vel_n_mps = 0.0f,
+                                    float vel_e_mps = 0.0f,
+                                    float vel_d_mps = 0.0f,
+                                    bool have_velocity = false,
+                                    float h_acc_m = 0.0f,
+                                    float v_acc_m = 0.0f,
+                                    float s_acc_mps = 0.0f,
+                                    bool have_accuracy = false )
+{
+    LocationMsg loc = {};
+    loc.lat = lat;
+    loc.lon = lon;
+    loc.alt_m = alt_m;
+    loc.timestamp_us = time_us_64();
+    loc.vel_n_mps = vel_n_mps;
+    loc.vel_e_mps = vel_e_mps;
+    loc.vel_d_mps = vel_d_mps;
+    loc.h_acc_m = h_acc_m;
+    loc.v_acc_m = v_acc_m;
+    loc.s_acc_mps = s_acc_mps;
+    loc.source_boot_ms = boot_ms;
+    loc.have_velocity = have_velocity;
+    loc.have_accuracy = have_accuracy;
+    xQueueOverwrite( g_rocket_location_q, &loc );
+}
+
+static bool handle_sigma2_gps_nav( const radio::Packet& pkt,
+                                   const SIGMA2::DecodedFrame& frame )
+{
+    SIGMA2::TRANSMIT_PACKETS::GPSNav gps = {};
+    if ( !SIGMA2::deserialize_packet_payload( frame, gps ) ) return false;
+
+    const double lat = static_cast<double>( gps.lat_deg_e7 ) * 1.0e-7;
+    const double lon = static_cast<double>( gps.lon_deg_e7 ) * 1.0e-7;
+    const float alt_m = static_cast<float>( gps.alt_msl_cm ) * 0.01f;
+    const float vel_n = cms_to_mps( gps.vel_n_cms );
+    const float vel_e = cms_to_mps( gps.vel_e_cms );
+    const float vel_d = cms_to_mps( gps.vel_d_cms );
+
+    groundstation_RocketLoRaSample pb = groundstation_RocketLoRaSample_init_zero;
+    pb.has_boot_ms = true;     pb.boot_ms = frame.header.timestamp_ms;
+    pb.has_sats = true;        pb.sats = gps.num_sv;
+    pb.has_flags = true;       pb.flags = gps.flags;
+    pb.has_lat = true;         pb.lat = lat;
+    pb.has_lon = true;         pb.lon = lon;
+    pb.has_alt_gps_m = true;   pb.alt_gps_m = alt_m;
+    pb.has_speed_ms = true;    pb.speed_ms = speed_from_cms( gps.vel_n_cms,
+                                                             gps.vel_e_cms,
+                                                             gps.vel_d_cms );
+    pb.has_rssi = true;        pb.rssi = pkt.rssi;
+    pb.has_snr = true;         pb.snr = pkt.snr;
+
+    publish_lora_sample( pb );
+
+    if ( ( gps.flags & SIGMA2::DATA_VALID_FLAG::GPS_VALID ) || gps.fix_type >= 2u ) {
+        update_rocket_location( lat, lon, static_cast<double>( alt_m ),
+                                frame.header.timestamp_ms,
+                                vel_n, vel_e, vel_d, true,
+                                cm_to_m( gps.h_acc_cm ),
+                                cm_to_m( gps.v_acc_cm ),
+                                cm_to_m( gps.s_acc_cms ),
+                                true );
+    }
+    return true;
+}
+
+static bool handle_sigma2_nav_state( const radio::Packet& pkt,
+                                     const SIGMA2::DecodedFrame& frame )
+{
+    SIGMA2::TRANSMIT_PACKETS::NavState nav = {};
+    if ( !SIGMA2::deserialize_packet_payload( frame, nav ) ) return false;
+
+    const double lat = static_cast<double>( nav.lat_deg_e7 ) * 1.0e-7;
+    const double lon = static_cast<double>( nav.lon_deg_e7 ) * 1.0e-7;
+    const float alt_m = static_cast<float>( nav.alt_fused_cm ) * 0.01f;
+    const float vel_n = cms_to_mps( nav.vel_n_cms );
+    const float vel_e = cms_to_mps( nav.vel_e_cms );
+    const float vel_d = cms_to_mps( nav.vel_d_cms );
+
+    groundstation_RocketLoRaSample pb = groundstation_RocketLoRaSample_init_zero;
+    pb.has_boot_ms = true;      pb.boot_ms = frame.header.timestamp_ms;
+    pb.has_state = true;        pb.state = map_sigma2_state( nav.state );
+    pb.has_flags = true;        pb.flags = nav.flags;
+    pb.has_lat = true;          pb.lat = lat;
+    pb.has_lon = true;          pb.lon = lon;
+    pb.has_alt_gps_m = true;    pb.alt_gps_m = alt_m;
+    pb.has_alt_baro_m = true;   pb.alt_baro_m = alt_m;
+    pb.has_speed_ms = true;     pb.speed_ms = speed_from_cms( nav.vel_n_cms,
+                                                              nav.vel_e_cms,
+                                                              nav.vel_d_cms );
+    pb.q_count = 4;
+    pb.q[0] = q15_to_float( nav.q[0] );
+    pb.q[1] = q15_to_float( nav.q[1] );
+    pb.q[2] = q15_to_float( nav.q[2] );
+    pb.q[3] = q15_to_float( nav.q[3] );
+    pb.has_rssi = true;         pb.rssi = pkt.rssi;
+    pb.has_snr = true;          pb.snr = pkt.snr;
+
+    publish_lora_sample( pb );
+
+    const bool has_gps_pos =
+        ( nav.flags & SIGMA2::DATA_VALID_FLAG::GPS_VALID ) ||
+        ( nav.nav_source & SIGMA2::TRANSMIT_PACKETS::NavSource::GPS_POS );
+    if ( has_gps_pos ) {
+        update_rocket_location( lat, lon, static_cast<double>( alt_m ),
+                                frame.header.timestamp_ms,
+                                vel_n, vel_e, vel_d, true );
+    }
+    return true;
+}
+
+static bool handle_sigma2_packet( const radio::Packet& pkt )
+{
+    SIGMA2::DecodedFrame frame = {};
+    const SIGMA2::DecodeStatus status =
+        SIGMA2::deserialize_frame( pkt.data, pkt.len, frame );
+    if ( status != SIGMA2::DecodeStatus::Ok ) return false;
+
+    switch ( frame.header.type ) {
+        case SIGMA2::PacketType::GPS:
+            return handle_sigma2_gps_nav( pkt, frame );
+        case SIGMA2::PacketType::NAV_STATE:
+            return handle_sigma2_nav_state( pkt, frame );
+        default:
+            log_print( "[lora0] SIGMA2 frame type %u ignored (%u B RSSI %.1f SNR %.1f)\n",
+                       static_cast<unsigned>( frame.header.type ),
+                       static_cast<unsigned>( pkt.len ),
+                       static_cast<double>( pkt.rssi ),
+                       static_cast<double>( pkt.snr ) );
+            return true;
+    }
+}
+
+static bool handle_legacy_sigma_packet( const radio::Packet& pkt )
+{
+    SigmaLoRaData d;
+    if ( !SigmaLoRaData::deserialize( pkt.data, pkt.len, d ) ) return false;
+
+    groundstation_RocketLoRaSample pb = groundstation_RocketLoRaSample_init_zero;
+    pb.has_boot_ms = true;    pb.boot_ms = d.boot_ms;
+    pb.has_state = true;      pb.state = (groundstation_FlightState)d.state;
+    pb.has_sats = true;       pb.sats = d.satellites;
+    pb.has_flags = true;      pb.flags = d.flags;
+    pb.has_lat = true;        pb.lat = d.lat;
+    pb.has_lon = true;        pb.lon = d.lon;
+    pb.has_alt_gps_m = true;  pb.alt_gps_m = d.alt_gps_m;
+    pb.has_alt_baro_m = true; pb.alt_baro_m = d.alt_baro_m;
+    pb.has_speed_ms = true;   pb.speed_ms = d.speed_ms;
+    pb.q_count = 4;
+    pb.q[0] = d.q[0]; pb.q[1] = d.q[1];
+    pb.q[2] = d.q[2]; pb.q[3] = d.q[3];
+    pb.has_rssi = true;       pb.rssi = pkt.rssi;
+    pb.has_snr = true;        pb.snr = pkt.snr;
+
+    publish_lora_sample( pb );
+
+    if ( d.flags & SIGMA_FLAG_GPS_VALID ) {
+        update_rocket_location( d.lat, d.lon, static_cast<double>( d.alt_gps_m ),
+                                d.boot_ms );
+    }
+    return true;
 }
 
 static uint8_t diag_spi_read_reg( bool miso_pullup )
@@ -136,39 +360,9 @@ static void lora0_task( void* )
             state = s_radio.read_packet( pkt );
 
             if ( state == 0 ) {
-                SigmaLoRaData d;
-                if ( SigmaLoRaData::deserialize( pkt.data, pkt.len, d ) ) {
-                    if ( mqtt_is_connected() ) {
-                        MqttMessage m = {};
-                        groundstation_RocketLoRaSample pb =
-                            groundstation_RocketLoRaSample_init_zero;
-                        pb.has_boot_ms = true;   pb.boot_ms = d.boot_ms;
-                        pb.has_state = true;     pb.state = (groundstation_FlightState)d.state;
-                        pb.has_sats = true;      pb.sats = d.satellites;
-                        pb.has_flags = true;     pb.flags = d.flags;
-                        pb.has_lat = true;       pb.lat = d.lat;
-                        pb.has_lon = true;       pb.lon = d.lon;
-                        pb.has_alt_gps_m = true; pb.alt_gps_m = d.alt_gps_m;
-                        pb.has_alt_baro_m = true; pb.alt_baro_m = d.alt_baro_m;
-                        pb.has_speed_ms = true;  pb.speed_ms = d.speed_ms;
-                        pb.q_count = 4;
-                        pb.q[0] = d.q[0]; pb.q[1] = d.q[1];
-                        pb.q[2] = d.q[2]; pb.q[3] = d.q[3];
-                        pb.has_rssi = true;      pb.rssi = pkt.rssi;
-                        pb.has_snr = true;       pb.snr = pkt.snr;
-
-                        if ( mqtt_encode_proto( m, "rocket/lora0",
-                                                groundstation_RocketLoRaSample_fields,
-                                                &pb ) )
-                            xQueueSend( g_mqtt_queue, &m, 0 );
-                    }
-
-                    if ( d.flags & SIGMA_FLAG_GPS_VALID ) {
-                        LocationMsg loc = { d.lat, d.lon, (double)d.alt_gps_m, time_us_64() };
-                        xQueueOverwrite( g_rocket_location_q, &loc );
-                    }
-                } else {
-                    log_print( "[lora0] rx %u B RSSI %.1f dBm SNR %.1f dB - bad SIGMA frame\n",
+                if ( !handle_sigma2_packet( pkt ) &&
+                     !handle_legacy_sigma_packet( pkt ) ) {
+                    log_print( "[lora0] rx %u B RSSI %.1f dBm SNR %.1f dB - bad SIGMA2/SIGMA frame\n",
                                (unsigned)pkt.len, (double)pkt.rssi, (double)pkt.snr );
                 }
             } else {

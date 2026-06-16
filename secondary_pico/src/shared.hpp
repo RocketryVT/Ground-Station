@@ -43,9 +43,8 @@ extern EventGroupHandle_t g_net_events;
 // LoRa tasks enqueue raw InterPico frames (framed SIGMA bytes) here.
 // The UDP task drains it and sends each frame to the primary Pico.
 //
-// Max SIGMA frame = payload(40) + overhead(9) = 49 bytes for INTER_PICO.
-// Use 64-byte slot for alignment headroom.
-#define INTER_PICO_FRAME_MAX  64
+// Max SIGMA frame = payload(60) + overhead(10) = 70 bytes for INTER_PICO.
+#define INTER_PICO_FRAME_MAX  96
 #define UDP_QUEUE_DEPTH       8
 
 struct UdpFrame {
@@ -84,7 +83,7 @@ namespace LoRa1Cfg {
 }
 
 namespace LoRa2Cfg {
-    static constexpr float   FREQ_MHZ    = 433.0f;
+    static constexpr float   FREQ_MHZ    = 424.5f;
     static constexpr float   BR_KBPS     = 4.8f;
     static constexpr float   FREQ_DEV_KHZ = 5.0f;
     static constexpr float   RX_BW_KHZ   = 125.0f;

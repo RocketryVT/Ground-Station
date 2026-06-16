@@ -174,6 +174,7 @@ static void axis_task_body( void* arg )
         if ( have_cmd ) {
             if ( cmd.stop ) {
                 drv.stop();
+                have_target = false;
                 target_dirty = false;
                 move_pending_completion = false;
             } else {
@@ -265,6 +266,10 @@ void stepper_az_task_init()
     g_stepper_az_status_q = xQueueCreateStatic(
         1, sizeof(StepperStatus), s_az_status_storage, &s_az_status_buf );
 
+    StepperCmd stop = {};
+    stop.stop = true;
+    xQueueOverwrite( g_stepper_az_cmd_q, &stop );
+
     const TrackerConfig cfg = tracker_config_snapshot();
     s_az_ctx.cfg = AxisCfg {
         .drv = {
@@ -302,6 +307,10 @@ void stepper_zen_task_init()
         1, sizeof(StepperCalibrationCmd), s_zen_cal_storage, &s_zen_cal_buf );
     g_stepper_zen_status_q = xQueueCreateStatic(
         1, sizeof(StepperStatus), s_zen_status_storage, &s_zen_status_buf );
+
+    StepperCmd stop = {};
+    stop.stop = true;
+    xQueueOverwrite( g_stepper_zen_cmd_q, &stop );
 
     const TrackerConfig cfg = tracker_config_snapshot();
     s_el_ctx.cfg = AxisCfg {

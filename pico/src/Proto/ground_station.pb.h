@@ -288,6 +288,8 @@ typedef struct _groundstation_AxisCommand {
     float speed_dps;
     bool has_stop;
     bool stop;
+    bool has_absolute_ahrs;
+    bool absolute_ahrs;
 } groundstation_AxisCommand;
 
 typedef struct _groundstation_JogCommand {
@@ -486,7 +488,7 @@ extern "C" {
 #define groundstation_RawMagSample_init_default  {false, 0, false, 0, false, 0, false, 0}
 #define groundstation_RawYawImuSample_init_default {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define groundstation_RawSensorsCommand_init_default {false, 0, false, 0, false, 0}
-#define groundstation_AxisCommand_init_default   {false, 0, false, 0, false, 0}
+#define groundstation_AxisCommand_init_default   {false, 0, false, 0, false, 0, false, 0}
 #define groundstation_JogCommand_init_default    {false, _groundstation_JogAxis_MIN, false, 0, false, 0}
 #define groundstation_DeclinationCommand_init_default {false, 0}
 #define groundstation_MagCalibrationCommand_init_default {false, 0, 0, {0, 0, 0}, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0}}
@@ -505,7 +507,7 @@ extern "C" {
 #define groundstation_RawMagSample_init_zero     {false, 0, false, 0, false, 0, false, 0}
 #define groundstation_RawYawImuSample_init_zero  {false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0, false, 0}
 #define groundstation_RawSensorsCommand_init_zero {false, 0, false, 0, false, 0}
-#define groundstation_AxisCommand_init_zero      {false, 0, false, 0, false, 0}
+#define groundstation_AxisCommand_init_zero      {false, 0, false, 0, false, 0, false, 0}
 #define groundstation_JogCommand_init_zero       {false, _groundstation_JogAxis_MIN, false, 0, false, 0}
 #define groundstation_DeclinationCommand_init_zero {false, 0}
 #define groundstation_MagCalibrationCommand_init_zero {false, 0, 0, {0, 0, 0}, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0}}
@@ -623,6 +625,7 @@ extern "C" {
 #define groundstation_AxisCommand_target_angle_deg_tag 1
 #define groundstation_AxisCommand_speed_dps_tag  2
 #define groundstation_AxisCommand_stop_tag       3
+#define groundstation_AxisCommand_absolute_ahrs_tag 4
 #define groundstation_JogCommand_axis_tag        1
 #define groundstation_JogCommand_delta_deg_tag   2
 #define groundstation_JogCommand_speed_dps_tag   3
@@ -821,7 +824,8 @@ X(a, STATIC,   OPTIONAL, BOOL,     yaw_imu,           3)
 #define groundstation_AxisCommand_FIELDLIST(X, a) \
 X(a, STATIC,   OPTIONAL, FLOAT,    target_angle_deg,   1) \
 X(a, STATIC,   OPTIONAL, FLOAT,    speed_dps,         2) \
-X(a, STATIC,   OPTIONAL, BOOL,     stop,              3)
+X(a, STATIC,   OPTIONAL, BOOL,     stop,              3) \
+X(a, STATIC,   OPTIONAL, BOOL,     absolute_ahrs,     4)
 #define groundstation_AxisCommand_CALLBACK NULL
 #define groundstation_AxisCommand_DEFAULT NULL
 
@@ -960,7 +964,7 @@ extern const pb_msgdesc_t groundstation_StarlinkProxyStatus_msg;
 #define GROUNDSTATION_GROUND_STATION_PB_H_MAX_SIZE groundstation_StarlinkProxyStatus_size
 #define groundstation_AhrsStatus_size            33
 #define groundstation_AntennaState_size          174
-#define groundstation_AxisCommand_size           12
+#define groundstation_AxisCommand_size           14
 #define groundstation_CalibrationCommand_size    110
 #define groundstation_DeclinationCommand_size    5
 #define groundstation_GroundImu_size             209

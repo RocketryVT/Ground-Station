@@ -295,6 +295,8 @@ pub struct AxisCommand {
     pub speed_dps: Option<f32>,
     #[prost(bool, optional, tag = "3")]
     pub stop: Option<bool>,
+    #[prost(bool, optional, tag = "4")]
+    pub absolute_ahrs: Option<bool>,
 }
 
 #[derive(Clone, PartialEq, Message)]

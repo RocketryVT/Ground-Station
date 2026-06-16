@@ -1,4 +1,4 @@
-// lora2_task.cpp — RFM69HCW / 433 MHz receive, forward to primary Pico via UDP.
+// lora2_task.cpp — RFM69HCW / 424.5 MHz receive, forward to primary Pico via UDP.
 //
 // Mirrors lora1_task.cpp but uses the RF69 driver on SPI1.
 // Each received SIGMA LoRa frame is decoded and immediately re-encoded as a
@@ -6,6 +6,7 @@
 
 #include "lora2_task.hpp"
 #include "shared.hpp"
+#include "sigma2_forward.hpp"
 
 #include "rf69/RF69.hpp"
 #include "SIGMA.hpp"
@@ -67,7 +68,12 @@ static void lora2_task( void* )
             continue;
         }
 
-        // Decode the SIGMA LoRa frame from the raw radio payload
+        if ( lora_bridge::handle_sigma2_packet( pkt, "lora2" ) ) {
+            s_radio.start_receive();
+            continue;
+        }
+
+        // Decode the legacy SIGMA LoRa frame from the raw radio payload
         SIGMA::LoRaData d;
         if ( !SIGMA::LoRaData::deserialize( pkt.data, pkt.len, d ) ) {
             log_print( "[lora2] rx %u B  RSSI %.0f dBm — bad frame\n",

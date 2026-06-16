@@ -925,6 +925,35 @@
   font-size: var(--font-2xs);
 }
 
+.directSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(16,18,22,0.1);
+}
+
+.directSectionTitle {
+  color: rgba(16,18,22,0.72);
+  font-size: var(--font-2xs);
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.directReadout {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(16,18,22,0.54);
+  font-size: var(--font-2xs);
+  font-weight: 800;
+}
+
+.directReadout strong {
+  color: #151820;
+  font-size: var(--font-xs);
+}
+
 .cmdDivider {
   border: none;
   border-top: 1px solid rgba(16,18,22,0.1);

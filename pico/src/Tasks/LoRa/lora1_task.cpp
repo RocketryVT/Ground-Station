@@ -19,7 +19,7 @@ static const radio::rf69::Config s_lora1_cfg {
     .fdev_khz   = LoRa1Cfg::FREQ_DEV_KHZ,
     .rx_bw_khz  = LoRa1Cfg::RX_BW_KHZ,
     .tx_dbm     = LoRa1Cfg::TX_POWER,
-    .high_power = true,
+    .high_power = LoRa1Cfg::HIGH_POWER,
     .preamble   = LoRa1Cfg::PREAMBLE,
 };
 

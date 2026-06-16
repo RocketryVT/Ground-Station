@@ -77,9 +77,13 @@ void tracker_set_control_status( const TrackerControlStatus& status );
 
 // Last operator-commanded manual target per axis.  Recorded when a manual az/el
 // (or jog) command is accepted so the controller can hold/servo to it via AHRS
-// while in Manual mode.  Cleared automatically when leaving Manual mode.
-void tracker_set_manual_target( bool is_az, float deg );
+// while in Manual mode.  `absolute_ahrs` means `deg` is already in the reported
+// AHRS frame: yaw_frame_yaw360 for AZ, bar_rel_pitch for EL.
+// Cleared automatically when leaving Manual mode.
+void tracker_set_manual_target( bool is_az, float deg, bool absolute_ahrs = false );
 bool tracker_get_manual_target( bool is_az, float* deg );
+bool tracker_get_manual_target_info( bool is_az, float* deg, bool* absolute_ahrs );
+void tracker_clear_manual_target( bool is_az );
 void tracker_clear_manual_targets();
 
 void tracker_mark_az_calibrated( float reference_deg, const char* status );

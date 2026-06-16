@@ -1,4 +1,5 @@
 #include "yaw_imu_task.hpp"
+#include "lis3mdl/LIS3MDL.hpp"
 #include "shared.hpp"
 #include "Tasks/I2C/i2c_task.hpp"
 #include "Tasks/MQTT/mqtt_task.hpp"
@@ -90,6 +91,26 @@ static bool yaw_imu_init( Device& device, uint8_t imu_addr )
     if ( !device.imu().initialize() ) {
         log_print( "[yaw_imu] LSM6DSOX init failed at 0x%02X (WHO=0x%02X)\n",
                    imu_addr, imu_who );
+        return false;
+    }
+
+    if (!device.imu().set_accel_odr( lsm6dsox::AccelODR::hz_104 )) {
+        return false;
+    }
+    if (!device.imu().set_gyro_odr( lsm6dsox::GyroODR::hz_104 )) {
+        return false;
+    }
+    if (!device.imu().set_accel_range( lsm6dsox::AccelRange::g4 )) {
+        return false;
+    }
+    if (!device.imu().set_gyro_range( lsm6dsox::GyroRange::dps_125 )) {
+        return false;
+    }
+
+    if ( !device.mag().set_range( lis3mdl::Range::gauss_4 ) ) {
+        return false;
+    }
+    if ( !device.mag().set_data_rate( lis3mdl::DataRate::hz_80 ) ) {
         return false;
     }
 

@@ -71,9 +71,64 @@ src/CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora1_task.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/lock.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/stdio.h \
  /Users/gregory/Downloads/Rocketry/Avionics/boards/gs_pcb_v1_pins.hpp \
- /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/lora/radio/sx1276/SX1276.hpp \
- /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/lora/radio/sx1276/../Radio.hpp \
+ /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/src/Tasks/LoRa/sigma2_forward.hpp \
+ /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/lora/radio/Radio.hpp \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cstdint \
+ /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/packets/SIGMA.hpp \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/string.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_locale.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/strings.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/string.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/packets/SIGMA2/SIGMA2.hpp \
+ /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/packets/SIGMA2/crc.hpp \
+ /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/packets/SIGMA2/packets.hpp \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cstddef \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/version.h \
+ /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/packets/SIGMA2/packets/gps_packets.hpp \
+ /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/packets/SIGMA2/packets/mesh_packets.hpp \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/math.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cmath \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/requires_hosted.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/cpp_type_traits.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/type_traits \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/ext/type_traits.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/math.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/std_abs.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdlib.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/machine/stdlib.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/alloca.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/specfun.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/stl_algobase.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/functexcept.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/exception_defines.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/ext/numeric_traits.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/stl_pair.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/move.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/utility.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/stl_iterator_base_types.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/stl_iterator_base_funcs.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/concept_check.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/debug/assertions.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/stl_iterator.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/ptr_traits.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/debug/debug.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/predefined_ops.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bit \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/concepts \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/limits \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/gamma.tcc \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/special_function_util.h \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/bessel_function.tcc \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/beta_function.tcc \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/ell_integral.tcc \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/exp_integral.tcc \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/hypergeometric.tcc \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/legendre_function.tcc \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/modified_bessel_func.tcc \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/poly_hermite.tcc \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/poly_laguerre.tcc \
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/tr1/riemann_zeta.tcc \
+ /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/lora/radio/sx1276/SX1276.hpp \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/lora/radio/sx1276/../../hal/PicoHal.h \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/RadioLib.h \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/TypeDef.h \
@@ -86,10 +141,6 @@ src/CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora1_task.cpp.o: \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/utils/Utils.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/stdlib.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cstdlib \
- /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/stdlib.h \
- /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/machine/stdlib.h \
- /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/alloca.h \
- /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/std_abs.h \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/utils/../BuildOpt.h \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/CC1101/CC1101.h \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/modules/CC1101/../../TypeDef.h \
@@ -208,10 +259,6 @@ src/CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora1_task.cpp.o: \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/AX25/../BellModem/../PhysicalLayer/PhysicalLayer.h \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/AX25/../BellModem/../AFSK/AFSK.h \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/AX25/../BellModem/../Print/Print.h \
- /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/string.h \
- /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/_locale.h \
- /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/strings.h \
- /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/string.h \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/AX25/../BellModem/../Print/ITA2String.h \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/AX25/../BellModem/../Print/../../TypeDef.h \
  /Users/gregory/Downloads/Rocketry/Avionics/RadioLib-7.7.1/src/protocols/AX25/../BellModem/../Print/ITA2String.h \
@@ -298,6 +345,4 @@ src/CMakeFiles/gs_secondary_pico.dir/Tasks/LoRa/lora1_task.cpp.o: \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/rp2_common/hardware_spi/include/hardware/spi.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/rp2350/hardware_structs/include/hardware/structs/spi.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/rp2350/hardware_regs/include/hardware/regs/spi.h \
- /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cstring \
- /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/bits/version.h \
- /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/packets/SIGMA.hpp
+ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/cstring

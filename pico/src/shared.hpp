@@ -60,29 +60,54 @@ struct MqttMessage {
 extern QueueHandle_t g_mqtt_queue;
 
 // -- Pin assignments -----------------------------------------------------------
-// Single source of truth for the Ground Station PCB rev 1 (Pico 2 W) lives in
-// the shared board pin map. LORA0 = 915 MHz LoRa (SX1276, SPI0); LORA1 = 433 MHz
-// GFSK (RFM69, SPI1); GPS on UART0 (TX=12, RX=13).
-#include "boards/gs_pcb_v1_pins.hpp"
+// Single source of truth for the active board pins and this firmware's plugged-in
+// devices. LORA0 = 915 MHz LoRa (SX1276, SPI0); LORA1 = 433 MHz GFSK (RFM69,
+// SPI1); GPS on UART0 (TX=12, RX=13).
+#include "boards/board.hpp"
+
+static_assert(HAS_GPS, "gs_pico requires a GPS in board_profile.hpp");
+static_assert(HAS_RADIO, "gs_pico requires radios in board_profile.hpp");
+static_assert(Board::RadioCount >= 2, "gs_pico requires LORA0 and LORA1 radio profiles");
+static_assert(Board::GpsCount > 0, "gs_pico requires at least one GPS profile");
+static_assert(Board::Radios[0].model == Board::RadioModel::SX1276,
+              "Board::Radios[0] must be the LORA0 SX1276");
+static_assert(Board::Radios[0].bus == Board::Bus::SPI0,
+              "LORA0 SX1276 must be on SPI0");
+static_assert(Board::Radios[1].model == Board::RadioModel::RFM69HCW,
+              "Board::Radios[1] must be the LORA1 RFM69HCW");
+static_assert(Board::Radios[1].bus == Board::Bus::SPI1,
+              "LORA1 RFM69HCW must be on SPI1");
+static_assert(Board::Gpses[0].bus == Board::Bus::UART0,
+              "ground-station GPS task currently supports UART0 only");
+static_assert(Board::Gpses[0].nav_hz > 0, "GPS nav_hz must be non-zero");
+static_assert(Board::Gpses[0].nav_hz <= Board::spec_of(Board::Gpses[0].model).max_nav_hz,
+              "GPS nav_hz exceeds selected receiver spec");
+static_assert(Board::Radios[0].freq_mhz >= Board::spec_of(Board::Radios[0].model).freq_min_mhz &&
+              Board::Radios[0].freq_mhz <= Board::spec_of(Board::Radios[0].model).freq_max_mhz,
+              "LORA0 frequency outside selected radio spec");
+static_assert(Board::Radios[1].freq_mhz >= Board::spec_of(Board::Radios[1].model).freq_min_mhz &&
+              Board::Radios[1].freq_mhz <= Board::spec_of(Board::Radios[1].model).freq_max_mhz,
+              "LORA1 frequency outside selected radio spec");
 
 // -- LoRa radio parameters -----------------------------------------------------
 namespace LoRa0Cfg {
-    static constexpr float    FREQ_MHZ   = 915.0f;
-    static constexpr float    BW_KHZ     = 125.0f;
-    static constexpr uint8_t  SF         = 7;
-    static constexpr uint8_t  CR         = 5;
-    static constexpr uint8_t  SYNC_WORD  = 0x12;
-    static constexpr int8_t   TX_POWER   = 20;
-    static constexpr uint16_t PREAMBLE   = 8;
+    static constexpr float    FREQ_MHZ   = Board::Radios[0].freq_mhz;
+    static constexpr float    BW_KHZ     = Board::Lora915::BW_KHZ;
+    static constexpr uint8_t  SF         = Board::Lora915::SF;
+    static constexpr uint8_t  CR         = Board::Lora915::CR;
+    static constexpr uint8_t  SYNC_WORD  = Board::Lora915::SYNC_WORD;
+    static constexpr int8_t   TX_POWER   = Board::Lora915::TX_DBM;
+    static constexpr uint16_t PREAMBLE   = Board::Lora915::PREAMBLE;
 }
 
 namespace LoRa1Cfg {
-    static constexpr float   FREQ_MHZ    = 433.0f;
-    static constexpr float   BR_KBPS     = 4.8f;
-    static constexpr float   FREQ_DEV_KHZ = 5.0f;
-    static constexpr float   RX_BW_KHZ   = 125.0f;
-    static constexpr int8_t  TX_POWER    = 20;    // RFM69HCW high-power mode
-    static constexpr uint8_t PREAMBLE    = 16;
+    static constexpr float    FREQ_MHZ     = Board::Radios[1].freq_mhz;
+    static constexpr float    BR_KBPS      = Board::Rfm433::BR_KBPS;
+    static constexpr float    FREQ_DEV_KHZ = Board::Rfm433::FDEV_KHZ;
+    static constexpr float    RX_BW_KHZ    = Board::Rfm433::RXBW_KHZ;
+    static constexpr int8_t   TX_POWER     = Board::Rfm433::TX_DBM;
+    static constexpr uint16_t PREAMBLE     = Board::Rfm433::PREAMBLE;
+    static constexpr bool     HIGH_POWER   = Board::Rfm433::HIGH_POWER;
 }
 
 namespace LoRa2Cfg = LoRa1Cfg;
@@ -99,6 +124,15 @@ struct LocationMsg {
     double lon;
     double alt_m;
     uint64_t timestamp_us;
+    float vel_n_mps;
+    float vel_e_mps;
+    float vel_d_mps;
+    float h_acc_m;
+    float v_acc_m;
+    float s_acc_mps;
+    uint32_t source_boot_ms;
+    bool have_velocity;
+    bool have_accuracy;
 };
 
 extern QueueHandle_t g_gs_location_q;
@@ -166,8 +200,8 @@ extern QueueHandle_t g_imu_q;
 
 // -- WiFi / MQTT configuration --------------------------------------------------
 #define WIFI_SSID         "RocketryAtVT"     // change to your Starlink SSID
-#define WIFI_PASSWORD     "RocketryAtVT147"   // change to your Starlink password
-#define MQTT_BROKER_HOST   "192.168.1.170"
+#define WIFI_PASSWORD     "RocketryAtVT52"   // change to your Starlink password
+#define MQTT_BROKER_HOST   "192.168.88.252"
 #define MQTT_BROKER_PORT   1883
 #define MQTT_CLIENT_ID     "gs_pico"
 

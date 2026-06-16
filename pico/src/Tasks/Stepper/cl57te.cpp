@@ -84,12 +84,12 @@ void Cl57te::init( const Config& cfg )
     cfg_ = cfg;
 
     gpio_init( cfg_.pul_n );
-    gpio_set_dir( cfg_.pul_n, GPIO_OUT );
     gpio_put( cfg_.pul_n, true );     // PUL- idle HIGH
+    gpio_set_dir( cfg_.pul_n, GPIO_OUT );
 
     gpio_init( cfg_.dir_n );
-    gpio_set_dir( cfg_.dir_n, GPIO_OUT );
     gpio_put( cfg_.dir_n, true );     // DIR- idle = positive direction
+    gpio_set_dir( cfg_.dir_n, GPIO_OUT );
     have_last_dir_level_ = true;
     last_dir_level_ = true;
 

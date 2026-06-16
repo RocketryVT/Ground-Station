@@ -83,6 +83,7 @@ pub fn encode_command_payload(topic: &str, payload: &str) -> Vec<u8> {
             target_angle_deg: f32_field(&data, "target_angle_deg"),
             speed_dps: f32_field(&data, "speed_dps"),
             stop: bool_field(&data, "stop"),
+            absolute_ahrs: bool_field(&data, "absolute_ahrs"),
         }),
         STEPPER_JOG_CMD => encode_message(proto::JogCommand {
             axis: match data.get("axis").and_then(Value::as_str) {
@@ -390,6 +391,7 @@ fn decode_axis_cmd(payload: &[u8]) -> Result<Value, String> {
         ("target_angle_deg", json!(msg.target_angle_deg)),
         ("speed_dps", json!(msg.speed_dps)),
         ("stop", json!(msg.stop)),
+        ("absolute_ahrs", json!(msg.absolute_ahrs)),
     ]))
 }
 
