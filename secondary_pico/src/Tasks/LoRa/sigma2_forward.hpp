@@ -57,6 +57,7 @@ static inline bool enqueue_inter_pico(const SIGMA::InterPicoData& data)
 }
 
 static inline bool handle_sigma2_gps_nav(const radio::Packet& pkt,
+                                          const char* tag,
                                           const SIGMA2::DecodedFrame& frame)
 {
     SIGMA2::TRANSMIT_PACKETS::GPSNav gps = {};
@@ -82,10 +83,24 @@ static inline bool handle_sigma2_gps_nav(const radio::Packet& pkt,
     out.flags = gps.flags;
     out.rssi = static_cast<int>(pkt.rssi);
     out.snr_dB = pkt.snr;
-    return enqueue_inter_pico(out);
+    const bool enqueued = enqueue_inter_pico(out);
+    log_print("[%s] SIGMA2 GPS lat=%.5f lon=%.5f alt=%.0f m sats=%u "
+              "vel=%.1f m/s hacc=%.1f m RSSI=%.0f SNR=%.1f %s\n",
+              tag,
+              out.lat,
+              out.lon,
+              static_cast<double>(out.alt_gps_m),
+              static_cast<unsigned>(out.satellites),
+              static_cast<double>(out.speed_ms),
+              static_cast<double>(out.h_acc_m),
+              static_cast<double>(pkt.rssi),
+              static_cast<double>(pkt.snr),
+              enqueued ? "queued" : "udp queue full");
+    return true;
 }
 
 static inline bool handle_sigma2_nav_state(const radio::Packet& pkt,
+                                           const char* tag,
                                            const SIGMA2::DecodedFrame& frame)
 {
     SIGMA2::TRANSMIT_PACKETS::NavState nav = {};
@@ -115,7 +130,20 @@ static inline bool handle_sigma2_nav_state(const radio::Packet& pkt,
     out.flags = nav.flags;
     out.rssi = static_cast<int>(pkt.rssi);
     out.snr_dB = pkt.snr;
-    return enqueue_inter_pico(out);
+    const bool enqueued = enqueue_inter_pico(out);
+    log_print("[%s] SIGMA2 NAV lat=%.5f lon=%.5f alt=%.0f m "
+              "vn=%.1f ve=%.1f vd=%.1f RSSI=%.0f SNR=%.1f %s\n",
+              tag,
+              out.lat,
+              out.lon,
+              static_cast<double>(out.alt_gps_m),
+              static_cast<double>(out.vel_ned_ms[0]),
+              static_cast<double>(out.vel_ned_ms[1]),
+              static_cast<double>(out.vel_ned_ms[2]),
+              static_cast<double>(pkt.rssi),
+              static_cast<double>(pkt.snr),
+              enqueued ? "queued" : "udp queue full");
+    return true;
 }
 
 static inline bool handle_sigma2_packet(const radio::Packet& pkt, const char* tag)
@@ -129,9 +157,9 @@ static inline bool handle_sigma2_packet(const radio::Packet& pkt, const char* ta
 
     switch (frame.header.type) {
     case SIGMA2::PacketType::GPS:
-        return handle_sigma2_gps_nav(pkt, frame);
+        return handle_sigma2_gps_nav(pkt, tag, frame);
     case SIGMA2::PacketType::NAV_STATE:
-        return handle_sigma2_nav_state(pkt, frame);
+        return handle_sigma2_nav_state(pkt, tag, frame);
     case SIGMA2::PacketType::TIMESYNC:
         return true;
     default:
