@@ -1,0 +1,7 @@
+# macOS: re-sign the dev binary with camera/mic entitlements right before it
+# runs, so WKWebView's getUserMedia works under `tauri dev`. Cargo invokes the
+# runner between linking and execution on every rebuild, so the entitlements
+# survive. Only affects `cargo run` (dev); `cargo build` / `tauri build` are
+# untouched. See sign-run.sh + Entitlements.dev.plist.
+[target.'cfg(target_os = "macos")']
+runner = "./sign-run.sh"
