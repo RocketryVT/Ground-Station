@@ -18,6 +18,14 @@ const PANEL  = Cesium.Color.fromCssColorString('#861F41').withAlpha(0.85);
 const N_CONE_EDGES = 16;
 const MIN_CLEARANCE_M = 0.5;
 
+function hasMapPosition(t: { lat?: number; lon?: number } | null | undefined): t is { lat: number; lon: number } {
+  return !!t
+    && Number.isFinite(t.lat)
+    && Number.isFinite(t.lon)
+    && t.lat !== 0
+    && t.lon !== 0;
+}
+
 type TileCacheInfo = {
   proxy_url: string;
   cache_dir: string;
@@ -252,7 +260,9 @@ export function TrajectoryMap() {
       removePreRender = viewer.scene.preRender.addEventListener(() => {
         const { history, latest: l, antenna, nodes: ns } = useTelemetryStore.getState();
 
-        if (l && padAltRef.current === null) {
+        const latestHasMapPosition = hasMapPosition(l);
+
+        if (l && latestHasMapPosition && padAltRef.current === null) {
           padAltRef.current = l.alt_m;
           padLatRef.current = l.lat;
           padLonRef.current = l.lon;
@@ -275,7 +285,7 @@ export function TrajectoryMap() {
           if (trackPolyRef.current) {
             if (offset !== null) {
               const positions = history
-                .filter((t) => t.lat !== 0 && t.lon !== 0)
+                .filter(hasMapPosition)
                 .map((t) => {
                   const altitude = clampToTerrainHeight(viewer, t.lon, t.lat, t.alt_m + offset);
                   return Cesium.Cartesian3.fromDegrees(t.lon, t.lat, altitude);
@@ -292,7 +302,7 @@ export function TrajectoryMap() {
         const rocket = rocketRef.current;
         const rpp    = rocketPosPropRef.current;
         const rtp    = rocketTextPropRef.current;
-        if (l && rocket && rpp && rtp && offset !== null) {
+        if (l && rocket && rpp && rtp && offset !== null && latestHasMapPosition) {
           const displayAlt = clampToTerrainHeight(viewer, l.lon, l.lat, l.alt_m + offset);
           const pos = Cesium.Cartesian3.fromDegrees(l.lon, l.lat, displayAlt, undefined, posScratch.current);
           rpp.setValue(pos, Cesium.ReferenceFrame.FIXED);
@@ -302,6 +312,8 @@ export function TrajectoryMap() {
             viewer.trackedEntity = rocket;
             trackedRef.current   = true;
           }
+        } else if (rocket) {
+          rocket.show = false;
         }
 
         // Beam cone
@@ -465,7 +477,9 @@ export function TrajectoryMap() {
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       {latest && (
         <div className={styles.coords}>
-          {latest.lat.toFixed(6)},&nbsp;{latest.lon.toFixed(6)}
+          {hasMapPosition(latest)
+            ? <>{latest.lat.toFixed(6)},&nbsp;{latest.lon.toFixed(6)}</>
+            : <>Baro-only</>}
           &nbsp;&nbsp;↑&nbsp;{formatFeet(latest.alt_m)}
         </div>
       )}
