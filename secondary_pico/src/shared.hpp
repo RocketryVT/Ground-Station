@@ -73,7 +73,7 @@ extern QueueHandle_t g_udp_queue;
 
 // -- LoRa radio parameters (must match rocket transmitter settings) -------------
 namespace LoRa1Cfg {
-    static constexpr float    FREQ_MHZ   = 915.0f;
+    static constexpr float    FREQ_MHZ   = 904.5f;
     static constexpr float    BW_KHZ     = 125.0f;
     static constexpr uint8_t  SF         = 7;
     static constexpr uint8_t  CR         = 5;
@@ -86,7 +86,7 @@ namespace LoRa2Cfg {
     static constexpr float   FREQ_MHZ    = 424.5f;
     static constexpr float   BR_KBPS     = 4.8f;
     static constexpr float   FREQ_DEV_KHZ = 5.0f;
-    static constexpr float   RX_BW_KHZ   = 125.0f;
+    static constexpr float   RX_BW_KHZ   = 125.0f;  // wide: tolerates RFM69 crystal offset w/o AFC
     static constexpr int8_t  TX_POWER    = 20;
     static constexpr uint8_t PREAMBLE    = 16;
 }

@@ -84,6 +84,11 @@ static inline bool handle_sigma2_gps_nav(const radio::Packet& pkt,
     out.rssi = static_cast<int>(pkt.rssi);
     out.snr_dB = pkt.snr;
     const bool enqueued = enqueue_inter_pico(out);
+    log_print("ALT,%.2f,%lu,%.1f,%.1f\n",
+              static_cast<double>(out.alt_baro_m),
+              static_cast<unsigned long>(out.boot_ms),
+              static_cast<double>(pkt.rssi),
+              static_cast<double>(pkt.snr));
     log_print("[%s] SIGMA2 GPS lat=%.5f lon=%.5f alt=%.0f m sats=%u "
               "vel=%.1f m/s hacc=%.1f m RSSI=%.0f SNR=%.1f %s\n",
               tag,
@@ -131,6 +136,11 @@ static inline bool handle_sigma2_nav_state(const radio::Packet& pkt,
     out.rssi = static_cast<int>(pkt.rssi);
     out.snr_dB = pkt.snr;
     const bool enqueued = enqueue_inter_pico(out);
+    log_print("ALT,%.2f,%lu,%.1f,%.1f\n",
+              static_cast<double>(out.alt_baro_m),
+              static_cast<unsigned long>(out.boot_ms),
+              static_cast<double>(pkt.rssi),
+              static_cast<double>(pkt.snr));
     log_print("[%s] SIGMA2 NAV lat=%.5f lon=%.5f alt=%.0f m "
               "vn=%.1f ve=%.1f vd=%.1f RSSI=%.0f SNR=%.1f %s\n",
               tag,
@@ -143,6 +153,31 @@ static inline bool handle_sigma2_nav_state(const radio::Packet& pkt,
               static_cast<double>(pkt.rssi),
               static_cast<double>(pkt.snr),
               enqueued ? "queued" : "udp queue full");
+    return true;
+}
+
+static inline bool handle_sigma2_baro(const radio::Packet& pkt,
+                                      const char* tag,
+                                      const SIGMA2::DecodedFrame& frame)
+{
+    SIGMA2::TRANSMIT_PACKETS::Barometer baro = {};
+    if (!SIGMA2::deserialize_packet_payload(frame, baro)) {
+        return false;
+    }
+
+    const float alt_m = static_cast<float>(baro.altitude_cm) * 0.01f;
+    log_print("ALT,%.2f,%lu,%.1f,%.1f\n",
+              static_cast<double>(alt_m),
+              static_cast<unsigned long>(frame.header.timestamp_ms),
+              static_cast<double>(pkt.rssi),
+              static_cast<double>(pkt.snr));
+    log_print("[%s] SIGMA2 BARO alt=%.1f m  P=%ld Pa  T=%.2f C  RSSI=%.0f SNR=%.1f\n",
+              tag,
+              static_cast<double>(alt_m),
+              static_cast<long>(baro.pressure_pa),
+              static_cast<double>(baro.temperature_cc) * 0.01,
+              static_cast<double>(pkt.rssi),
+              static_cast<double>(pkt.snr));
     return true;
 }
 
@@ -160,6 +195,8 @@ static inline bool handle_sigma2_packet(const radio::Packet& pkt, const char* ta
         return handle_sigma2_gps_nav(pkt, tag, frame);
     case SIGMA2::PacketType::NAV_STATE:
         return handle_sigma2_nav_state(pkt, tag, frame);
+    case SIGMA2::PacketType::BARO:
+        return handle_sigma2_baro(pkt, tag, frame);
     case SIGMA2::PacketType::TIMESYNC:
         return true;
     default:

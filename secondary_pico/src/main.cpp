@@ -1,11 +1,8 @@
-// Secondary Ground Station Pico — dual LoRa receiver + UDP forwarder
+// Secondary Ground Station Pico — 433 MHz receiver + USB altitude forwarder
 // FreeRTOS / RP2350 (Pico 2W)
 //
 // Task layout:
-//   wifi      (pri 3) – connects to Starlink AP; sets EVT_WIFI_CONNECTED
-//   lora1     (pri 4) – SX1276 / 915 MHz receive -> g_udp_queue
-//   lora2     (pri 4) – RFM69HCW / 433 MHz receive -> g_udp_queue
-//   udp_send  (pri 2) – drains g_udp_queue; sends InterPico frames to primary Pico
+//   lora2     (pri 4) – RFM69HCW / 433 MHz receive -> USB ALT lines
 //   usb       (pri 1) – USB CDC logger + serial console
 //
 // Each received LoRa packet is decoded and immediately forwarded as a
@@ -16,10 +13,12 @@
 
 #include "shared.hpp"
 
-#include "Tasks/WiFi/wifi_task.hpp"
-#include "Tasks/LoRa/lora1_task.hpp"
+// WiFi/UDP and the 915 MHz receiver are intentionally disabled for the no-WiFi
+// field profile. USB CDC is the forwarding path.
+// #include "Tasks/WiFi/wifi_task.hpp"
+// #include "Tasks/LoRa/lora1_task.hpp"
 #include "Tasks/LoRa/lora2_task.hpp"
-#include "Tasks/UDP/udp_send_task.hpp"
+// #include "Tasks/UDP/udp_send_task.hpp"
 #include "Tasks/USB/usb_task.hpp"
 
 #include "pico/stdlib.h"
@@ -99,10 +98,10 @@ int main()
 
     printf( "Initializing tasks...\n" );
 
-    wifi_task_init();
-    lora1_task_init();
+    // wifi_task_init();
+    // lora1_task_init();
     lora2_task_init();
-    udp_send_task_init();
+    // udp_send_task_init();
 
     printf( "Initializing USB task...\n" );
     usb_task_init();

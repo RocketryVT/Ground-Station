@@ -23,6 +23,7 @@ static const radio::rf69::Config s_cfg = [] {
     cfg.rx_bw_khz = LoRa2Cfg::RX_BW_KHZ;
     cfg.tx_dbm    = LoRa2Cfg::TX_POWER;
     cfg.preamble  = LoRa2Cfg::PREAMBLE;
+    cfg.afc       = false;  // re-enable only with a wider AfcBw + longer TX preamble (AFC wasn't locking)
     return cfg;
 }();
 
@@ -83,8 +84,13 @@ static void lora2_task( void* )
             continue;
         }
 
-        log_print( "[lora2] rx lat=%.5f lon=%.5f alt_gps=%.0f m  RSSI=%.0f dBm\n",
-                   d.lat, d.lon, (double)d.alt_gps_m, (double)pkt.rssi );
+        log_print( "ALT,%.2f,%lu,%.1f,%.1f\n",
+                   (double)d.alt_baro_m,
+                   (unsigned long)d.boot_ms,
+                   (double)pkt.rssi,
+                   (double)pkt.snr );
+        log_print( "[lora2] rx baro=%.1f m gps=%.1f m RSSI=%.0f dBm\n",
+                   (double)d.alt_baro_m, (double)d.alt_gps_m, (double)pkt.rssi );
 
         // SNR is not available on FSK/OOK radios — RF69 reports 0.0
         SIGMA::InterPicoData fwd = SIGMA::InterPicoData::from_lora(

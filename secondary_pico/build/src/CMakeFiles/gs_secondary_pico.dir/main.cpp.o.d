@@ -70,10 +70,7 @@ src/CMakeFiles/gs_secondary_pico.dir/main.cpp.o: \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/lock.h \
  /Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/sys/stdio.h \
  /Users/gregory/Downloads/Rocketry/Avionics/boards/gs_pcb_v1_pins.hpp \
- /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/src/Tasks/WiFi/wifi_task.hpp \
- /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/src/Tasks/LoRa/lora1_task.hpp \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/src/Tasks/LoRa/lora2_task.hpp \
- /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/src/Tasks/UDP/udp_send_task.hpp \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/ground_station/secondary_pico/src/Tasks/USB/usb_task.hpp \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/common/pico_stdlib_headers/include/pico/stdlib.h \
  /Users/gregory/Downloads/Rocketry/Avionics/projects/libs/Third_Party/pico-sdk/src/rp2_common/pico_stdio/include/pico/stdio.h \
