@@ -5,8 +5,9 @@
 //   lora2     (pri 4) – RFM69HCW / 433 MHz receive -> USB ALT lines
 //   usb       (pri 1) – USB CDC logger + serial console
 //
-// Each received LoRa packet is decoded and immediately forwarded as a
-// SIGMA INTER_PICO frame via UDP — no buffering or field-gathering.
+// Each decoded altitude-bearing packet is printed as:
+//   ALT,<alt_m>,<boot_ms>,<rssi>,<snr>
+// A laptop-side bridge can forward those lines to the primary Pico USB console.
 //
 // All FreeRTOS objects are statically allocated — no heap usage for scheduler
 // infrastructure.

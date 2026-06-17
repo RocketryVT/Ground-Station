@@ -39,9 +39,9 @@ void log_print( const char* fmt, ... ) __attribute__(( format( printf, 1, 2 ) ))
 
 extern EventGroupHandle_t g_net_events;
 
-// -- UDP forwarding queue ------------------------------------------------------
-// LoRa tasks enqueue raw InterPico frames (framed SIGMA bytes) here.
-// The UDP task drains it and sends each frame to the primary Pico.
+// -- Optional InterPico queue --------------------------------------------------
+// Kept for the existing LoRa bridge helpers, but the no-WiFi field profile
+// forwards altitude over USB CDC instead of starting the UDP task.
 //
 // Max SIGMA frame = payload(60) + overhead(10) = 70 bytes for INTER_PICO.
 #define INTER_PICO_FRAME_MAX  96

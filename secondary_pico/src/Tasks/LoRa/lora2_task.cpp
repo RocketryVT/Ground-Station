@@ -36,6 +36,27 @@ static radio::rf69::RF69 s_radio( spi1,
                                   Pins::LORA1_RST,
                                   s_cfg );
 
+static void log_bad_frame_summary(const radio::Packet& pkt)
+{
+    static uint32_t s_bad_count = 0;
+    ++s_bad_count;
+
+    log_print( "[lora2] rx %u B  RSSI %.0f dBm — bad frame\n",
+               (unsigned)pkt.len, (double)pkt.rssi );
+
+    if ( (s_bad_count % 50u) != 1u ) {
+        return;
+    }
+
+    const unsigned n = pkt.len < 16u ? pkt.len : 16u;
+    log_print( "[lora2] bad frame #%lu first %u B:",
+               (unsigned long)s_bad_count, n );
+    for ( unsigned i = 0; i < n; ++i ) {
+        log_print( " %02X", (unsigned)pkt.data[i] );
+    }
+    log_print( "\n" );
+}
+
 // -- Task ----------------------------------------------------------------------
 static void lora2_task( void* )
 {
@@ -78,8 +99,7 @@ static void lora2_task( void* )
         // Decode the legacy SIGMA LoRa frame from the raw radio payload
         SIGMA::LoRaData d;
         if ( !SIGMA::LoRaData::deserialize( pkt.data, pkt.len, d ) ) {
-            log_print( "[lora2] rx %u B  RSSI %.0f dBm — bad frame\n",
-                       (unsigned)pkt.len, (double)pkt.rssi );
+            log_bad_frame_summary( pkt );
             s_radio.start_receive();
             continue;
         }

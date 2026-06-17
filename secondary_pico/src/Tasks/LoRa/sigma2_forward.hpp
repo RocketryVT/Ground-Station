@@ -56,6 +56,36 @@ static inline bool enqueue_inter_pico(const SIGMA::InterPicoData& data)
     return xQueueSend(g_udp_queue, &frame, 0) == pdTRUE;
 }
 
+static inline SIGMA2::DecodeStatus deserialize_sigma2_packet(const radio::Packet& pkt,
+                                                             SIGMA2::DecodedFrame& frame)
+{
+    SIGMA2::DecodeStatus status =
+        SIGMA2::deserialize_frame(pkt.data, pkt.len, frame);
+    if (status != SIGMA2::DecodeStatus::LengthMismatch) {
+        return status;
+    }
+
+    // RFM69 fixed-packet mode always receives 64 bytes. ADS transmit pads the
+    // actual SIGMA2 frame with zeros, while SIGMA2 validates the exact length.
+    SIGMA2::HEADER header = {};
+    if (!SIGMA2::HEADER::deserialize(pkt.data, pkt.len, header)) {
+        return SIGMA2::DecodeStatus::TooShort;
+    }
+    if (!header.valid_start()) {
+        return SIGMA2::DecodeStatus::BadStart;
+    }
+    if (header.len > SIGMA2::MAX_PAYLOAD) {
+        return SIGMA2::DecodeStatus::PayloadTooLarge;
+    }
+
+    const size_t total = SIGMA2::HEADER::WIRE_SIZE + header.len +
+                         SIGMA2::FOOTER::WIRE_SIZE;
+    if (total > pkt.len) {
+        return SIGMA2::DecodeStatus::TooShort;
+    }
+    return SIGMA2::deserialize_frame(pkt.data, total, frame);
+}
+
 static inline bool handle_sigma2_gps_nav(const radio::Packet& pkt,
                                           const char* tag,
                                           const SIGMA2::DecodedFrame& frame)
@@ -185,7 +215,7 @@ static inline bool handle_sigma2_packet(const radio::Packet& pkt, const char* ta
 {
     SIGMA2::DecodedFrame frame = {};
     const SIGMA2::DecodeStatus status =
-        SIGMA2::deserialize_frame(pkt.data, pkt.len, frame);
+        deserialize_sigma2_packet(pkt, frame);
     if (status != SIGMA2::DecodeStatus::Ok) {
         return false;
     }
