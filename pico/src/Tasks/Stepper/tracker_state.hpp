@@ -38,6 +38,10 @@ struct TrackerConfig {
     float ahrs_max_age_ms = 250.0f;
     float ahrs_feedback_gain = 0.35f;
     float ahrs_max_correction_deg = 8.0f;
+
+    bool altitude_only_tracking = true;
+    float base_altitude_m = 880.0f;
+    float altitude_full_scale_m = 1000.0f;
 };
 
 struct TrackerControlStatus {
@@ -64,6 +68,7 @@ TrackerControlStatus tracker_control_status_snapshot();
 TrackerCalibrationStatus tracker_calibration_status_snapshot();
 
 void tracker_apply_config_command( const groundstation_TrackerConfigCommand& cmd );
+void tracker_set_altitude_profile( float base_altitude_m, float full_scale_m );
 
 TrackerMode tracker_mode();
 const char* tracker_mode_name( TrackerMode mode );
@@ -90,3 +95,4 @@ void tracker_mark_az_calibrated( float reference_deg, const char* status );
 void tracker_mark_el_calibrated( float reference_deg, const char* status );
 void tracker_clear_calibration( const char* status );
 bool tracker_axes_calibrated();
+bool tracker_elevation_calibrated();

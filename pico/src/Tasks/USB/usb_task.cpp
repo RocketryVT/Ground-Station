@@ -1,13 +1,18 @@
 #include "usb_task.hpp"
 #include "shared.hpp"
 #include "Tasks/MQTT/mqtt_task.hpp"
+#include "Tasks/Stepper/stepper_task.hpp"
+#include "Tasks/Stepper/tracker_state.hpp"
 
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
 
 #include "pico/stdlib.h"
 #include "pico/stdio_usb.h"
+#include "pico/time.h"
 
 // -- log_print -----------------------------------------------------------------
 // Sole caller of printf() in the whole project.  All other tasks call
@@ -35,8 +40,15 @@ static void cmd_help()
     printf(
         "Commands:\n"
         "  help           show this list\n"
-        "  status         print heap, queue depths, WiFi/MQTT state\n"
+        "  status         print heap, queue depths, tracker state\n"
         "  log   [on|off] toggle/set task log message output (default: off)\n"
+        "  ALT,<m>[,<boot_ms>,<rssi>,<snr>]  update rocket baro altitude MSL\n"
+        "  alt <m>        update rocket baro altitude MSL\n"
+        "  base <m> [fs]  set base altitude MSL and full-scale AGL metres\n"
+        "  arm|disarm     arm/disarm tracker\n"
+        "  auto|manual|stop  set tracker mode\n"
+        "  elcal [deg]    mark elevation calibrated at deg (default 0)\n"
+        "  el <deg> [spd] command zenith/elevation axis in manual mode\n"
         "  clear          clear terminal screen\n"
     );
 }
@@ -54,7 +66,128 @@ static void cmd_status()
             ( unsigned ) uxQueueMessagesWaiting( g_log_queue  ), ( unsigned ) LOG_QUEUE_DEPTH );
     printf( "mqtt_q     : %u / %u\n",
             ( unsigned ) uxQueueMessagesWaiting( g_mqtt_queue ), ( unsigned ) MQTT_QUEUE_DEPTH );
+    printf( "tracker    : %s armed=%u el_cal=%u\n",
+            tracker_mode_name( tracker_mode() ),
+            tracker_is_armed() ? 1u : 0u,
+            tracker_elevation_calibrated() ? 1u : 0u );
+    const TrackerConfig cfg = tracker_config_snapshot();
+    printf( "altitude   : base=%.1f m full_scale=%.1f m altitude_only=%u\n",
+            (double)cfg.base_altitude_m,
+            (double)cfg.altitude_full_scale_m,
+            cfg.altitude_only_tracking ? 1u : 0u );
     printf( "log output : %s\n", s_log_enabled ? "on" : "off" );
+}
+
+static bool parse_float_arg( const char* text, float* out )
+{
+    if ( !text || !out ) return false;
+    char* end = nullptr;
+    const float value = strtof( text, &end );
+    if ( end == text ) return false;
+    while ( *end != '\0' ) {
+        if ( !isspace( (unsigned char)*end ) && *end != ',' ) return false;
+        end++;
+    }
+    *out = value;
+    return true;
+}
+
+static void cmd_altitude( float alt_m,
+                          uint32_t boot_ms = 0,
+                          float rssi = 0.0f,
+                          float snr = 0.0f )
+{
+    if ( !g_rocket_altitude_q ) {
+        printf( "altitude queue not ready\n" );
+        return;
+    }
+
+    AltitudeMsg msg = {};
+    msg.alt_m = alt_m;
+    msg.source_boot_ms = boot_ms;
+    msg.timestamp_us = time_us_64();
+    msg.rssi = rssi;
+    msg.snr = snr;
+    msg.valid = true;
+    xQueueOverwrite( g_rocket_altitude_q, &msg );
+    printf( "altitude: %.2f m MSL\n", (double)alt_m );
+}
+
+static bool dispatch_alt_line( const char* line )
+{
+    if ( strncmp( line, "ALT,", 4 ) != 0 ) return false;
+
+    float alt_m = 0.0f;
+    unsigned long boot_ms = 0;
+    float rssi = 0.0f;
+    float snr = 0.0f;
+    const int count = sscanf( line + 4, "%f,%lu,%f,%f",
+                              &alt_m, &boot_ms, &rssi, &snr );
+    if ( count < 1 ) {
+        printf( "bad ALT line\n" );
+        return true;
+    }
+
+    cmd_altitude( alt_m, (uint32_t)boot_ms, rssi, snr );
+    return true;
+}
+
+static void cmd_base( const char* args )
+{
+    float base_m = 880.0f;
+    float full_scale_m = tracker_config_snapshot().altitude_full_scale_m;
+    int consumed = 0;
+    if ( sscanf( args, "%f %f%n", &base_m, &full_scale_m, &consumed ) < 1 ) {
+        printf( "usage: base <m> [full_scale_m]\n" );
+        return;
+    }
+
+    tracker_set_altitude_profile( base_m, full_scale_m );
+    const TrackerConfig cfg = tracker_config_snapshot();
+    printf( "altitude profile: base=%.1f m full_scale=%.1f m\n",
+            (double)cfg.base_altitude_m,
+            (double)cfg.altitude_full_scale_m );
+}
+
+static void cmd_el_cal( const char* args )
+{
+    float ref = 0.0f;
+    if ( args && *args ) parse_float_arg( args, &ref );
+    if ( !g_stepper_zen_cal_q ) {
+        printf( "elevation calibration queue not ready\n" );
+        return;
+    }
+
+    StepperCalibrationCmd cal = {};
+    cal.set_current_angle = true;
+    cal.current_angle_deg = ref;
+    xQueueOverwrite( g_stepper_zen_cal_q, &cal );
+    printf( "elevation calibrated at %.2f deg\n", (double)ref );
+}
+
+static void cmd_el( const char* args )
+{
+    float target = 0.0f;
+    float speed = tracker_config_snapshot().default_speed_dps;
+    if ( sscanf( args, "%f %f", &target, &speed ) < 1 ) {
+        printf( "usage: el <deg> [speed_dps]\n" );
+        return;
+    }
+    if ( !g_stepper_zen_cmd_q ) {
+        printf( "elevation command queue not ready\n" );
+        return;
+    }
+
+    tracker_set_armed( true );
+    tracker_set_mode( TrackerMode::Manual );
+    tracker_set_manual_target( false, target, false );
+    StepperCmd cmd = {};
+    cmd.target_angle_deg = target;
+    cmd.speed_dps = speed;
+    cmd.stop = false;
+    xQueueOverwrite( g_stepper_zen_cmd_q, &cmd );
+    printf( "elevation command: %.2f deg speed=%.2f dps\n",
+            (double)target, (double)speed );
 }
 
 // -- Command dispatch ----------------------------------------------------------
@@ -63,8 +196,23 @@ static void dispatch( const char* line, size_t len )
 {
     if ( len == 0 ) return;
 
+    if ( dispatch_alt_line( line ) ) return;
+
     if ( strncmp( line, "help",   4 ) == 0 ) { cmd_help();   return; }
     if ( strncmp( line, "status", 6 ) == 0 ) { cmd_status(); return; }
+    if ( strncmp( line, "arm",    3 ) == 0 ) { tracker_set_armed( true );  printf( "armed\n" ); return; }
+    if ( strncmp( line, "disarm", 6 ) == 0 ) { tracker_set_armed( false ); printf( "disarmed\n" ); return; }
+    if ( strncmp( line, "auto",   4 ) == 0 ) { tracker_set_mode( TrackerMode::Auto ); printf( "mode: auto\n" ); return; }
+    if ( strncmp( line, "manual", 6 ) == 0 ) { tracker_set_mode( TrackerMode::Manual ); printf( "mode: manual\n" ); return; }
+    if ( strncmp( line, "stop",   4 ) == 0 ) {
+        tracker_set_mode( TrackerMode::Stop );
+        StepperCmd stop = {};
+        stop.stop = true;
+        if ( g_stepper_az_cmd_q ) xQueueOverwrite( g_stepper_az_cmd_q, &stop );
+        if ( g_stepper_zen_cmd_q ) xQueueOverwrite( g_stepper_zen_cmd_q, &stop );
+        printf( "stopped\n" );
+        return;
+    }
 
     if ( strncmp( line, "clear",  5 ) == 0 ) {
         printf( "\x1b[2J\x1b[H" );
@@ -81,6 +229,22 @@ static void dispatch( const char* line, size_t len )
         printf( "log output: %s\n", s_log_enabled ? "on" : "off" );
         return;
     }
+
+    if ( strncmp( line, "alt ", 4 ) == 0 ) {
+        float alt_m = 0.0f;
+        if ( parse_float_arg( line + 4, &alt_m ) ) cmd_altitude( alt_m );
+        else printf( "usage: alt <m>\n" );
+        return;
+    }
+
+    if ( strncmp( line, "base ", 5 ) == 0 ) { cmd_base( line + 5 ); return; }
+    if ( strncmp( line, "elcal", 5 ) == 0 ) {
+        const char* arg = line + 5;
+        while ( *arg == ' ' ) arg++;
+        cmd_el_cal( arg );
+        return;
+    }
+    if ( strncmp( line, "el ", 3 ) == 0 ) { cmd_el( line + 3 ); return; }
 
     printf( "unknown command: '%s'  (type 'help')\n", line );
 }

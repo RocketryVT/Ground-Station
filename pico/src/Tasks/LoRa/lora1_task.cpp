@@ -4,11 +4,15 @@
 #include "Proto/mqtt_proto.hpp"
 
 #include "rf69/RF69.hpp"
+#include "SIGMA.hpp"
+#include "SIGMA2/SIGMA2.hpp"
+#include "SIGMA2/packets/gps_packets.hpp"
 
 #include "FreeRTOS.h"
 #include "task.h"
 #include "hardware/gpio.h"
 #include "hardware/spi.h"
+#include "pico/time.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -107,6 +111,53 @@ static void publish_hex_packet( const radio::Packet& pkt )
         xQueueSend( g_mqtt_queue, &m, 0 );
 }
 
+static void update_altitude( float alt_m,
+                             uint32_t boot_ms,
+                             float rssi,
+                             float snr )
+{
+    if ( !g_rocket_altitude_q ) return;
+
+    AltitudeMsg msg = {};
+    msg.alt_m = alt_m;
+    msg.source_boot_ms = boot_ms;
+    msg.timestamp_us = time_us_64();
+    msg.rssi = rssi;
+    msg.snr = snr;
+    msg.valid = true;
+    xQueueOverwrite( g_rocket_altitude_q, &msg );
+}
+
+static bool handle_sigma2_baro_packet( const radio::Packet& pkt )
+{
+    SIGMA2::DecodedFrame frame = {};
+    if ( SIGMA2::deserialize_frame( pkt.data, pkt.len, frame ) !=
+         SIGMA2::DecodeStatus::Ok ) {
+        return false;
+    }
+    if ( frame.header.type != SIGMA2::PacketType::BARO ) return false;
+
+    SIGMA2::TRANSMIT_PACKETS::Barometer baro = {};
+    if ( !SIGMA2::deserialize_packet_payload( frame, baro ) ) return false;
+
+    const float alt_m = static_cast<float>( baro.altitude_cm ) * 0.01f;
+    update_altitude( alt_m, frame.header.timestamp_ms, pkt.rssi, pkt.snr );
+    log_print( "[lora1] SIGMA2 BARO alt=%.1f m RSSI=%.0f\n",
+               (double)alt_m, (double)pkt.rssi );
+    return true;
+}
+
+static bool handle_legacy_sigma_packet( const radio::Packet& pkt )
+{
+    SIGMA::LoRaData d;
+    if ( !SIGMA::LoRaData::deserialize( pkt.data, pkt.len, d ) ) return false;
+
+    update_altitude( d.alt_baro_m, d.boot_ms, pkt.rssi, pkt.snr );
+    log_print( "[lora1] SIGMA baro=%.1f m gps=%.1f m RSSI=%.0f\n",
+               (double)d.alt_baro_m, (double)d.alt_gps_m, (double)pkt.rssi );
+    return true;
+}
+
 static void lora1_task( void* )
 {
     gpio_init( Pins::LORA1_EN );
@@ -136,6 +187,12 @@ static void lora1_task( void* )
             state = s_radio.read_packet( pkt );
 
             if ( state == 0 && pkt.len > 0 ) {
+                if ( handle_sigma2_baro_packet( pkt ) ||
+                     handle_legacy_sigma_packet( pkt ) ) {
+                    publish_hex_packet( pkt );
+                    s_radio.start_receive();
+                    continue;
+                }
                 publish_hex_packet( pkt );
             } else if ( state != 0 ) {
                 log_print( "[lora1] read_packet error %d\n", state );

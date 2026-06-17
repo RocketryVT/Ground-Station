@@ -138,6 +138,19 @@ struct LocationMsg {
 extern QueueHandle_t g_gs_location_q;
 extern QueueHandle_t g_rocket_location_q;
 
+// -- Altitude-only tracking ----------------------------------------------------
+// Used when only a barometric altitude feed is available. `alt_m` is MSL.
+struct AltitudeMsg {
+    float alt_m;
+    uint32_t source_boot_ms;
+    uint64_t timestamp_us;
+    float rssi;
+    float snr;
+    bool valid;
+};
+
+extern QueueHandle_t g_rocket_altitude_q;
+
 // -- Raw sensor queues (depth-1 overwrite) ------------------------------------
 // Each sensor task writes its latest reading.  fusion_task peeks all three.
 

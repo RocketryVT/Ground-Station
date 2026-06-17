@@ -4,9 +4,11 @@
 
 #include "shared.hpp"
 
-#include "Tasks/WiFi/wifi_task.hpp"
-#include "Tasks/NTP/ntp_task.hpp"
-#include "Tasks/MQTT/mqtt_task.hpp"
+// WiFi/MQTT/NTP are intentionally not started for the no-WiFi field profile.
+// USB CDC is the command/status path.
+// #include "Tasks/WiFi/wifi_task.hpp"
+// #include "Tasks/NTP/ntp_task.hpp"
+// #include "Tasks/MQTT/mqtt_task.hpp"
 #include "Tasks/I2C/i2c_task.hpp"
 #include "Tasks/IMU/imu_task.hpp"
 #include "Tasks/YawIMU/yaw_imu_task.hpp"
@@ -16,7 +18,7 @@
 #include "Tasks/GPS/gps_task.hpp"
 #include "Tasks/LoRa/lora1_task.hpp"
 #include "Tasks/LoRa/lora_task.hpp"
-#include "Tasks/UDP/udp_recv_task.hpp"
+// #include "Tasks/UDP/udp_recv_task.hpp"
 #include "Tasks/Stepper/stepper_task.hpp"
 #include "Tasks/USB/usb_task.hpp"
 
@@ -32,6 +34,7 @@ QueueHandle_t      g_mqtt_queue        = nullptr;
 QueueHandle_t      g_log_queue         = nullptr;
 QueueHandle_t      g_gs_location_q     = nullptr;
 QueueHandle_t      g_rocket_location_q = nullptr;
+QueueHandle_t      g_rocket_altitude_q = nullptr;
 QueueHandle_t      g_imu_q             = nullptr;
 QueueHandle_t      g_icm_q             = nullptr;
 QueueHandle_t      g_mag_q             = nullptr;
@@ -52,6 +55,9 @@ static uint8_t       s_gs_location_storage[ 1 * sizeof(LocationMsg) ];
 
 static StaticQueue_t s_rocket_location_buf;
 static uint8_t       s_rocket_location_storage[ 1 * sizeof(LocationMsg) ];
+
+static StaticQueue_t s_rocket_altitude_buf;
+static uint8_t       s_rocket_altitude_storage[ 1 * sizeof(AltitudeMsg) ];
 
 static StaticQueue_t s_imu_buf;
 static uint8_t       s_imu_storage[ 1 * sizeof(ImuMsg) ];
@@ -128,6 +134,8 @@ int main()
                                                s_gs_location_storage, &s_gs_location_buf );
     g_rocket_location_q = xQueueCreateStatic( 1, sizeof(LocationMsg),
                                                s_rocket_location_storage, &s_rocket_location_buf );
+    g_rocket_altitude_q = xQueueCreateStatic( 1, sizeof(AltitudeMsg),
+                                               s_rocket_altitude_storage, &s_rocket_altitude_buf );
 
     g_imu_q  = xQueueCreateStatic( 1, sizeof(ImuMsg),  s_imu_storage,  &s_imu_buf  );
     g_icm_q  = xQueueCreateStatic( 1, sizeof(IcmMsg),  s_icm_storage,  &s_icm_buf  );
@@ -146,14 +154,16 @@ int main()
     // baro_task_init();
     fusion_task_init();
 
-    wifi_task_init();
-    ntp_task_init();
-    mqtt_task_init();
+    // No WiFi at the pad. Commands and telemetry move over USB CDC instead.
+    // wifi_task_init();
+    // ntp_task_init();
+    // mqtt_task_init();
     gps_task_init();
 
-    lora0_task_init();
+    // 915 MHz is currently unavailable; leave lora0 powered down.
+    // lora0_task_init();
     lora1_task_init();
-    udp_recv_task_init();
+    // udp_recv_task_init();
 
     stepper_az_task_init();
     stepper_zen_task_init();

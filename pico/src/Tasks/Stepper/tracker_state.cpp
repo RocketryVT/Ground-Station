@@ -58,6 +58,9 @@ static TrackerConfig sanitize( TrackerConfig cfg )
     cfg.ahrs_feedback_gain = min_float( 1.0f, max_float( 0.0f, sane_float( cfg.ahrs_feedback_gain, 0.35f ) ) );
     cfg.ahrs_max_correction_deg =
         max_float( 0.0f, sane_float( cfg.ahrs_max_correction_deg, 8.0f ) );
+    cfg.base_altitude_m = sane_float( cfg.base_altitude_m, 880.0f );
+    cfg.altitude_full_scale_m =
+        max_float( 1.0f, sane_float( cfg.altitude_full_scale_m, 1000.0f ) );
     return cfg;
 }
 
@@ -113,6 +116,16 @@ void tracker_apply_config_command( const groundstation_TrackerConfigCommand& cmd
     if ( cmd.has_ahrs_max_correction_deg ) {
         cfg.ahrs_max_correction_deg = cmd.ahrs_max_correction_deg;
     }
+    s_config = sanitize( cfg );
+    taskEXIT_CRITICAL();
+}
+
+void tracker_set_altitude_profile( float base_altitude_m, float full_scale_m )
+{
+    taskENTER_CRITICAL();
+    TrackerConfig cfg = s_config;
+    cfg.base_altitude_m = base_altitude_m;
+    cfg.altitude_full_scale_m = full_scale_m;
     s_config = sanitize( cfg );
     taskEXIT_CRITICAL();
 }
@@ -312,6 +325,15 @@ bool tracker_axes_calibrated()
     bool calibrated;
     taskENTER_CRITICAL();
     calibrated = s_cal_status.az_calibrated && s_cal_status.el_calibrated;
+    taskEXIT_CRITICAL();
+    return calibrated;
+}
+
+bool tracker_elevation_calibrated()
+{
+    bool calibrated;
+    taskENTER_CRITICAL();
+    calibrated = s_cal_status.el_calibrated;
     taskEXIT_CRITICAL();
     return calibrated;
 }

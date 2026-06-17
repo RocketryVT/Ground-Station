@@ -57,6 +57,19 @@ static void publish_pointing_command( float az_deg, float el_deg, float speed_dp
     if ( g_stepper_zen_cmd_q ) xQueueOverwrite( g_stepper_zen_cmd_q, &el_cmd );
 }
 
+static void publish_elevation_command( float el_deg, float speed_dps )
+{
+    StepperCmd el_cmd { el_deg, speed_dps, false };
+    if ( g_stepper_zen_cmd_q ) xQueueOverwrite( g_stepper_zen_cmd_q, &el_cmd );
+}
+
+static void publish_az_stop()
+{
+    StepperCmd stop = {};
+    stop.stop = true;
+    if ( g_stepper_az_cmd_q ) xQueueOverwrite( g_stepper_az_cmd_q, &stop );
+}
+
 static bool read_ahrs_actual( const TrackerConfig& cfg,
                               float* actual_az,
                               float* actual_el,
@@ -232,6 +245,103 @@ static void update_scan( float dt_s, const TrackerConfig& cfg, float* scan_az,
     }
 }
 
+static float altitude_to_elevation_deg( const TrackerConfig& cfg, float altitude_m )
+{
+    const float agl_m = altitude_m - cfg.base_altitude_m;
+    const float normalized = clamp_float( agl_m / cfg.altitude_full_scale_m, 0.0f, 1.0f );
+    return clamp_float( normalized * 90.0f + cfg.el_trim_deg,
+                        cfg.el_min_deg,
+                        cfg.el_max_deg );
+}
+
+static bool read_zenith_pitch( const TrackerConfig& cfg, float* pitch_deg )
+{
+    if ( !g_imu_q || !pitch_deg ) return false;
+
+    ImuMsg imu = {};
+    if ( xQueuePeek( g_imu_q, &imu, 0 ) != pdTRUE || !imu.valid ) return false;
+
+    const uint64_t now_us = time_us_64();
+    if ( imu.timestamp_us == 0 ||
+         now_us - imu.timestamp_us > (uint64_t)cfg.ahrs_max_age_ms * 1000ull ) {
+        return false;
+    }
+
+    *pitch_deg = imu.bar_rel_pitch;
+    return true;
+}
+
+static void reset_altitude_pid( float* integral, float* last_error, bool* have_last_error )
+{
+    *integral = 0.0f;
+    *last_error = 0.0f;
+    *have_last_error = false;
+}
+
+static bool pid_zenith_to_pitch( const TrackerConfig& cfg,
+                                 float desired_el,
+                                 float dt_s,
+                                 float* integral,
+                                 float* last_error,
+                                 bool* have_last_error,
+                                 TrackerControlStatus* status )
+{
+    if ( !g_stepper_zen_status_q || !g_stepper_zen_cmd_q ) return false;
+
+    StepperStatus st = {};
+    if ( xQueuePeek( g_stepper_zen_status_q, &st, 0 ) != pdTRUE ) return false;
+
+    float actual_el = 0.0f;
+    if ( !read_zenith_pitch( cfg, &actual_el ) ) return false;
+
+    const float error = desired_el - actual_el;
+    status->pointing_error_el = error;
+    status->ahrs_el_used = true;
+
+    static constexpr float kDeadbandDeg = 0.35f;
+    if ( fabsf( error ) <= kDeadbandDeg ) {
+        reset_altitude_pid( integral, last_error, have_last_error );
+        return true;
+    }
+
+    const float safe_dt_s = clamp_float( dt_s, 0.001f, 0.25f );
+    const float kp = cfg.ahrs_feedback_gain;
+    static constexpr float ki = 0.015f;
+    static constexpr float kd = 0.04f;
+
+    *integral = clamp_float( *integral + error * safe_dt_s, -30.0f, 30.0f );
+    const float derivative = *have_last_error
+        ? ( error - *last_error ) / safe_dt_s
+        : 0.0f;
+    *last_error = error;
+    *have_last_error = true;
+
+    const float correction = clamp_float( kp * error + ki * *integral + kd * derivative,
+                                          -cfg.ahrs_max_correction_deg,
+                                          cfg.ahrs_max_correction_deg );
+
+    StepperCmd cmd = {};
+    cmd.target_angle_deg = st.angle_deg + correction;
+    cmd.speed_dps = cfg.default_speed_dps;
+    cmd.stop = false;
+    xQueueOverwrite( g_stepper_zen_cmd_q, &cmd );
+
+    static TickType_t s_last_pid_log = 0;
+    const TickType_t now_ticks = xTaskGetTickCount();
+    if ( now_ticks - s_last_pid_log >= pdMS_TO_TICKS(500) ) {
+        s_last_pid_log = now_ticks;
+        log_print( "[tracker] alt-pid target=%.2f pitch=%.2f err=%.2f corr=%.2f cmd=%.2f alt_base=%.1f\n",
+                   (double)desired_el,
+                   (double)actual_el,
+                   (double)error,
+                   (double)correction,
+                   (double)cmd.target_angle_deg,
+                   (double)cfg.base_altitude_m );
+    }
+
+    return true;
+}
+
 static StaticTask_t s_ctrl_tcb;
 static StackType_t s_ctrl_stack[ 768 ];
 
@@ -245,6 +355,9 @@ static void stepper_ctrl_task( void* )
     float scan_el = 0.0f;
     bool scan_el_reverse = false;
     uint64_t last_us = time_us_64();
+    float altitude_pid_integral = 0.0f;
+    float altitude_pid_last_error = 0.0f;
+    bool altitude_pid_have_last_error = false;
 
     for ( ;; ) {
         const uint64_t now_us = time_us_64();
@@ -257,16 +370,22 @@ static void stepper_ctrl_task( void* )
 
         LocationMsg gs = {};
         LocationMsg rkt = {};
+        AltitudeMsg alt = {};
         const bool have_gs = g_gs_location_q &&
             xQueuePeek( g_gs_location_q, &gs, 0 ) == pdTRUE;
         const bool have_rkt = g_rocket_location_q &&
             xQueuePeek( g_rocket_location_q, &rkt, 0 ) == pdTRUE;
+        const bool have_alt = g_rocket_altitude_q &&
+            xQueuePeek( g_rocket_altitude_q, &alt, 0 ) == pdTRUE && alt.valid;
         const bool gs_fresh = have_gs && is_fresh( gs, now_us, cfg.gs_timeout_ms );
         const bool target_fresh = have_rkt && is_fresh( rkt, now_us, cfg.target_timeout_ms );
+        const bool alt_fresh = have_alt &&
+            alt.timestamp_us != 0 &&
+            now_us - alt.timestamp_us <= (uint64_t)cfg.target_timeout_ms * 1000ull;
 
         TrackerControlStatus status = {};
         status.gs_fresh = gs_fresh;
-        status.target_fresh = target_fresh;
+        status.target_fresh = cfg.altitude_only_tracking ? alt_fresh : target_fresh;
 
         if ( !armed || mode == TrackerMode::Stop || mode == TrackerMode::Fault ) {
             publish_stop();
@@ -281,9 +400,42 @@ static void stepper_ctrl_task( void* )
             // axis calibration; absolute AHRS targets can run from live reported
             // yaw/elevation plus current stepper status.
             if ( mode == TrackerMode::Manual ) {
-                manual_servo_axis( cfg, true,  &status );
                 manual_servo_axis( cfg, false, &status );
             }
+            tracker_set_control_status( status );
+            vTaskDelay( kControlPeriodTicks );
+            continue;
+        }
+
+        if ( cfg.altitude_only_tracking && mode == TrackerMode::Auto ) {
+            publish_az_stop();
+
+            if ( alt_fresh ) {
+                const float desired_el = altitude_to_elevation_deg( cfg, alt.alt_m );
+                if ( pid_zenith_to_pitch( cfg, desired_el, dt_s,
+                                          &altitude_pid_integral,
+                                          &altitude_pid_last_error,
+                                          &altitude_pid_have_last_error,
+                                          &status ) ) {
+                    scan_el = desired_el;
+                } else {
+                    reset_altitude_pid( &altitude_pid_integral,
+                                        &altitude_pid_last_error,
+                                        &altitude_pid_have_last_error );
+                }
+                status.distance_m = alt.alt_m - cfg.base_altitude_m;
+            } else if ( cfg.scan_on_loss ) {
+                reset_altitude_pid( &altitude_pid_integral,
+                                    &altitude_pid_last_error,
+                                    &altitude_pid_have_last_error );
+                update_scan( dt_s, cfg, &scan_az, &scan_el, &scan_el_reverse );
+                publish_elevation_command( scan_el, cfg.default_speed_dps );
+            } else {
+                reset_altitude_pid( &altitude_pid_integral,
+                                    &altitude_pid_last_error,
+                                    &altitude_pid_have_last_error );
+            }
+
             tracker_set_control_status( status );
             vTaskDelay( kControlPeriodTicks );
             continue;
